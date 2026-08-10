@@ -1,0 +1,274 @@
+<?php
+
+// SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+declare(strict_types=1);
+
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Uninstall removes this plugin's own custom tables and options; direct queries and the DROP are the entire job of this file, and it runs only when WordPress itself invokes an uninstall.
+
+/**
+ * Remove everything WPPilot stored.
+ *
+ * WordPress runs this file in a request where the plugin is NOT loaded, so it
+ * cannot call any WPPilot function or reference any WPPilot constant. Every
+ * key is repeated literally here on purpose; the lists are grouped to match the
+ * files that own them so a new key is easy to add in the right place.
+ *
+ * Two things are deliberately left on disk:
+ *
+ * - wp-content/wppilot-sandbox/ holds PHP written through the sandbox. That is
+ *   the site owner's own code, and deleting source is not recoverable, so it
+ *   stays. The directory is inert once the plugin is gone.
+ * - Nothing outside WPPilot's own prefixes is touched.
+ */
+
+if (!defined('WP_UNINSTALL_PLUGIN')) {
+    exit();
+}
+
+function wppilot_uninstall_wpdb(): wpdb
+{
+    // @mago-expect lint:no-global -- $wpdb is WordPress' database handle.
+    global $wpdb;
+
+    /** @var wpdb $wpdb */
+    return $wpdb;
+}
+
+/**
+ * Tables created by WPPilot on each site.
+ *
+ * @return list<string>
+ */
+function wppilot_uninstall_tables(): array
+{
+    $wpdb = wppilot_uninstall_wpdb();
+
+    return [
+        $wpdb->prefix . 'wppilot_chat_sessions',
+        $wpdb->prefix . 'wppilot_connections',
+        $wpdb->prefix . 'wppilot_oauth_clients',
+        $wpdb->prefix . 'wppilot_oauth_auth_codes',
+        $wpdb->prefix . 'wppilot_oauth_access_tokens',
+        $wpdb->prefix . 'wppilot_oauth_refresh_tokens',
+    ];
+}
+
+/**
+ * Options written by WPPilot, by owning file.
+ *
+ * @return list<string>
+ */
+function wppilot_uninstall_options(): array
+{
+    return [
+        // includes/chat/schema.php
+        'wppilot_chat_schema_version',
+        // includes/connections.php
+        'wppilot_connections_schema_version',
+        // Legacy pre-table chat storage.
+        'wppilot_chat_sessions',
+        // includes/oauth/
+        'wppilot_oauth_schema_version',
+        'wppilot_oauth_private_key',
+        'wppilot_oauth_public_key',
+        'wppilot_oauth_encryption_key',
+        // includes/environment.php + includes/abilities/policy.php
+        'wppilot_ai_abilities_enabled',
+        'wppilot_ai_abilities_domain',
+        'wppilot_ability_rules',
+        // includes/safety.php
+        'wppilot_safety_profile',
+        'wppilot_safety_policy_version',
+        // includes/change-log.php
+        'wppilot_change_log',
+        // includes/admin/instructions.php
+        'wppilot_instructions_enabled',
+        'wppilot_instructions_content',
+        // includes/design/cpt.php
+        'wppilot_active_design',
+        // includes/admin/pro-upsell.php
+        'wppilot_pro_upsell_installed_at',
+        // includes/troubleshoot/bootstrap.php
+        'wppilot_mcp_last_request',
+        // includes/abilities/gutenberg/bootstrap.php
+        'wppilot_gb_finalizer_poll_token',
+    ];
+}
+
+/**
+ * Post types whose posts belong to WPPilot.
+ *
+ * @return list<string>
+ */
+function wppilot_uninstall_post_types(): array
+{
+    return [
+        'wppilot_skill',
+        'wppilot_design',
+        'wppilot_gb_change',
+    ];
+}
+
+/**
+ * User meta keys, including the dismissal prefix handled by LIKE below.
+ *
+ * @return list<string>
+ */
+function wppilot_uninstall_user_meta_keys(): array
+{
+    return [
+        'wppilot_production_warning_dismissed',
+        'wppilot_troubleshoot_dismissed',
+        'wppilot_chat_consent',
+    ];
+}
+
+/**
+ * Cron hooks WPPilot schedules.
+ *
+ * @return list<string>
+ */
+function wppilot_uninstall_cron_hooks(): array
+{
+    return [
+        'wppilot_oauth_gc',
+        'wppilot_gutenberg_cleanup',
+    ];
+}
+
+/**
+ * Delete posts of a post type without relying on the type being registered.
+ *
+ * wp_delete_post() is used rather than a direct DELETE so that post meta,
+ * revisions, and term relationships go with them.
+ */
+function wppilot_uninstall_delete_posts(string $post_type): void
+{
+    $wpdb = wppilot_uninstall_wpdb();
+
+    /** @var list<int>|null $ids */
+    // @mago-expect analysis:possibly-invalid-argument -- $wpdb->posts is a trusted table name.
+    $ids = $wpdb->get_col(
+        // @mago-expect analysis:possibly-invalid-argument
+        $wpdb->prepare("SELECT ID FROM {$wpdb->posts} WHERE post_type = %s", $post_type),
+    );
+    if (!is_array($ids)) {
+        return;
+    }
+
+    foreach ($ids as $id) {
+        wp_delete_post((int) $id, force_delete: true);
+    }
+}
+
+/**
+ * Delete every option whose name starts with the given prefix.
+ *
+ * Covers the generated keys — pending OAuth authorizations and the transients
+ * WPPilot stores under its own prefixes — that cannot be listed literally.
+ */
+function wppilot_uninstall_delete_options_like(string $prefix): void
+{
+    $wpdb = wppilot_uninstall_wpdb();
+
+    /** @var list<string>|null $names */
+    // @mago-expect analysis:possibly-invalid-argument -- $wpdb->options is a trusted table name.
+    $names = $wpdb->get_col(
+        // @mago-expect analysis:possibly-invalid-argument
+        $wpdb->prepare(
+            "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+            $wpdb->esc_like($prefix) . '%',
+        ),
+    );
+    if (!is_array($names)) {
+        return;
+    }
+
+    foreach ($names as $name) {
+        delete_option((string) $name);
+    }
+}
+
+/**
+ * Remove every WPPilot trace from the current site.
+ */
+function wppilot_uninstall_current_site(): void
+{
+    $wpdb = wppilot_uninstall_wpdb();
+
+    foreach (wppilot_uninstall_cron_hooks() as $hook) {
+        wp_clear_scheduled_hook($hook);
+    }
+
+    foreach (wppilot_uninstall_post_types() as $post_type) {
+        wppilot_uninstall_delete_posts($post_type);
+    }
+
+    foreach (wppilot_uninstall_options() as $option) {
+        delete_option($option);
+    }
+
+    // Generated option names: pending OAuth authorizations, plus WPPilot's own
+    // transients and their timeout twins.
+    foreach ([
+        'wppilot_oauth_pending_',
+        '_transient_wppilot_',
+        '_transient_timeout_wppilot_',
+        '_site_transient_wppilot_',
+        '_site_transient_timeout_wppilot_',
+    ] as $prefix) {
+        wppilot_uninstall_delete_options_like($prefix);
+    }
+
+    foreach (wppilot_uninstall_user_meta_keys() as $meta_key) {
+        // @mago-expect analysis:possibly-invalid-argument -- $wpdb->usermeta is a trusted table name.
+        $wpdb->query(
+            // @mago-expect analysis:possibly-invalid-argument
+            $wpdb->prepare("DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s", $meta_key),
+        );
+    }
+
+    // Per-notice dismissal flags: includes/admin/pro-upsell.php writes one key
+    // per notice under this prefix.
+    // @mago-expect analysis:possibly-invalid-argument -- $wpdb->usermeta is a trusted table name.
+    $wpdb->query(
+        // @mago-expect analysis:possibly-invalid-argument
+        $wpdb->prepare(
+            "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s",
+            $wpdb->esc_like('wppilot_pro_dismissed_') . '%',
+        ),
+    );
+
+    // Tables last: the post deletions above read from them.
+    //
+    // Not prepared, and cannot be: $wpdb->prepare() has no placeholder for an
+    // identifier, only for values. The names come from wppilot_uninstall_tables(),
+    // which builds each one from $wpdb->prefix and a literal — no request data
+    // reaches this string.
+    foreach (wppilot_uninstall_tables() as $table) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- No values are interpolated at all — prepare() has no placeholder for a table identifier, and the names come from $wpdb->prefix plus a literal.
+        $wpdb->query("DROP TABLE IF EXISTS {$table}");
+    }
+}
+
+if (is_multisite()) {
+    // @mago-expect analysis:mixed-assignment -- WordPress returns site ids when fields=ids.
+    $wppilot_site_ids = get_sites(['fields' => 'ids', 'number' => 0]);
+    if (is_array($wppilot_site_ids)) {
+        // @mago-expect analysis:mixed-assignment
+        foreach ($wppilot_site_ids as $wppilot_site_id) {
+            switch_to_blog((int) $wppilot_site_id);
+            try {
+                wppilot_uninstall_current_site();
+            } finally {
+                restore_current_blog();
+            }
+        }
+    }
+
+    return;
+}
+
+wppilot_uninstall_current_site();

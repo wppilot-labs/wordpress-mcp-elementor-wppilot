@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"jsx": "react-jsx",
+		"module": "esnext",
+		"moduleResolution": "node",
+		"target": "es2017",
+		"strict": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true
+	},
+	"include": ["src/**/*.ts", "src/**/*.tsx"]
+}

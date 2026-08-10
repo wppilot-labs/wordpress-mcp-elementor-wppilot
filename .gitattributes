@@ -1,0 +1,27 @@
+# The plugin runs on Linux hosts. Normalise everything to LF in the repository
+# and on checkout, so a clone made on Windows still produces a package with the
+# line endings the server expects.
+* text=auto eol=lf
+
+*.php text eol=lf
+*.js  text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md  text eol=lf
+*.txt text eol=lf
+*.sh  text eol=lf
+
+# Binary — never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text eol=lf
+*.zip binary
+*.woff binary
+*.woff2 binary
+
+# Keep the repository tidy on GitHub: vendor is shipped, but it is not the
+# project's own code, so exclude it from language stats and diffs.
+vendor/** linguist-vendored
+includes/assets/** linguist-generated

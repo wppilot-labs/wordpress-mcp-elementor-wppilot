@@ -1,0 +1,11 @@
+{
+	"private": true,
+	"scripts": {
+		"build": "bun run build:chat",
+		"build:chat": "wp-scripts build src/chat/index.tsx --output-path=includes/assets/chat --output-filename=index.js",
+		"start": "wp-scripts start src/chat/index.tsx --output-path=includes/assets/chat --output-filename=index.js"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^34.0.0"
+	}
+}

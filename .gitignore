@@ -1,0 +1,28 @@
+# Build output
+/build/
+/dist/
+*.zip
+
+# Node — the chat UI is built from src/ into includes/assets/, which IS tracked
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.bun/
+
+# Composer dev tooling. NOTE: vendor/ is intentionally tracked — a WordPress
+# plugin has to ship its runtime dependencies, and a clone without them is not
+# installable.
+composer.lock.bak
+.phpunit.result.cache
+.phpcs-cache
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local environment
+.env
+.env.*
