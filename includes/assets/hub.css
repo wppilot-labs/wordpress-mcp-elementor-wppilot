@@ -1,0 +1,532 @@
+/*
+ * Abilities Hub admin styles. Mirrors Skills and Sandbox: collapsible card
+ * sections, compact rows, restrained pills, and hover-revealed row actions.
+ *
+ * Design tokens are scoped to .wppilot-hub so they cascade to every section
+ * without leaking into the rest of wp-admin.
+ */
+
+.wppilot-hub {
+    /* Text */
+    --wpp-hub-text: #1d2327;
+    --wpp-hub-text-soft: #646970;
+    --wpp-hub-muted: #52525b;
+    --wpp-hub-muted-2: #71717a;
+    --wpp-hub-muted-3: #a1a1aa;
+    --wpp-hub-hint: #d4d4d8;
+
+    /* Surfaces & borders. Greys step up by weight so the layers stay distinct:
+     * rows (white / faint stripe) < row hover < category bar < category hover. */
+    --wpp-hub-bg: #fff;
+    --wpp-hub-bg-hover: #fafafa;
+    --wpp-hub-bg-rail: #f4f4f5;
+    --wpp-hub-row-stripe: #fafafa;
+    --wpp-hub-row-hover: #f0f1f2;
+    --wpp-hub-cat-bg: #ececef;
+    --wpp-hub-cat-hover: #e3e3e8;
+    --wpp-hub-border: #c3c4c7;
+    --wpp-hub-border-soft: #e4e4e7;
+    --wpp-hub-border-faint: #f4f4f5;
+
+    /* Pill palettes */
+    --wpp-hub-pill-bg: #f4f4f5;
+    --wpp-hub-pill-text: #52525b;
+    --wpp-hub-pill-mcp-bg: #eff6ff;
+    --wpp-hub-pill-mcp-text: #1d4ed8;
+    --wpp-hub-pill-on-bg: #dcfce7;
+    --wpp-hub-pill-on-text: #166534;
+    --wpp-hub-pill-off-bg: #fee2e2;
+    --wpp-hub-pill-off-text: #b32d2e;
+    --wpp-hub-pill-protected-bg: #fef3c7;
+    --wpp-hub-pill-protected-text: #92400e;
+    /* Source: which plugin registered the ability. Uses the WPPilot accent so it
+       reads as identity rather than as another status. */
+    --wpp-hub-pill-source-bg: #ecebff;
+    --wpp-hub-pill-source-text: #3d2bff;
+
+    /* Focus, radius, shadow */
+    --wpp-hub-focus: #2271b1;
+    --wpp-hub-radius-sm: 3px;
+    --wpp-hub-radius: 4px;
+    --wpp-hub-radius-lg: 6px;
+    --wpp-hub-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+
+    /* Spacing scale (4 / 8 / 12 / 16 / 24) */
+    --wpp-hub-space-1: 4px;
+    --wpp-hub-space-2: 8px;
+    --wpp-hub-space-3: 12px;
+    --wpp-hub-space-4: 16px;
+    --wpp-hub-space-6: 24px;
+
+    /* Motion */
+    --wpp-hub-transition: 120ms ease;
+}
+
+.wppilot-hub .wrap-title {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--wpp-hub-space-3);
+    margin: var(--wpp-hub-space-3) 0 20px;
+}
+
+.wppilot-hub .wrap-title h1 {
+    margin: 0;
+    font-size: 23px;
+    font-weight: 400;
+    color: var(--wpp-hub-text);
+}
+
+.wppilot-hub .wrap-title .description {
+    max-width: 1200px;
+    margin: var(--wpp-hub-space-2) 0 0;
+    color: var(--wpp-hub-text-soft);
+}
+
+.wppilot-hub-section {
+    background: var(--wpp-hub-bg);
+    border: 1px solid var(--wpp-hub-border);
+    border-radius: var(--wpp-hub-radius-lg);
+    box-shadow: var(--wpp-hub-shadow);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+/* Boundary between WPPilot's abilities and the other plugins' groups. */
+.wppilot-hub-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--wpp-hub-space-3);
+    margin: 28px 0 var(--wpp-hub-space-3);
+    padding: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--wpp-hub-muted-2);
+}
+
+.wppilot-hub-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--wpp-hub-border-soft);
+}
+
+/* Provider header (group level) */
+.wppilot-hub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--wpp-hub-space-4) var(--wpp-hub-space-6);
+    border-bottom: 1px solid var(--wpp-hub-border-soft);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.wppilot-hub-header::-webkit-details-marker {
+    display: none;
+}
+
+.wppilot-hub-header:hover {
+    background: var(--wpp-hub-bg-hover);
+}
+
+.wppilot-hub-header:focus-visible {
+    outline: 2px solid var(--wpp-hub-focus);
+    outline-offset: -2px;
+}
+
+.wppilot-hub-header::after {
+    content: "";
+    flex: none;
+    width: 7px;
+    height: 7px;
+    margin-left: var(--wpp-hub-space-3);
+    border-right: 2px solid var(--wpp-hub-muted-2);
+    border-bottom: 2px solid var(--wpp-hub-muted-2);
+    transform: rotate(-45deg);
+    transition: transform var(--wpp-hub-transition);
+}
+
+.wppilot-hub-section[open] > .wppilot-hub-header::after {
+    transform: rotate(45deg);
+}
+
+.wppilot-hub-section:not([open]) > .wppilot-hub-header {
+    border-bottom: none;
+}
+
+.wppilot-hub-header h2 {
+    margin: 0 auto 0 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpp-hub-text);
+    letter-spacing: -0.01em;
+}
+
+.wppilot-hub-header h2 .count {
+    margin-left: var(--wpp-hub-space-2);
+    color: var(--wpp-hub-muted-2);
+    font-weight: 400;
+    font-size: 13px;
+}
+
+/* Category sub-section */
+.wppilot-hub-subsection {
+    border-top: 1px solid var(--wpp-hub-border-faint);
+}
+
+.wppilot-hub-subsection:first-of-type {
+    border-top: none;
+}
+
+.wppilot-hub-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--wpp-hub-space-2) var(--wpp-hub-space-6);
+    background: var(--wpp-hub-cat-bg);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.wppilot-hub-subheader::-webkit-details-marker {
+    display: none;
+}
+
+.wppilot-hub-subheader:hover {
+    background: var(--wpp-hub-cat-hover);
+}
+
+.wppilot-hub-subheader:focus-visible {
+    outline: 2px solid var(--wpp-hub-focus);
+    outline-offset: -2px;
+}
+
+.wppilot-hub-subheader h3 {
+    margin: 0 auto 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--wpp-hub-muted-2);
+}
+
+.wppilot-hub-subheader h3 .count {
+    margin-left: var(--wpp-hub-space-2);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--wpp-hub-muted-3);
+}
+
+.wppilot-hub-subheader::after {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin-left: var(--wpp-hub-space-3);
+    border-right: 2px solid var(--wpp-hub-muted-3);
+    border-bottom: 2px solid var(--wpp-hub-muted-3);
+    transform: rotate(-45deg);
+    transition: transform var(--wpp-hub-transition);
+}
+
+.wppilot-hub-subsection[open] > .wppilot-hub-subheader::after {
+    transform: rotate(45deg);
+}
+
+/* "All disabled" pill in a provider/category header. The base .pill rules are
+ * scoped to row pill containers, so the header variant is styled on its own. */
+.wppilot-hub-header h2 .wppilot-hub-alloff,
+.wppilot-hub-subheader h3 .wppilot-hub-alloff {
+    margin-left: var(--wpp-hub-space-2);
+    padding: 2px var(--wpp-hub-space-2);
+    border-radius: var(--wpp-hub-radius-sm);
+    background: var(--wpp-hub-pill-off-bg);
+    color: var(--wpp-hub-pill-off-text);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-transform: none;
+    letter-spacing: 0;
+    vertical-align: middle;
+}
+
+/* Select-all checkbox in section headers. The heading takes the auto margin so
+ * the chevron stays pinned right while checkbox + title group on the left. */
+.wppilot-hub-select-all {
+    display: flex;
+    align-items: center;
+    margin: 0 var(--wpp-hub-space-3) 0 0;
+}
+
+.wppilot-hub-select-all input[type="checkbox"] {
+    margin: 0;
+}
+
+/* Rows */
+.wppilot-hub-rows {
+    display: block;
+}
+
+.wppilot-hub-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) max-content max-content;
+    align-items: center;
+    gap: var(--wpp-hub-space-3);
+    min-height: 40px;
+    padding: var(--wpp-hub-space-2) var(--wpp-hub-space-6);
+    border-bottom: 1px solid var(--wpp-hub-border-faint);
+    transition: background var(--wpp-hub-transition);
+}
+
+/* Only an expanded row needs its controls pinned to the top, next to the slug;
+ * collapsed rows (the common case) keep everything vertically centered. */
+.wppilot-hub-row:has(.wppilot-hub-main[open]) {
+    align-items: start;
+}
+
+.wppilot-hub-row:last-child {
+    border-bottom: none;
+}
+
+/* Zebra striping (restarts inside each category). The stripe is far lighter
+ * than the category bar so rows never read as headers; hover steps darker
+ * still, staying visible over both white and striped rows. */
+.wppilot-hub-row:nth-child(even) {
+    background: var(--wpp-hub-row-stripe);
+}
+
+.wppilot-hub-row:hover {
+    background: var(--wpp-hub-row-hover);
+}
+
+.wppilot-hub-row.is-off .wppilot-hub-main .slug,
+.wppilot-hub-row.is-off .wppilot-hub-main .desc {
+    color: var(--wpp-hub-muted-3);
+}
+
+/* While an AJAX toggle is in flight, dim the row and block further clicks. */
+.wppilot-hub-row.is-busy {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.wppilot-hub-select {
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.wppilot-hub-select input[type="checkbox"] {
+    margin: 0;
+}
+
+.wppilot-hub-main {
+    min-width: 0;
+}
+
+.wppilot-hub-main--plain,
+.wppilot-hub-summary {
+    display: flex;
+    align-items: baseline;
+    gap: var(--wpp-hub-space-2);
+    overflow: hidden;
+    min-width: 0;
+}
+
+.wppilot-hub-summary {
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.wppilot-hub-summary::-webkit-details-marker {
+    display: none;
+}
+
+.wppilot-hub-summary:hover .slug {
+    text-decoration: underline;
+    text-decoration-color: var(--wpp-hub-hint);
+    text-underline-offset: 2px;
+}
+
+.wppilot-hub-summary:focus-visible {
+    outline: 2px solid var(--wpp-hub-focus);
+    outline-offset: 2px;
+}
+
+.wppilot-hub-main[open] > .wppilot-hub-summary .desc {
+    display: none;
+}
+
+.wppilot-hub-detail {
+    padding: var(--wpp-hub-space-1) 0 var(--wpp-hub-space-2);
+}
+
+.wppilot-hub-detail .desc-full {
+    margin: 0;
+    max-width: 70ch;
+    color: var(--wpp-hub-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.wppilot-hub-main .slug {
+    flex: none;
+    font-family: ui-monospace, "DM Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    color: var(--wpp-hub-text);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.wppilot-hub-main .desc {
+    flex: 0 1 auto;
+    max-width: 70ch;
+    color: var(--wpp-hub-muted-2);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.wppilot-hub-main .desc::before {
+    content: "-";
+    margin-right: 6px;
+    color: var(--wpp-hub-hint);
+}
+
+/* Pills */
+.wppilot-hub-pills {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--wpp-hub-space-1);
+    min-height: 26px;
+}
+
+.wppilot-hub-pills .pill {
+    font-size: 11px;
+    padding: 2px var(--wpp-hub-space-2);
+    border-radius: var(--wpp-hub-radius-sm);
+    background: var(--wpp-hub-pill-bg);
+    color: var(--wpp-hub-pill-text);
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.wppilot-hub-pills .pill.mcp {
+    background: var(--wpp-hub-pill-mcp-bg);
+    color: var(--wpp-hub-pill-mcp-text);
+}
+
+.wppilot-hub-pills .pill.status.is-enabled {
+    background: var(--wpp-hub-pill-on-bg);
+    color: var(--wpp-hub-pill-on-text);
+}
+
+.wppilot-hub-pills .pill.status.is-disabled {
+    background: var(--wpp-hub-pill-off-bg);
+    color: var(--wpp-hub-pill-off-text);
+}
+
+.wppilot-hub-pills .pill.source {
+    background: var(--wpp-hub-pill-source-bg);
+    color: var(--wpp-hub-pill-source-text);
+    font-weight: 600;
+}
+
+.wppilot-hub-pills .pill.protected {
+    background: var(--wpp-hub-pill-protected-bg);
+    color: var(--wpp-hub-pill-protected-text);
+}
+
+/* Row actions (revealed on hover/focus) */
+.wppilot-hub-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--wpp-hub-space-1);
+    margin: 0;
+    min-height: 26px;
+    opacity: 0;
+    transition: opacity var(--wpp-hub-transition);
+}
+
+.wppilot-hub-row:hover .wppilot-hub-actions,
+.wppilot-hub-row:focus-within .wppilot-hub-actions {
+    opacity: 1;
+}
+
+.wppilot-hub-actions form {
+    margin: 0;
+}
+
+.wppilot-hub .action-btn {
+    background: transparent;
+    border: 0;
+    padding: var(--wpp-hub-space-1) 10px;
+    border-radius: var(--wpp-hub-radius);
+    cursor: pointer;
+    color: var(--wpp-hub-muted);
+    font-size: 12px;
+    text-decoration: none;
+    line-height: 1.4;
+    transition: background var(--wpp-hub-transition), color var(--wpp-hub-transition);
+    outline: none;
+    box-shadow: none;
+}
+
+.wppilot-hub .action-btn:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.wppilot-hub .action-btn:focus-visible {
+    outline: 2px solid var(--wpp-hub-focus);
+    outline-offset: 1px;
+}
+
+.wppilot-hub .action-btn:hover,
+.wppilot-hub .action-btn:focus {
+    background: var(--wpp-hub-bg-rail);
+    color: var(--wpp-hub-text);
+}
+
+/* Bulk action toolbars */
+.wppilot-hub .tablenav {
+    height: auto;
+    margin: var(--wpp-hub-space-3) 0;
+}
+
+.wppilot-hub .tablenav.bottom {
+    margin-top: 0;
+}
+
+.wppilot-hub .bulkactions {
+    display: flex;
+    align-items: center;
+    gap: var(--wpp-hub-space-2);
+}
+
+@media (max-width: 1200px) {
+    .wppilot-hub-row {
+        grid-template-columns: 28px minmax(0, 1fr) minmax(220px, auto);
+    }
+
+    .wppilot-hub-pills,
+    .wppilot-hub-actions {
+        grid-column: 2 / -1;
+        justify-content: flex-start;
+    }
+
+    .wppilot-hub-actions {
+        opacity: 1;
+    }
+}

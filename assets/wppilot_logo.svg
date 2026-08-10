@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 364 64" fill="none" role="img" aria-label="WPPilot">
+  <g stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="18" stroke-opacity=".34" stroke-width="2.5"/>
+    <path d="M14 22 21.6 44h6.9l3.6-10.5L35.7 44h6.9L50 22" stroke-width="4.35"/>
+    <path d="m23.5 22 5.9 15.5M40.5 22l-5.9 15.5" stroke-opacity=".64" stroke-width="4.35"/>
+    <path d="M44 14.3c6.5-4.3 12.1 1 8.3 7.5" stroke-opacity=".72" stroke-width="1.9"/>
+    <circle cx="51.5" cy="20.1" r="5.8" stroke-width="2.2"/>
+    <circle cx="51.5" cy="20.1" r="1.7" fill="#fff" stroke="none"/>
+  </g>
+  <text x="80" y="43" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="900" letter-spacing="-1.35">WP</text>
+  <text x="124" y="43" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="500" letter-spacing="-1.35">Pilot</text>
+</svg>

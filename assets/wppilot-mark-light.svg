@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="WPPilot">
+  <g stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1" y="1" width="46" height="46" rx="13" stroke-opacity=".28" stroke-width="2"/>
+    <path d="M10.5 16.5 16.2 33h5.2l2.7-7.9 2.7 7.9H32l5.5-16.5" stroke-width="3.25"/>
+    <path d="M17.6 16.5 22 28.1M30.4 16.5 26 28.1" stroke-opacity=".6" stroke-width="3.25"/>
+    <path d="M33 10.7c4.9-3.2 9.1.8 6.2 5.6" stroke-opacity=".7" stroke-width="1.4"/>
+    <circle cx="38.6" cy="15.1" r="4.35" stroke-width="1.8"/>
+    <circle cx="38.6" cy="15.1" r="1.4" fill="#fff" stroke="none"/>
+  </g>
+</svg>

@@ -1,0 +1,163 @@
+<?php
+
+// SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+declare(strict_types=1);
+
+/**
+ * Plugin lifecycle: activation, deactivation, and new-site provisioning.
+ *
+ * One owner for everything that must happen when WPPilot is switched on or off.
+ * Registering several activation hooks from several files made it easy for one
+ * of them to miss multisite: only the first looped the network, so a
+ * network-activated install provisioned exactly one site.
+ *
+ * Uninstall is deliberately not here — WordPress loads uninstall.php in a
+ * request where the plugin itself is not loaded, so it has to stand alone.
+ */
+
+if (!defined('ABSPATH')) {
+    exit();
+}
+
+/**
+ * Run a per-site routine on every site the current operation covers.
+ *
+ * On a network-wide operation this is every site in the network; otherwise it
+ * is the current site only. Single-site installs always take the second path.
+ *
+ * @param bool     $network_wide Whether WordPress reported a network-wide operation.
+ * @param callable $callback     Per-site routine, invoked with no arguments.
+ */
+function wppilot_for_each_site(bool $network_wide, callable $callback): void
+{
+    if (!$network_wide || !is_multisite()) {
+        $callback();
+        return;
+    }
+
+    // @mago-expect analysis:mixed-assignment -- WordPress returns site ids when fields=ids.
+    $site_ids = get_sites(['fields' => 'ids', 'number' => 0]);
+    if (!is_array($site_ids)) {
+        $callback();
+        return;
+    }
+
+    // @mago-expect analysis:mixed-assignment
+    foreach ($site_ids as $site_id) {
+        switch_to_blog((int) $site_id);
+        try {
+            $callback();
+        } finally {
+            // restore_current_blog() must run even if a site throws, or every
+            // later site — and the rest of the request — runs against the
+            // wrong database tables.
+            restore_current_blog();
+        }
+    }
+}
+
+/**
+ * Activation entry point.
+ *
+ * @param bool $network_wide Passed by WordPress; true when network-activated.
+ */
+function wppilot_activate(bool $network_wide = false): void
+{
+    // The sandbox lives in wp-content and is shared by the whole network, so it
+    // is provisioned once rather than per site.
+    if (!wppilot_is_wordpress_org_edition()) {
+        wppilot_get_sandbox_dir(ensure_exists: true);
+    }
+
+    wppilot_for_each_site($network_wide, callback: 'wppilot_activate_current_site');
+}
+
+/**
+ * Everything activation installs into a single site's tables and options.
+ *
+ * Must stay idempotent: it also runs when a new site is added to a network that
+ * already has WPPilot network-activated.
+ */
+function wppilot_activate_current_site(): void
+{
+    wppilot_chat_schema_install_current_site();
+    wppilot_connections_schema_install();
+    wppilot_safety_maybe_install();
+    wppilot_pro_upsell_on_activate();
+}
+
+/**
+ * Deactivation entry point.
+ *
+ * @param bool $network_wide Passed by WordPress; true when network-deactivated.
+ */
+function wppilot_deactivate(bool $network_wide = false): void
+{
+    wppilot_for_each_site($network_wide, callback: 'wppilot_deactivate_current_site');
+}
+
+/**
+ * Tear down the scheduled work WPPilot owns on a single site.
+ *
+ * Options and tables are intentionally left in place: deactivation is
+ * reversible and must not destroy configuration. Cron events are not
+ * configuration — an event whose callback is no longer registered just wakes
+ * WordPress up on a schedule to do nothing, every day, forever.
+ */
+function wppilot_deactivate_current_site(): void
+{
+    require_once __DIR__ . '/abilities/gutenberg/bootstrap.php';
+    \WPPilot\Abilities\Gutenberg\unschedule_cleanup();
+
+    wp_clear_scheduled_hook('wppilot_oauth_gc');
+}
+
+/**
+ * Provision a site created after WPPilot was already network-activated.
+ *
+ * Without this, such a site has no chat sessions table and no safety profile
+ * until something else happens to trigger the lazy installers.
+ */
+function wppilot_initialize_new_site(mixed $new_site): void
+{
+    if (!$new_site instanceof WP_Site) {
+        return;
+    }
+
+    if (!is_plugin_active_for_network(plugin_basename(WPPILOT_PLUGIN_FILE))) {
+        return;
+    }
+
+    switch_to_blog((int) $new_site->blog_id);
+    try {
+        wppilot_activate_current_site();
+    } finally {
+        restore_current_blog();
+    }
+}
+
+/**
+ * Register the lifecycle hooks.
+ *
+ * `is_plugin_active_for_network()` lives in wp-admin, and wp_initialize_site
+ * can fire from the front end or WP-CLI, so the file is required on demand
+ * inside the callback rather than at load time.
+ */
+function wppilot_register_lifecycle_hooks(): void
+{
+    register_activation_hook(WPPILOT_PLUGIN_FILE, callback: 'wppilot_activate');
+    register_deactivation_hook(WPPILOT_PLUGIN_FILE, callback: 'wppilot_deactivate');
+
+    if (is_multisite()) {
+        add_action(
+            'wp_initialize_site',
+            callback: static function (mixed $new_site): void {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+                wppilot_initialize_new_site($new_site);
+            },
+            priority: 20,
+        );
+    }
+}

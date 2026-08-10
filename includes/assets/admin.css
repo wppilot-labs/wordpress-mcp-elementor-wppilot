@@ -1,0 +1,2190 @@
+/*
+ * SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * WPPilot admin design system.
+ *
+ * One stylesheet for every WPPilot screen. Before this, each screen carried its
+ * own inline <style> block and invented its own spacing, borders, and colours.
+ *
+ * The direction is bold and high-contrast. WPPilot hands an AI agent real
+ * authority over a production site, and the interface should carry the weight of
+ * that rather than whisper it. So: heavy ink borders instead of hairlines, hard
+ * offset shadows instead of soft ones, oversized figures for the numbers that
+ * decide something, and one electric accent that belongs to WPPilot and nothing
+ * else.
+ *
+ * Colour is rationed. The accent marks position and identity; red, green and
+ * amber mean armed, ready and attention and are never used decoratively. A panel
+ * carries its state on a thick top edge, which is readable at a glance from
+ * across the page in a way a 3px spine was not.
+ *
+ * The predecessor to this file was a pale machined instrument panel: hairline
+ * rules, engraved labels, square corners, everything quiet. It was coherent but
+ * it read as inert, and nothing on the screen claimed your attention first.
+ *
+ * Everything is scoped to body[class*="wppilot"] so it can never leak into
+ * another plugin's screens.
+ */
+
+body[class*='wppilot'] {
+	--wpp-ink: #0a0a0b;
+	--wpp-ink-2: #43464d;
+	--wpp-muted: #6a6e77;
+	--wpp-faint: #8b9099;
+
+	--wpp-canvas: #efeee9;
+	--wpp-surface: #fff;
+	--wpp-sunk: #f6f5f1;
+
+	/* Structure is drawn in ink. Soft is for dividers inside a panel only. */
+	--wpp-line: #0a0a0b;
+	--wpp-line-soft: #dbd9d2;
+
+	/* Identity. Position, selection, focus — never state. */
+	--wpp-accent: #3d2bff;
+	--wpp-accent-soft: #ecebff;
+
+	/* State, not decoration. */
+	--wpp-armed: #d81e00;
+	--wpp-armed-soft: #ffefec;
+	--wpp-ready: #00734a;
+	--wpp-ready-soft: #e6f6ee;
+	--wpp-attention: #a8560a;
+	--wpp-attention-soft: #fdf3e3;
+	--wpp-idle: #a9a69c;
+
+	--wpp-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+	--wpp-border: 2px;
+	--wpp-radius: 10px;
+	--wpp-radius-sm: 6px;
+	--wpp-shadow: 4px 4px 0 var(--wpp-ink);
+	--wpp-shadow-sm: 3px 3px 0 var(--wpp-ink);
+	--wpp-gap: 24px;
+}
+
+/* ---------------------------------------------------------------- ground -- */
+
+body[class*='wppilot'] #wpbody-content {
+	background: var(--wpp-canvas);
+	padding-bottom: 64px;
+}
+
+body[class*='wppilot'] #wpcontent {
+	background: var(--wpp-canvas);
+}
+
+/*
+ * The content column is centred rather than pinned to the left edge.
+ * WordPress' own screens run full width, but WPPilot's are a fixed measure, and
+ * a fixed measure hard against the menu leaves a growing empty gutter on wide
+ * displays — the wider the screen, the more lopsided it looks.
+ */
+body[class*='wppilot'] .wrap {
+	max-width: 1220px;
+	margin: 0 auto;
+	padding: 0 20px;
+	box-sizing: border-box;
+}
+
+/*
+ * The page title is the loudest text on the screen and should look it.
+ *
+ * Matched at any depth inside .wrap, not just as a direct child: the Abilities
+ * screen nests its heading two levels down inside a title block, and a child
+ * combinator left that one page with a default-sized title while every other
+ * screen had a display one.
+ */
+body[class*='wppilot'] .wrap h1,
+body[class*='wppilot'] .wrap h1.wp-heading-inline {
+	font-size: 34px;
+	font-weight: 800;
+	letter-spacing: -0.028em;
+	line-height: 1.1;
+	color: var(--wpp-ink);
+	padding: 34px 0 10px;
+	margin: 0;
+}
+
+/* A heading that shares its row with an action keeps the row's own spacing. */
+body[class*='wppilot'] .wrap .wrap-title h1 {
+	padding-top: 26px;
+}
+
+/* --------------------------------------------------------------- masthead -- */
+
+.wppilot-masthead {
+	background: var(--wpp-ink);
+	margin: 0 0 0 -20px;
+	padding: 0 26px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 20px;
+	min-height: 76px;
+	/* The accent bar is the one place the brand colour appears at full width. */
+	border-bottom: 5px solid var(--wpp-accent);
+}
+
+.wppilot-masthead__inner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	width: 100%;
+	max-width: 1220px;
+}
+
+.wppilot-masthead__mark {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
+.wppilot-masthead__mark img {
+	max-height: 34px;
+	width: auto;
+	display: block;
+}
+
+.wppilot-masthead__legend {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: #a7adb5;
+	padding-left: 16px;
+	border-left: 2px solid #34383d;
+	line-height: 1;
+}
+
+/* Whether agents can act on this site: the most consequential fact there is, so
+ * it is a bordered plate rather than a line of text. */
+.wppilot-masthead__status {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 14px;
+	border: 2px solid #3a3e45;
+	border-radius: 999px;
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: #a7adb5;
+}
+
+.wppilot-masthead__lamp {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--wpp-idle);
+	flex: none;
+}
+
+.wppilot-masthead__status--armed {
+	color: #ffb3a8;
+	border-color: #7a2417;
+	background: #2a0f0b;
+}
+
+.wppilot-masthead__status--armed .wppilot-masthead__lamp {
+	background: #ff5236;
+	box-shadow: 0 0 0 4px rgba(255, 82, 54, 0.22);
+}
+
+.wppilot-masthead__status--attention {
+	color: #f0cd8f;
+	border-color: #6b4c14;
+	background: #241a08;
+}
+
+.wppilot-masthead__status--attention .wppilot-masthead__lamp {
+	background: #e0a92f;
+}
+
+/* Off is the resting state: unlit, no colour claim either way. */
+.wppilot-masthead__status--idle .wppilot-masthead__lamp {
+	background: #4a4f55;
+	border: 1px solid #62686e;
+}
+
+@media screen and (max-width: 782px) {
+	.wppilot-masthead {
+		margin-left: -10px;
+		padding: 16px;
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
+
+/* ------------------------------------------------------------------ tabs -- */
+
+/*
+ * Product navigation. WPPilot is one tool with many surfaces, and thirteen of
+ * them read as a list to be searched when laid out flat. They are grouped, so
+ * the rail says what each screen is for before you read a single label.
+ *
+ * The current tab is a filled ink chip. A position indicator that has to survive
+ * a page full of heavy borders cannot be an underline.
+ */
+/*
+ * The bar stays full-bleed so its bottom rule spans the screen, but the groups
+ * inside it are centred on the same measure as the content below, so the rail
+ * and the page share one axis instead of drifting apart on wide displays.
+ */
+.wppilot-tabs {
+	display: flex;
+	align-items: stretch;
+	justify-content: center;
+	gap: 0;
+	background: var(--wpp-surface);
+	border-bottom: var(--wpp-border) solid var(--wpp-line);
+	margin: 0 0 0 -20px;
+	padding: 0 26px;
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+.wppilot-tabs__group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: none;
+	padding: 10px 18px 11px;
+	border-right: 1px solid var(--wpp-line-soft);
+}
+
+.wppilot-tabs__group:last-child {
+	border-right: 0;
+}
+
+.wppilot-tabs__heading {
+	font-size: 9.5px;
+	font-weight: 800;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--wpp-faint);
+	line-height: 1;
+}
+
+.wppilot-tabs__items {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+.wppilot-tabs__tab {
+	flex: none;
+	padding: 6px 11px;
+	border-radius: var(--wpp-radius-sm);
+	font-size: 13.5px;
+	font-weight: 600;
+	line-height: 1.35;
+	color: var(--wpp-ink-2);
+	text-decoration: none;
+	white-space: nowrap;
+	border: 2px solid transparent;
+	transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.wppilot-tabs__tab:hover,
+.wppilot-tabs__tab:focus {
+	color: var(--wpp-ink);
+	border-color: var(--wpp-line);
+	box-shadow: none;
+}
+
+.wppilot-tabs__tab.is-current {
+	color: #fff;
+	background: var(--wpp-ink);
+	border-color: var(--wpp-ink);
+}
+
+.wppilot-tabs__tab:focus-visible {
+	outline: 3px solid var(--wpp-accent);
+	outline-offset: 1px;
+}
+
+@media screen and (max-width: 782px) {
+	.wppilot-tabs {
+		margin-left: -10px;
+		padding: 0 12px;
+	}
+
+	.wppilot-tabs__group {
+		padding: 8px 12px 9px;
+	}
+}
+
+/* ----------------------------------------------------------------- panel -- */
+
+body[class*='wppilot'] .wppilot-connect-section,
+body[class*='wppilot'] .wppilot-panel,
+body[class*='wppilot'] .postbox {
+	position: relative;
+	background: var(--wpp-surface);
+	border: var(--wpp-border) solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	box-shadow: var(--wpp-shadow);
+	padding: 28px 30px 30px;
+	margin: 0 0 var(--wpp-gap);
+}
+
+/* The status bar. A thick top edge reads from across the page; the 3px spine it
+ * replaced did not. Neutral unless a state class says otherwise. */
+body[class*='wppilot'] .wppilot-connect-section::before,
+body[class*='wppilot'] .wppilot-panel::before {
+	content: '';
+	position: absolute;
+	inset: -2px -2px auto -2px;
+	height: 6px;
+	background: var(--wpp-ink);
+	border-radius: var(--wpp-radius) var(--wpp-radius) 0 0;
+}
+
+body[class*='wppilot'] .is-armed::before {
+	background: var(--wpp-armed);
+}
+
+body[class*='wppilot'] .is-ready::before {
+	background: var(--wpp-ready);
+}
+
+body[class*='wppilot'] .is-attention::before {
+	background: var(--wpp-attention);
+}
+
+/* ------------------------------------------------------------------ step -- */
+
+body[class*='wppilot'] .wppilot-step-heading {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	font-size: 19px;
+	font-weight: 800;
+	letter-spacing: -0.015em;
+	color: var(--wpp-ink);
+	margin: 0 0 20px;
+	padding: 0;
+}
+
+/* Connecting a client genuinely is a sequence, so the numbers carry meaning. */
+body[class*='wppilot'] .wppilot-step-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	flex: none;
+	border-radius: var(--wpp-radius-sm);
+	background: var(--wpp-accent);
+	color: #fff;
+	font-family: var(--wpp-mono);
+	font-size: 14px;
+	font-weight: 700;
+}
+
+/* Section legend: tracked label with a rule running to the panel edge. */
+body[class*='wppilot'] .wppilot-legend {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--wpp-ink);
+	margin: 36px 0 14px;
+}
+
+body[class*='wppilot'] .wppilot-legend::after {
+	content: '';
+	flex: 1;
+	height: 2px;
+	background: var(--wpp-line-soft);
+}
+
+/* --------------------------------------------------------------- controls -- */
+
+body[class*='wppilot'] .button,
+body[class*='wppilot'] .button-secondary {
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	color: var(--wpp-ink);
+	font-weight: 700;
+	height: auto;
+	padding: 7px 16px;
+	line-height: 1.6;
+	box-shadow: none;
+	transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.12s ease;
+}
+
+body[class*='wppilot'] .button:hover {
+	background: var(--wpp-sunk);
+	border-color: var(--wpp-line);
+	color: var(--wpp-ink);
+	box-shadow: var(--wpp-shadow-sm);
+	transform: translate(-1px, -1px);
+}
+
+body[class*='wppilot'] .button-primary {
+	background: var(--wpp-accent);
+	border-color: var(--wpp-ink);
+	color: #fff;
+	font-weight: 700;
+	letter-spacing: 0.005em;
+	text-shadow: none;
+	box-shadow: var(--wpp-shadow-sm);
+}
+
+body[class*='wppilot'] .button-primary:hover,
+body[class*='wppilot'] .button-primary:focus {
+	background: #2c1cdb;
+	border-color: var(--wpp-ink);
+	color: #fff;
+	box-shadow: var(--wpp-shadow);
+	transform: translate(-1px, -1px);
+}
+
+/* Pressing returns the button to the page: the shadow collapses under it. */
+body[class*='wppilot'] .button:active,
+body[class*='wppilot'] .button-primary:active {
+	box-shadow: none;
+	transform: translate(0, 0);
+}
+
+body[class*='wppilot'] .button-link-delete,
+body[class*='wppilot'] .button.is-destructive {
+	color: var(--wpp-armed);
+	border-color: var(--wpp-armed);
+}
+
+body[class*='wppilot'] .button:focus,
+body[class*='wppilot'] .button-primary:focus,
+body[class*='wppilot'] input:focus,
+body[class*='wppilot'] select:focus,
+body[class*='wppilot'] textarea:focus {
+	outline: 3px solid var(--wpp-accent);
+	outline-offset: 1px;
+	box-shadow: none;
+}
+
+body[class*='wppilot'] input[type='text'],
+body[class*='wppilot'] input[type='url'],
+body[class*='wppilot'] input[type='search'],
+body[class*='wppilot'] input[type='password'],
+body[class*='wppilot'] input[type='number'],
+body[class*='wppilot'] textarea {
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	background: var(--wpp-surface);
+	color: var(--wpp-ink);
+	box-shadow: none;
+	padding: 8px 11px;
+	min-height: 38px;
+}
+
+/* Border and radius only: WordPress paints the dropdown arrow as a background
+ * image, so setting `background` here would erase it. */
+body[class*='wppilot'] select {
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	color: var(--wpp-ink);
+	box-shadow: none;
+	min-height: 38px;
+	padding-top: 0;
+	padding-bottom: 0;
+}
+
+body[class*='wppilot'] textarea {
+	font-family: var(--wpp-mono);
+	font-size: 12.5px;
+	line-height: 1.65;
+}
+
+body[class*='wppilot'] input[type='checkbox'],
+body[class*='wppilot'] input[type='radio'] {
+	border: 2px solid var(--wpp-line);
+	border-radius: 3px;
+}
+
+body[class*='wppilot'] input[type='checkbox']:checked,
+body[class*='wppilot'] input[type='radio']:checked {
+	background: var(--wpp-accent);
+	border-color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] input[type='checkbox']:checked::before {
+	filter: brightness(0) invert(1);
+}
+
+/* ----------------------------------------------------------- machine text -- */
+
+/* Ability names, endpoints, counts, tokens: values a machine produced. */
+body[class*='wppilot'] code,
+body[class*='wppilot'] .wppilot-mono {
+	font-family: var(--wpp-mono);
+	font-size: 12.5px;
+	background: var(--wpp-sunk);
+	border: 1px solid var(--wpp-line-soft);
+	border-radius: 4px;
+	padding: 2px 7px;
+	color: var(--wpp-ink);
+}
+
+/* Machine output is set on an ink plate: it is the machine talking, not us. */
+body[class*='wppilot'] pre {
+	font-family: var(--wpp-mono);
+	font-size: 12.5px;
+	line-height: 1.7;
+	background: var(--wpp-ink);
+	color: #e6e8ec;
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	padding: 18px 20px;
+	overflow-x: auto;
+}
+
+body[class*='wppilot'] pre code {
+	background: none;
+	border: 0;
+	padding: 0;
+	color: inherit;
+}
+
+/* Status pill: a hard-edged plate, sized to be read, not a soft bubble. */
+body[class*='wppilot'] .wppilot-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	padding: 5px 11px;
+	border: 2px solid var(--wpp-line);
+	border-radius: 999px;
+	color: var(--wpp-ink);
+	background: var(--wpp-surface);
+}
+
+body[class*='wppilot'] .wppilot-pill--armed {
+	color: var(--wpp-armed);
+	border-color: var(--wpp-armed);
+	background: var(--wpp-armed-soft);
+}
+
+body[class*='wppilot'] .wppilot-pill--ready {
+	color: var(--wpp-ready);
+	border-color: var(--wpp-ready);
+	background: var(--wpp-ready-soft);
+}
+
+body[class*='wppilot'] .wppilot-pill--attention {
+	color: var(--wpp-attention);
+	border-color: var(--wpp-attention);
+	background: var(--wpp-attention-soft);
+}
+
+/* --------------------------------------------------------------- notices -- */
+
+body[class*='wppilot'] .notice,
+body[class*='wppilot'] div.updated,
+body[class*='wppilot'] div.error {
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-left-width: 8px;
+	border-radius: var(--wpp-radius-sm);
+	box-shadow: none;
+	padding: 13px 17px;
+	margin: 0 0 var(--wpp-gap);
+}
+
+body[class*='wppilot'] .notice p {
+	margin: 0.35em 0;
+}
+
+body[class*='wppilot'] .notice-success {
+	border-left-color: var(--wpp-ready);
+}
+
+body[class*='wppilot'] .notice-warning {
+	border-left-color: var(--wpp-attention);
+}
+
+body[class*='wppilot'] .notice-error,
+body[class*='wppilot'] div.error {
+	border-left-color: var(--wpp-armed);
+}
+
+body[class*='wppilot'] .notice-info {
+	border-left-color: var(--wpp-accent);
+}
+
+/* ---------------------------------------------------------------- tables -- */
+
+body[class*='wppilot'] .wp-list-table,
+body[class*='wppilot'] table.widefat {
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	box-shadow: none;
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+}
+
+body[class*='wppilot'] .wp-list-table thead th,
+body[class*='wppilot'] table.widefat thead th {
+	background: var(--wpp-ink);
+	border-bottom: 0;
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: #fff;
+	padding: 12px 15px;
+}
+
+body[class*='wppilot'] .wp-list-table tbody td,
+body[class*='wppilot'] table.widefat tbody td {
+	border-bottom: 1px solid var(--wpp-line-soft);
+	padding: 14px 15px;
+	color: var(--wpp-ink-2);
+}
+
+body[class*='wppilot'] .wp-list-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+/* ------------------------------------------------------------ typography -- */
+
+body[class*='wppilot'] .wrap p,
+body[class*='wppilot'] .wrap li {
+	color: var(--wpp-ink-2);
+	font-size: 14px;
+	line-height: 1.65;
+}
+
+body[class*='wppilot'] .wrap h2 {
+	font-size: 19px;
+	font-weight: 800;
+	letter-spacing: -0.015em;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .description,
+body[class*='wppilot'] .wppilot-muted {
+	color: var(--wpp-muted);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+/* Intro copy under a page title. One measure for every screen, so the lede is
+ * not re-guessed per page with an inline max-width. */
+body[class*='wppilot'] .wppilot-lede {
+	max-width: 70ch;
+	font-size: 16px;
+	line-height: 1.55;
+	color: var(--wpp-ink-2);
+	margin: 0 0 26px;
+}
+
+/* WordPress uses this rule to mark the end of the header area; it is not a
+ * divider and must not paint one. */
+body[class*='wppilot'] hr.wp-header-end {
+	display: none;
+}
+
+/*
+ * Buttons are excluded explicitly. WordPress renders plenty of them as anchors,
+ * and `.wrap a` outranks `.button-primary` on specificity — so without this the
+ * accent link colour paints violet text onto the violet primary button and the
+ * label disappears entirely.
+ */
+body[class*='wppilot'] .wrap a:not(.button):not(.button-primary):not(.button-secondary):not(.page-title-action) {
+	color: var(--wpp-accent);
+	font-weight: 600;
+	text-decoration-color: currentColor;
+	text-underline-offset: 3px;
+}
+
+body[class*='wppilot']
+	.wrap
+	a:not(.button):not(.button-primary):not(.button-secondary):not(.page-title-action):hover {
+	color: var(--wpp-ink);
+}
+
+/* WordPress' "Add new" affordance beside a heading: a button in everything but
+ * its class name, so it is given the button treatment here. */
+body[class*='wppilot'] .page-title-action,
+body[class*='wppilot'] .wrap a.page-title-action {
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	color: var(--wpp-ink);
+	font-weight: 700;
+	padding: 5px 14px;
+	text-decoration: none;
+	box-shadow: none;
+}
+
+body[class*='wppilot'] .wrap a.page-title-action:hover {
+	background: var(--wpp-sunk);
+	color: var(--wpp-ink);
+	box-shadow: var(--wpp-shadow-sm);
+}
+
+/*
+ * The divide on the Overview screen between what is connected and how to
+ * connect something. Both used to be separate pages; the rule is what keeps
+ * them readable as two halves of one screen rather than one long scroll.
+ */
+body[class*='wppilot'] .wppilot-section-break {
+	margin: 44px 0 20px;
+	padding-top: 30px;
+	border-top: 4px solid var(--wpp-line);
+	font-size: 26px;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+	color: var(--wpp-ink);
+}
+
+/* ------------------------------------------------------------------ misc -- */
+
+body[class*='wppilot'] hr,
+body[class*='wppilot'] .wppilot-rule {
+	border: 0;
+	border-top: 2px solid var(--wpp-line-soft);
+	margin: 28px 0;
+}
+
+body[class*='wppilot'] .wppilot-grid {
+	display: grid;
+	gap: var(--wpp-gap);
+}
+
+@media screen and (min-width: 960px) {
+	body[class*='wppilot'] .wppilot-grid--2 {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+/* Respect the reduced-motion preference: nothing here needs to animate. */
+@media (prefers-reduced-motion: reduce) {
+	body[class*='wppilot'] * {
+		transition: none !important;
+		animation: none !important;
+	}
+
+	body[class*='wppilot'] .button:hover,
+	body[class*='wppilot'] .button-primary:hover {
+		transform: none;
+	}
+}
+
+/* --------------------------------------------------------- client cards -- */
+
+/*
+ * The Overview screen's answer to "what is talking to my site". One card per AI
+ * client, identified by what it reported on connect rather than by the label
+ * someone typed on a credential.
+ *
+ * The request count is the largest figure on the screen because it is the one
+ * that tells you whether a connection is real or merely configured.
+ */
+body[class*='wppilot'] .wppilot-clients {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+	gap: 14px;
+	margin: 18px 0 10px;
+}
+
+body[class*='wppilot'] .wppilot-client-card {
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	box-shadow: var(--wpp-shadow-sm);
+	padding: 16px 18px 14px;
+}
+
+/* A client the registry does not know still gets a card, but is not dressed as
+ * a recognised product. */
+body[class*='wppilot'] .wppilot-client-card.is-unknown {
+	border-style: dashed;
+	box-shadow: none;
+}
+
+body[class*='wppilot'] .wppilot-client-card__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	margin: 0 0 12px;
+	padding-bottom: 11px;
+	border-bottom: 2px solid var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-client-card__name {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 800;
+	letter-spacing: -0.015em;
+	color: var(--wpp-ink);
+	overflow-wrap: anywhere;
+}
+
+body[class*='wppilot'] .wppilot-client-card__version {
+	flex: none;
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--wpp-muted);
+}
+
+body[class*='wppilot'] .wppilot-client-card__facts {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 11px 14px;
+	margin: 0;
+}
+
+body[class*='wppilot'] .wppilot-client-card__facts dt {
+	font-size: 9.5px;
+	font-weight: 800;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--wpp-faint);
+	margin: 0 0 2px;
+}
+
+body[class*='wppilot'] .wppilot-client-card__facts dd {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wpp-ink);
+	overflow-wrap: anywhere;
+}
+
+/* Matched on the dd too: the generic fact rule above is one element more
+ * specific, so a bare class here would lose the font-size to it. */
+body[class*='wppilot'] .wppilot-client-card__facts dd.wppilot-client-card__count {
+	font-family: var(--wpp-mono);
+	font-size: 26px;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -0.02em;
+	color: var(--wpp-accent);
+}
+
+/* Clients that have never connected: present, but plainly not live. */
+body[class*='wppilot'] .wppilot-clients--idle {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 12px 0 8px;
+}
+
+body[class*='wppilot'] .wppilot-client-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 6px 12px;
+	border: 2px dashed var(--wpp-line-soft);
+	border-radius: 999px;
+	background: var(--wpp-surface);
+	color: var(--wpp-muted);
+	font-size: 12.5px;
+	font-weight: 600;
+	text-decoration: none;
+	transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+body[class*='wppilot'] .wrap a.wppilot-client-chip:hover {
+	color: var(--wpp-ink);
+	border-color: var(--wpp-ink);
+	border-style: solid;
+}
+
+/* ---------------------------------------------------- troubleshoot report -- */
+
+/*
+ * The diagnostics screen: a list of probes, each reporting a state. It reuses
+ * the same status vocabulary as the panels rather than inventing a second colour
+ * language, and every row wears its verdict on a thick left edge.
+ *
+ * Moved here from an inline <style> in includes/troubleshoot/ui.php.
+ */
+
+body[class*='wppilot'] .wppilot-troubleshoot {
+	max-width: 100%;
+}
+
+body[class*='wppilot'] .wppilot-ts-report {
+	list-style: none;
+	margin: 0 0 4px;
+	padding: 0;
+}
+
+body[class*='wppilot'] .wppilot-ts-row {
+	display: flex;
+	gap: 14px;
+	margin: 0 0 10px;
+	padding: 14px 17px;
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-left-width: 8px;
+	border-radius: var(--wpp-radius-sm);
+	opacity: 0;
+	transform: translateY(5px);
+	animation: wppilot-ts-in 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes wppilot-ts-in {
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+body[class*='wppilot'] .wppilot-ts-row.is-ok {
+	border-left-color: var(--wpp-ready);
+}
+
+body[class*='wppilot'] .wppilot-ts-row.is-warning {
+	border-left-color: var(--wpp-attention);
+	background: var(--wpp-attention-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-row.is-fail {
+	border-left-color: var(--wpp-armed);
+	background: var(--wpp-armed-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-row.is-skipped {
+	border-left-color: var(--wpp-idle);
+}
+
+body[class*='wppilot'] .wppilot-ts-row.is-info {
+	border-left-color: var(--wpp-accent);
+}
+
+body[class*='wppilot'] .wppilot-ts-dot {
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	margin-top: 1px;
+	border-radius: var(--wpp-radius-sm);
+	border: 2px solid currentColor;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+}
+
+body[class*='wppilot'] .is-ok .wppilot-ts-dot {
+	background: var(--wpp-ready-soft);
+	color: var(--wpp-ready);
+}
+
+body[class*='wppilot'] .is-warning .wppilot-ts-dot {
+	background: var(--wpp-attention-soft);
+	color: var(--wpp-attention);
+}
+
+body[class*='wppilot'] .is-fail .wppilot-ts-dot {
+	background: var(--wpp-armed-soft);
+	color: var(--wpp-armed);
+}
+
+body[class*='wppilot'] .is-skipped .wppilot-ts-dot {
+	background: var(--wpp-canvas);
+	color: var(--wpp-muted);
+}
+
+body[class*='wppilot'] .is-info .wppilot-ts-dot {
+	background: var(--wpp-accent-soft);
+	color: var(--wpp-accent);
+}
+
+body[class*='wppilot'] .wppilot-ts-row-body {
+	min-width: 0;
+}
+
+body[class*='wppilot'] .wppilot-ts-row-title {
+	font-weight: 700;
+	color: var(--wpp-ink);
+	margin: 2px 0 3px;
+}
+
+body[class*='wppilot'] .is-skipped .wppilot-ts-row-title,
+body[class*='wppilot'] .is-skipped .wppilot-ts-row-msg {
+	color: var(--wpp-faint);
+}
+
+body[class*='wppilot'] .wppilot-ts-row-msg {
+	color: var(--wpp-ink-2);
+	font-size: 13px;
+	line-height: 1.55;
+	overflow-wrap: break-word;
+}
+
+body[class*='wppilot'] .wppilot-ts-remedy {
+	margin-top: 10px;
+	padding: 11px 14px;
+	border-radius: var(--wpp-radius-sm);
+	background: var(--wpp-sunk);
+	border: 2px solid var(--wpp-line-soft);
+	font-size: 13px;
+	line-height: 1.55;
+	color: var(--wpp-ink-2);
+}
+
+body[class*='wppilot'] .wppilot-ts-remedy .button {
+	display: inline-block;
+	margin-top: 10px;
+}
+
+body[class*='wppilot'] .wppilot-ts-copy {
+	margin-top: 8px;
+}
+
+body[class*='wppilot'] .wppilot-ts-copy-text {
+	margin: 0;
+	padding: 12px 14px;
+	border-radius: var(--wpp-radius-sm);
+	background: var(--wpp-ink);
+	border: 2px solid var(--wpp-line);
+	font-family: var(--wpp-mono);
+	font-size: 12px;
+	line-height: 1.55;
+	color: #e6e8ec;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+/* Verdict chips, matching .wppilot-pill. */
+body[class*='wppilot'] .wppilot-ts-summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 16px;
+}
+
+body[class*='wppilot'] .wppilot-ts-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 5px 12px;
+	border: 2px solid var(--wpp-line);
+	border-radius: 999px;
+	background: var(--wpp-surface);
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-ts-chip.is-ok {
+	color: var(--wpp-ready);
+	border-color: var(--wpp-ready);
+	background: var(--wpp-ready-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-chip.is-warning {
+	color: var(--wpp-attention);
+	border-color: var(--wpp-attention);
+	background: var(--wpp-attention-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-chip.is-fail {
+	color: var(--wpp-armed);
+	border-color: var(--wpp-armed);
+	background: var(--wpp-armed-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-chip.is-skipped {
+	color: var(--wpp-muted);
+	border-color: var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-chip.is-info {
+	color: var(--wpp-accent);
+	border-color: var(--wpp-accent);
+	background: var(--wpp-accent-soft);
+}
+
+body[class*='wppilot'] .wppilot-ts-clean {
+	margin: 0 0 16px;
+	padding: 15px 18px;
+	border-radius: var(--wpp-radius-sm);
+	border: 2px solid var(--wpp-ready);
+	border-left-width: 8px;
+	background: var(--wpp-ready-soft);
+	color: var(--wpp-ready);
+	font-weight: 700;
+}
+
+body[class*='wppilot'] .wppilot-ts-clean.is-caveat {
+	border-color: var(--wpp-attention);
+	background: var(--wpp-attention-soft);
+	color: var(--wpp-attention);
+}
+
+body[class*='wppilot'] .wppilot-ts-copy-report {
+	margin: 4px 0 16px;
+}
+
+body[class*='wppilot'] .wppilot-ts-controls {
+	display: flex;
+	gap: 14px;
+	align-items: flex-end;
+	flex-wrap: wrap;
+	margin: 0 0 18px;
+}
+
+body[class*='wppilot'] .wppilot-ts-method-pick {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+body[class*='wppilot'] .wppilot-ts-method-label {
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--wpp-ink);
+}
+
+/* Placeholder rows while the probes run. */
+body[class*='wppilot'] .wppilot-ts-skeleton {
+	height: 52px;
+	margin: 0 0 10px;
+	border-radius: var(--wpp-radius-sm);
+	border: 2px solid var(--wpp-line-soft);
+	background: linear-gradient(100deg, var(--wpp-canvas) 30%, #fbfaf7 45%, var(--wpp-canvas) 60%);
+	background-size: 250% 100%;
+	animation: wppilot-ts-shimmer 1.1s ease-in-out infinite;
+}
+
+@keyframes wppilot-ts-shimmer {
+	from {
+		background-position: 120% 0;
+	}
+
+	to {
+		background-position: -30% 0;
+	}
+}
+
+body[class*='wppilot'] .wppilot-ts-symptoms {
+	border-top: 2px solid var(--wpp-line-soft);
+	margin-top: 20px;
+	padding-top: 18px;
+}
+
+body[class*='wppilot'] .wppilot-ts-symptoms-title {
+	margin: 0 0 8px;
+	font-weight: 700;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-ts-symptoms > select {
+	min-width: min(420px, 100%);
+	max-width: 100%;
+}
+
+body[class*='wppilot'] .wppilot-ts-branch {
+	margin-top: 14px;
+	padding: 16px 18px;
+	border: 2px solid var(--wpp-line-soft);
+	border-radius: var(--wpp-radius-sm);
+	background: var(--wpp-sunk);
+}
+
+body[class*='wppilot'] .wppilot-ts-branch > p:first-child {
+	margin-top: 0;
+}
+
+body[class*='wppilot'] .wppilot-ts-mint-controls,
+body[class*='wppilot'] .wppilot-ts-mint-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 9px;
+	align-items: center;
+}
+
+body[class*='wppilot'] .wppilot-ts-mint-row {
+	margin: 5px 0;
+}
+
+/* A minted client id is a credential; set it like one. */
+body[class*='wppilot'] .wppilot-ts-mint-id {
+	display: inline-block;
+	padding: 10px 15px;
+	border-radius: var(--wpp-radius-sm);
+	background: var(--wpp-ink);
+	color: #e8eaed;
+	font-family: var(--wpp-mono);
+	font-size: 13px;
+	letter-spacing: 0.04em;
+	user-select: all;
+}
+
+/* ------------------------------------------------------- connect: client -- */
+
+/*
+ * The Connect screen: method cards, generated client config, and the one-time
+ * password reveal. Moved here from an inline <style> in
+ * includes/admin/connect/page.php.
+ */
+
+body[class*='wppilot'] .wppilot-method-cards {
+	display: flex;
+	gap: 14px;
+	margin: 0 0 18px;
+	flex-wrap: wrap;
+}
+
+body[class*='wppilot'] .wppilot-method-card {
+	flex: 1 1 240px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	text-align: left;
+	cursor: pointer;
+	padding: 17px 19px;
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	background: var(--wpp-surface);
+	transition: box-shadow 0.12s ease, transform 0.1s ease;
+}
+
+body[class*='wppilot'] .wppilot-method-card:hover {
+	box-shadow: var(--wpp-shadow-sm);
+	transform: translate(-1px, -1px);
+}
+
+/* Selection is unmistakable: the card fills with the accent. */
+body[class*='wppilot'] .wppilot-method-card.is-active {
+	background: var(--wpp-accent-soft);
+	box-shadow: var(--wpp-shadow);
+}
+
+body[class*='wppilot'] .wppilot-method-title {
+	font-weight: 800;
+	font-size: 15px;
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-recommended-badge {
+	font-family: var(--wpp-mono);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	color: var(--wpp-ready);
+	background: var(--wpp-ready-soft);
+	border: 2px solid var(--wpp-ready);
+	border-radius: 999px;
+	padding: 2px 9px;
+}
+
+/* Generated config is machine output: ink plate, mono, copy affordance. */
+body[class*='wppilot'] .wppilot-config-block {
+	position: relative;
+}
+
+body[class*='wppilot'] .wppilot-config-block pre {
+	background: var(--wpp-ink);
+	color: #e6e8ec;
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	padding: 18px 20px;
+	overflow-x: auto;
+	margin: 0;
+}
+
+body[class*='wppilot'] .wppilot-copy-btn {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	padding: 4px 12px;
+	font-size: 11px;
+	font-family: var(--wpp-mono);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+/* Shown once and never again, so it is treated as a hand-off, not a field. */
+body[class*='wppilot'] .wppilot-password-box {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	background: var(--wpp-attention-soft);
+	border: 2px solid var(--wpp-attention);
+	border-left-width: 8px;
+	border-radius: var(--wpp-radius-sm);
+	padding: 16px 19px;
+	margin: 14px 0;
+}
+
+body[class*='wppilot'] .wppilot-password-value {
+	font-family: var(--wpp-mono);
+	font-size: 19px;
+	letter-spacing: 0.06em;
+	font-weight: 700;
+	color: var(--wpp-ink);
+	user-select: all;
+}
+
+/* Client picker: peers, so the same chip treatment as the product tabs. */
+body[class*='wppilot'] .wppilot-client-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0 0 16px;
+	padding-bottom: 14px;
+	border-bottom: 2px solid var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-client-tab {
+	padding: 7px 13px;
+	border: 2px solid var(--wpp-line-soft);
+	border-radius: 999px;
+	background: var(--wpp-surface);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wpp-ink-2);
+	transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+body[class*='wppilot'] .wppilot-client-tab:hover {
+	color: var(--wpp-ink);
+	border-color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-client-tab.active {
+	color: #fff;
+	font-weight: 700;
+	background: var(--wpp-ink);
+	border-color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-top-client-tab {
+	padding: 8px 16px;
+	font-size: 13.5px;
+}
+
+body[class*='wppilot'] .wppilot-tab-content {
+	border: 0;
+}
+
+body[class*='wppilot'] .wppilot-revoke-btn {
+	color: var(--wpp-armed);
+	border-color: var(--wpp-armed);
+}
+
+/* A value the reader must replace before the config will work. */
+body[class*='wppilot'] .wppilot-placeholder {
+	background: var(--wpp-armed);
+	color: #fff;
+	font-family: var(--wpp-mono);
+	font-weight: 700;
+	padding: 1px 6px;
+	border-radius: 4px;
+}
+
+body[class*='wppilot'] .wppilot-mcp-error-panel {
+	background: var(--wpp-armed-soft);
+	border: 2px solid var(--wpp-armed);
+	border-left-width: 8px;
+	border-radius: var(--wpp-radius-sm);
+	margin: 18px 0 26px;
+	padding: 16px 19px;
+}
+
+body[class*='wppilot'] .wppilot-mcp-error-panel h2 {
+	color: var(--wpp-ink);
+	font-size: 17px;
+	line-height: 1.4;
+	margin: 0 0 8px;
+}
+
+body[class*='wppilot'] .wppilot-mcp-error-panel p {
+	margin: 0;
+}
+
+body[class*='wppilot'] .wppilot-production-warning {
+	background: var(--wpp-attention-soft);
+	border: 2px solid var(--wpp-attention);
+	border-left-width: 8px;
+	border-radius: var(--wpp-radius-sm);
+	padding: 15px 19px;
+	margin: 12px 0 26px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+body[class*='wppilot'] .wppilot-production-warning p {
+	margin: 0;
+	flex: 1 1 auto;
+}
+
+/* The paste-to-agent block: a labelled plate with a collapsed preview. */
+body[class*='wppilot'] .wppilot-paste-block {
+	margin: 14px 0;
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	overflow: hidden;
+}
+
+body[class*='wppilot'] .wppilot-paste-header {
+	background: var(--wpp-ink);
+	color: #fff;
+	padding: 11px 17px;
+	font-family: var(--wpp-mono);
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+
+body[class*='wppilot'] .wppilot-paste-content {
+	position: relative;
+	background: var(--wpp-sunk);
+}
+
+body[class*='wppilot'] .wppilot-paste-content pre {
+	background: transparent;
+	color: var(--wpp-ink-2);
+	padding: 17px 19px;
+	border: 0;
+	border-radius: 0;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	margin: 0;
+	max-height: 6.5em;
+	overflow: hidden;
+}
+
+body[class*='wppilot'] .wppilot-paste-content.is-expanded pre {
+	max-height: none;
+	overflow: visible;
+}
+
+body[class*='wppilot'] .wppilot-paste-content:not(.is-expanded)::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 34px;
+	background: linear-gradient(to bottom, rgba(246, 245, 241, 0), rgba(246, 245, 241, 1));
+	pointer-events: none;
+}
+
+body[class*='wppilot'] .wppilot-paste-actions {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 12px 16px 16px;
+	background: var(--wpp-surface);
+	border-top: 2px solid var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-panel-footer,
+body[class*='wppilot'] .wppilot-manage-passwords {
+	margin: 24px 0 0;
+	border-top: 2px solid var(--wpp-line-soft);
+	padding-top: 18px;
+}
+
+body[class*='wppilot'] .wppilot-manage-passwords-summary {
+	font-weight: 700;
+	cursor: pointer;
+	list-style: none;
+	color: var(--wpp-ink);
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	padding: 4px 0;
+}
+
+body[class*='wppilot'] .wppilot-manage-passwords-summary::-webkit-details-marker {
+	display: none;
+}
+
+body[class*='wppilot'] .wppilot-manage-passwords-summary::before {
+	content: '▸';
+	color: var(--wpp-accent);
+	transition: transform 0.15s ease;
+}
+
+body[class*='wppilot'] .wppilot-manage-passwords[open] .wppilot-manage-passwords-summary::before {
+	transform: rotate(90deg);
+}
+
+body[class*='wppilot'] .wppilot-manage-passwords-body {
+	padding-top: 14px;
+}
+
+/* ---------------------------------------------------------------- context -- */
+
+/*
+ * The Instructions screen: whether custom instructions are injected, a preview
+ * of what the agent actually receives, and the editor for it.
+ *
+ * Moved here from an inline <style> in includes/admin/instructions.php.
+ */
+
+body[class*='wppilot'] .wppilot-context-intro {
+	margin-top: 8px;
+	max-width: 70ch;
+}
+
+body[class*='wppilot'] .wppilot-context-section {
+	margin-top: 28px;
+}
+
+body[class*='wppilot'] .wppilot-context-section h2 {
+	margin-bottom: 4px;
+}
+
+body[class*='wppilot'] .wppilot-context-panel {
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	box-shadow: var(--wpp-shadow-sm);
+	padding: 20px 24px;
+	margin-top: 14px;
+}
+
+body[class*='wppilot'] .wppilot-context-status {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+body[class*='wppilot'] .wppilot-context-status .status-text {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+}
+
+/* Same plate as .wppilot-pill: on/off is state, not a badge. */
+body[class*='wppilot'] .wppilot-context-status .status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 5px 12px;
+	border: 2px solid var(--wpp-line);
+	border-radius: 999px;
+	background: var(--wpp-surface);
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-context-status .status-pill.is-on {
+	color: var(--wpp-ready);
+	border-color: var(--wpp-ready);
+	background: var(--wpp-ready-soft);
+}
+
+body[class*='wppilot'] .wppilot-context-status .status-pill.is-off {
+	color: var(--wpp-muted);
+	border-color: var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-context-status .status-hint {
+	color: var(--wpp-muted);
+	margin: 6px 0 0;
+	max-width: 70ch;
+}
+
+body[class*='wppilot'] .wppilot-system-box summary {
+	cursor: pointer;
+	font-weight: 700;
+}
+
+body[class*='wppilot'] .wppilot-system-preview-wrap {
+	position: relative;
+	margin-top: 14px;
+}
+
+/* This is the literal text handed to the agent, so it is set as machine copy. */
+body[class*='wppilot'] .wppilot-system-preview {
+	box-sizing: border-box;
+	width: 100%;
+	overflow: auto;
+	margin: 0;
+	padding: 16px 18px;
+	background: var(--wpp-sunk);
+	border: 2px solid var(--wpp-line-soft);
+	border-radius: var(--wpp-radius-sm);
+	white-space: pre-wrap;
+	font-family: var(--wpp-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--wpp-ink-2);
+}
+
+body[class*='wppilot'] .wppilot-system-preview.is-excerpt {
+	margin-top: 14px;
+}
+
+body[class*='wppilot'] .wppilot-system-details[open] + .wppilot-system-preview.is-excerpt {
+	display: none;
+}
+
+body[class*='wppilot'] .wppilot-context-guidance {
+	margin-top: 14px;
+	color: var(--wpp-ink-2);
+}
+
+body[class*='wppilot'] .wppilot-context-guidance ul {
+	list-style: disc;
+	margin-left: 20px;
+	max-width: 70ch;
+}
+
+body[class*='wppilot'] .wppilot-context-guidance li {
+	margin: 4px 0;
+}
+
+body[class*='wppilot'] .wppilot-context-form {
+	margin-top: 14px;
+}
+
+/* ------------------------------------------------- block editor finalizer -- */
+
+/*
+ * The Block Queue screen. Some Gutenberg blocks can only be finalized by the
+ * browser, so this screen drives a hidden editor frame and reports progress.
+ *
+ * Moved here from an inline <style> in includes/admin/gutenberg-finalizer.php.
+ */
+
+body[class*='wppilot'] .wppilot-gb-finalizer .summary-panel {
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	box-shadow: var(--wpp-shadow-sm);
+	padding: 24px 28px;
+	margin: 22px 0;
+}
+
+body[class*='wppilot'] .wppilot-gb-finalizer .summary-panel p {
+	color: var(--wpp-ink-2);
+	margin: 0 0 12px;
+}
+
+body[class*='wppilot'] .wppilot-gb-finalizer .summary-panel p strong {
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-gb-finalizer .progress-line {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	margin: 22px 0 0;
+	padding-top: 18px;
+	border-top: 2px solid var(--wpp-line-soft);
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	color: var(--wpp-ink);
+}
+
+/* Work in progress is a running state: the same lamp, pulsing. */
+body[class*='wppilot'] .wppilot-gb-finalizer .progress-line::before {
+	content: '';
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background-color: var(--wpp-attention);
+	box-shadow: 0 0 0 0 rgba(168, 86, 10, 0.55);
+	animation: wppilot-pulse 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+
+@keyframes wppilot-pulse {
+	to {
+		box-shadow: 0 0 0 9px rgba(168, 86, 10, 0);
+	}
+}
+
+/* The editor frame does the finalizing work off-screen; never show it. */
+body[class*='wppilot'] .wppilot-gb-finalizer .wppilot-gb-editor-frame-wrap {
+	position: absolute;
+	top: 0;
+	left: -10000px;
+	width: 1280px;
+	height: 900px;
+	overflow: hidden;
+	opacity: 0;
+	pointer-events: none;
+}
+
+body[class*='wppilot'] .wppilot-gb-finalizer .wppilot-gb-editor-frame {
+	display: block;
+	width: 1280px;
+	height: 900px;
+	border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	body[class*='wppilot'] .wppilot-gb-finalizer .progress-line::before {
+		animation: none;
+	}
+}
+
+/* -------------------------------------------------------------- settings -- */
+
+/*
+ * The Settings screen. Each row is one decision: what it is on the left, the
+ * control on the right, and the consequence in the help text — so the page can
+ * be read down the left edge without touching anything.
+ */
+
+body[class*='wppilot'] .wppilot-setting-group__title {
+	font-size: 19px;
+	font-weight: 800;
+	letter-spacing: -0.015em;
+	color: var(--wpp-ink);
+	margin: 0 0 5px;
+}
+
+body[class*='wppilot'] .wppilot-setting-group__note {
+	color: var(--wpp-muted);
+	max-width: 70ch;
+	margin: 0 0 6px;
+}
+
+body[class*='wppilot'] .wppilot-setting {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 32px;
+	padding: 19px 0;
+	border-top: 2px solid var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-setting:first-of-type {
+	margin-top: 14px;
+}
+
+body[class*='wppilot'] .wppilot-setting__text {
+	min-width: 0;
+}
+
+body[class*='wppilot'] .wppilot-setting__label {
+	display: block;
+	font-weight: 700;
+	font-size: 14.5px;
+	color: var(--wpp-ink);
+	cursor: pointer;
+}
+
+body[class*='wppilot'] .wppilot-setting__help {
+	color: var(--wpp-muted);
+	font-size: 13px;
+	line-height: 1.6;
+	max-width: 66ch;
+	margin: 4px 0 0;
+}
+
+body[class*='wppilot'] .wppilot-setting__control {
+	flex: none;
+	padding-top: 2px;
+}
+
+/*
+ * A physical switch, not a checkbox: this is equipment. The armed variant is
+ * used only where flipping it grants agents real authority, so the on state
+ * reads red rather than the usual success green.
+ */
+body[class*='wppilot'] .wppilot-switch {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+}
+
+body[class*='wppilot'] .wppilot-switch input {
+	position: absolute;
+	opacity: 0;
+	width: 0;
+	height: 0;
+	margin: 0;
+}
+
+body[class*='wppilot'] .wppilot-switch__track {
+	position: relative;
+	display: block;
+	width: 52px;
+	height: 30px;
+	border-radius: 999px;
+	background: var(--wpp-canvas);
+	border: 2px solid var(--wpp-line);
+	transition: background 0.14s ease;
+}
+
+body[class*='wppilot'] .wppilot-switch__track::after {
+	content: '';
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: var(--wpp-surface);
+	border: 2px solid var(--wpp-line);
+	transition: transform 0.14s ease;
+}
+
+body[class*='wppilot'] .wppilot-switch input:checked + .wppilot-switch__track {
+	background: var(--wpp-accent);
+}
+
+body[class*='wppilot'] .wppilot-switch input:checked + .wppilot-switch__track::after {
+	transform: translateX(22px);
+}
+
+body[class*='wppilot'] .wppilot-switch--armed input:checked + .wppilot-switch__track {
+	background: var(--wpp-armed);
+}
+
+body[class*='wppilot'] .wppilot-switch input:focus-visible + .wppilot-switch__track {
+	outline: 3px solid var(--wpp-accent);
+	outline-offset: 2px;
+}
+
+/* A setting that lives on another screen: state here, editing there. */
+body[class*='wppilot'] .wppilot-setting-link {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------- dashboard -- */
+
+/*
+ * The connection strip: a row of readings. The figures are large because they
+ * are the summary of the whole screen, and the label sits above each one so the
+ * row scans as a set of gauges rather than a sentence.
+ */
+body[class*='wppilot'] .wppilot-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 2px;
+	background: var(--wpp-line);
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	overflow: hidden;
+	margin: 18px 0 10px;
+}
+
+body[class*='wppilot'] .wppilot-stat {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 17px 19px;
+	background: var(--wpp-surface);
+}
+
+body[class*='wppilot'] .wppilot-stat__label {
+	font-size: 9.5px;
+	font-weight: 800;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--wpp-faint);
+}
+
+body[class*='wppilot'] .wppilot-stat__value {
+	font-family: var(--wpp-mono);
+	font-size: 27px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--wpp-ink);
+	line-height: 1.1;
+}
+
+/* Live is the one reading that should catch the eye. */
+body[class*='wppilot'] .wppilot-stat__value.is-armed {
+	color: var(--wpp-armed);
+}
+
+body[class*='wppilot'] .wppilot-stat__value.is-idle {
+	color: var(--wpp-muted);
+}
+
+/* ------------------------------------------------------------ approvals -- */
+
+/*
+ * One held agent call. The ability name and its arguments are the whole point,
+ * so they lead; the decision buttons sit under them rather than beside, because
+ * a reviewer should read before choosing.
+ */
+body[class*='wppilot'] .wppilot-approval {
+	border: 2px solid var(--wpp-line);
+	border-radius: var(--wpp-radius-sm);
+	padding: 16px 18px;
+	margin: 0 0 14px;
+	background: var(--wpp-surface);
+}
+
+body[class*='wppilot'] .wppilot-approval__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 14px;
+	flex-wrap: wrap;
+	margin-bottom: 10px;
+}
+
+body[class*='wppilot'] .wppilot-approval__head code {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+body[class*='wppilot'] .wppilot-approval pre {
+	margin: 0 0 12px;
+	max-height: 220px;
+	overflow: auto;
+}
+
+body[class*='wppilot'] .wppilot-approval__actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+/* ----------------------------------------------------------------- plans -- */
+
+/*
+ * The Upgrade screen. Price cards are the one place on any WPPilot screen where
+ * a number is the argument, so the figure is set at display size and everything
+ * else defers to it. The recommended tier lifts off the page with the same hard
+ * offset shadow the rest of the system uses, rather than a coloured fill: the
+ * accent belongs to identity, not to a sales nudge.
+ */
+body[class*='wppilot'] .wppilot-plans {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+	gap: 18px;
+	margin: 0 0 var(--wpp-gap);
+}
+
+body[class*='wppilot'] .wppilot-plan {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	background: var(--wpp-surface);
+	border: var(--wpp-border) solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	padding: 20px;
+}
+
+body[class*='wppilot'] .wppilot-plan.is-featured {
+	box-shadow: var(--wpp-shadow);
+}
+
+body[class*='wppilot'] .wppilot-plan__name {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 800;
+	letter-spacing: -0.01em;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-plan__sites {
+	margin: 0;
+	font-family: var(--wpp-mono);
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--wpp-muted);
+}
+
+body[class*='wppilot'] .wppilot-plan__price {
+	margin: 10px 0 0;
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+}
+
+body[class*='wppilot'] .wppilot-plan__amount {
+	font-size: 40px;
+	font-weight: 800;
+	line-height: 1;
+	letter-spacing: -0.03em;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-plan__period {
+	font-size: 13px;
+	color: var(--wpp-muted);
+}
+
+body[class*='wppilot'] .wppilot-plan__blurb {
+	margin: 4px 0 14px;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--wpp-ink-2);
+	/* Holds the button on one baseline across cards with uneven copy. */
+	flex: 1 1 auto;
+}
+
+body[class*='wppilot'] .wppilot-plan__buy {
+	width: 100%;
+	text-align: center;
+}
+
+body[class*='wppilot'] .wppilot-plan__alt {
+	margin: 10px 0 0;
+	font-size: 12px;
+	color: var(--wpp-muted);
+}
+
+/*
+ * Client card actions: the revoked-credential badge and Forget.
+ *
+ * Forget is a quiet link rather than a button. It removes a record, not a
+ * connection — the destructive act in this area is revoking a credential, and
+ * this must not compete with it for weight.
+ */
+body[class*='wppilot'] .wppilot-client-card__actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid var(--wpp-line-soft);
+}
+
+body[class*='wppilot'] .wppilot-client-card__actions:only-child,
+body[class*='wppilot'] .wppilot-client-card__actions > form:only-child {
+	margin-left: auto;
+}
+
+body[class*='wppilot'] .wppilot-client-card__forget {
+	margin: 0;
+	margin-left: auto;
+}
+
+/* --------------------------------------------------------------- prompts -- */
+
+/*
+ * The prompt library. Each prompt is a block of text to be copied whole, so it
+ * is set on the ink plate like the generated configs elsewhere: monospace,
+ * preserved line breaks, and a copy button that is the only affordance.
+ */
+body[class*='wppilot'] .wppilot-prompt {
+	border: var(--wpp-border) solid var(--wpp-line);
+	border-radius: var(--wpp-radius);
+	background: var(--wpp-surface);
+	padding: 16px;
+	margin: 0 0 14px;
+}
+
+body[class*='wppilot'] .wppilot-prompt:last-child {
+	margin-bottom: 0;
+}
+
+body[class*='wppilot'] .wppilot-prompt__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 14px;
+	margin-bottom: 12px;
+}
+
+body[class*='wppilot'] .wppilot-prompt__title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--wpp-ink);
+}
+
+body[class*='wppilot'] .wppilot-prompt__body {
+	margin: 0;
+	padding: 14px;
+	background: var(--wpp-ink);
+	color: #f4f4f5;
+	border-radius: var(--wpp-radius-sm);
+	font-family: var(--wpp-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-word;
+	max-height: 320px;
+	overflow: auto;
+}
+
+/* Locked packs list what they contain without showing the text. */
+body[class*='wppilot'] .wppilot-prompt-locked-list {
+	margin: 0 0 4px;
+	padding-left: 18px;
+	color: var(--wpp-ink-2);
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+body[class*='wppilot'] .wppilot-prompt-lock {
+	margin-left: 6px;
+	font-size: 11px;
+	opacity: 0.75;
+}
+
+/*
+ * A client that has actually connected, in the supported-clients roster.
+ *
+ * Solid rather than dashed, ink rather than grey, with a live dot: the same
+ * grammar the rest of the admin uses for "this is real" versus "this is
+ * possible". Green is reserved for ready states, so it is the dot that carries
+ * the colour rather than the whole chip shouting.
+ */
+body[class*='wppilot'] .wppilot-client-chip.is-connected {
+	border-style: solid;
+	border-color: var(--wpp-ready);
+	background: var(--wpp-ready-soft);
+	color: var(--wpp-ink);
+	gap: 7px;
+}
+
+body[class*='wppilot'] .wppilot-client-chip__dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--wpp-ready);
+	flex: none;
+}
