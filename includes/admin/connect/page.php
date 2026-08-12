@@ -82,11 +82,15 @@ function wppilot_render_connect_page(): void
 
         <?php wppilot_render_production_warning(); ?>
 
-        <div class="wppilot-connect-section">
-            <?php wppilot_render_enable_toggle(); ?>
-        </div>
-
         <?php wppilot_render_enable_prompt($mcp_dependency_error); ?>
+
+        <?php if (!$mcp_ready): ?>
+            <?php /* Nothing can be connected yet, so the switch is the only thing worth showing. */ ?>
+            <div class="wppilot-connect-section">
+                <?php wppilot_render_enable_toggle(); ?>
+            </div>
+        <?php endif; ?>
+
         <?php if ($mcp_ready): ?>
             <?php if ($create_error !== null): ?>
                 <div class="notice notice-error"><p><?php
@@ -102,6 +106,13 @@ function wppilot_render_connect_page(): void
                 ?></p></div>
             <?php endif; ?>
 
+            <?php /*
+             * Authentication comes first. Choosing a method, and generating an
+             * application password, is what a user actually came here to do —
+             * and since abilities are switched on at activation, the toggle
+             * below is normally already correct and only needs finding when
+             * someone wants to turn the endpoint off.
+             */ ?>
             <div class="wppilot-connect-section">
                 <?php wppilot_render_method_chooser($new_password, $existing_password, $existing_error); ?>
             </div>
@@ -114,6 +125,11 @@ function wppilot_render_connect_page(): void
 
             <div class="wppilot-connect-section">
                 <?php wppilot_render_verify_step(); ?>
+            </div>
+
+            <?php /* The off switch and the safety profile, after the steps that connect a client. */ ?>
+            <div class="wppilot-connect-section">
+                <?php wppilot_render_enable_toggle(); ?>
             </div>
         <?php endif; ?>
         <?php if (!$mcp_ready && wppilot_get_mcp_passwords() !== []): ?>
@@ -221,7 +237,7 @@ function wppilot_render_method_chooser(
     $badge = '<span class="wppilot-recommended-badge">' . $badge_label . '</span>';
     ?>
     <h2 class="wppilot-step-heading">
-        <span class="wppilot-step-badge">2</span>
+        <span class="wppilot-step-badge">1</span>
         <?php esc_html_e('Choose your authentication method', domain: 'wppilot'); ?>
     </h2>
 
@@ -392,7 +408,7 @@ function wppilot_render_config_section(string $rest_url, string $username, strin
     );
     ?>
     <h2 class="wppilot-step-heading">
-        <span class="wppilot-step-badge">3</span>
+        <span class="wppilot-step-badge">2</span>
         <?php esc_html_e('Connect Your AI Client', domain: 'wppilot'); ?>
     </h2>
 
@@ -1053,7 +1069,7 @@ function wppilot_render_verify_step(): void
     }
     ?>
     <h2 class="wppilot-step-heading">
-        <span class="wppilot-step-badge">4</span>
+        <span class="wppilot-step-badge">3</span>
         <?php esc_html_e('Check it worked', domain: 'wppilot'); ?>
     </h2>
 
