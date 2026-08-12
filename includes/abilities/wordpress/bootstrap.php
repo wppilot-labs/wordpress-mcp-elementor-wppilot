@@ -53,10 +53,19 @@ function wppilot_load_wordpress_abilities(): void
     $dir = __DIR__ . '/';
 
     require_once $dir . 'helpers.php';
+
+    // content-read.php defines wordpress_core_mcp_meta(), which every later
+    // registration calls at file scope, so it stays second.
     require_once $dir . 'content-read.php';
     require_once $dir . 'create-post.php';
     require_once $dir . 'update-post.php';
     require_once $dir . 'delete-post.php';
+    require_once $dir . 'restore-post.php';
+    require_once $dir . 'taxonomies.php';
+    require_once $dir . 'comments.php';
+    require_once $dir . 'revisions.php';
     require_once $dir . 'media.php';
+    require_once $dir . 'media-attachments.php';
     require_once $dir . 'site-management.php';
+    require_once $dir . 'menus.php';
 }

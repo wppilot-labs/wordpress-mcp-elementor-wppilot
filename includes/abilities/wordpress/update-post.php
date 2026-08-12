@@ -23,10 +23,10 @@ if (!defined('ABSPATH')) {
 }
 
 register_core_ability('wppilot/update-post', [
-    'label' => __('Update Post', domain: 'wppilot-pro'),
+    'label' => __('Update Post', domain: 'wppilot'),
     'description' => __(
         'Updates an existing WordPress post of any post type with partial-update semantics. A non-empty `content` / `post_content` write to a Breakdance-owned post is gated and rejected unless the user explicitly confirms the raw WordPress write and the re-call sets `allow_raw_content_on_breakdance_post:true`; use `wppilot/breakdance-set-content` plus the element abilities for the native canvas. Use this ability for status, title/slug, featured-image, and ordinary-meta changes. Identifies the target via `post_id` (short alias: `id`). Accepts both short names (title, slug, status, content, excerpt, parent, author, date) and WordPress-native aliases (post_title, post_name, post_status, post_content, post_excerpt, post_parent, post_author, post_date).',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -151,7 +151,7 @@ register_core_ability('wppilot/update-post', [
         ],
     ],
     'execute_callback' => __NAMESPACE__ . '\wordpress_update_post',
-    'permission_callback' => 'wppilot_permission_callback',
+    'permission_callback' => __NAMESPACE__ . '\\wordpress_core_permission',
     'meta' => [
         'show_in_rest' => true,
         'mcp' => ['public' => true],
@@ -204,6 +204,30 @@ function wordpress_update_post(array $input): array|WP_Error
 
     if (!$post) {
         return new WP_Error('not_found', sprintf('Post %d not found.', $post_id));
+    }
+
+    $agent_facing = wordpress_post_type_is_agent_facing((string) $post->post_type);
+    if ($agent_facing !== null) {
+        return $agent_facing;
+    }
+
+    // Object-level: `edit_post` resolves the post type's capability object and
+    // the post's ownership together, so an Author editing someone else's post is
+    // refused here rather than at a blanket type-level check.
+    if (!current_user_can('edit_post', $post_id)) {
+        return new WP_Error(
+            'cannot_edit_post',
+            sprintf('You are not allowed to edit post %d.', $post_id),
+            ['status' => 403],
+        );
+    }
+
+    // A status change is a separate grant from an edit: moving a draft to
+    // publish must satisfy the type's publish capability even when the caller
+    // may otherwise edit the post freely.
+    $status_error = wordpress_update_status_capability_error($post, $input);
+    if ($status_error !== null) {
+        return $status_error;
     }
 
     // Builder-managed content and builder storage meta are never written

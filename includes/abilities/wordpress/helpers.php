@@ -308,6 +308,86 @@ function wordpress_builder_meta_error(array $meta): ?WP_Error
 }
 
 /**
+ * Registration-time gate for every WordPress-core ability.
+ *
+ * Deliberately coarse. It answers only "may this connection reach the core
+ * surface at all", and the authoritative decision is made inside each execute
+ * callback against the specific post type, taxonomy, or object being touched —
+ * a permission callback cannot see those, because the target only exists in the
+ * input. Gating registration on `manage_options` instead would be both too
+ * loose (an administrator still needs the per-type check) and too tight (an
+ * Editor holding `edit_posts` could not use the content wrappers at all).
+ *
+ * The `wppilot_is_enabled()` half is not optional: without it these abilities
+ * would keep executing after an administrator switches WPPilot off.
+ */
+function wordpress_core_permission(): bool
+{
+    return \wppilot_is_enabled() && is_user_logged_in();
+}
+
+/**
+ * The same gate, plus one specific capability checked up front.
+ *
+ * Used where a whole ability is meaningless without the capability — comment
+ * moderation, for instance — so the refusal happens before any work.
+ */
+function wordpress_core_permission_for(string $capability): bool
+{
+    return wordpress_core_permission() && current_user_can($capability);
+}
+
+/**
+ * Reject URLs whose scheme WordPress does not consider safe.
+ *
+ * Menu items and similar records store a raw URL that is later rendered into an
+ * href. `javascript:`, `data:`, and `vbscript:` URLs there are stored XSS, so
+ * the scheme is validated against WordPress's own allowlist rather than a
+ * hand-written denylist, and protocol-relative or path-relative values are
+ * accepted because they carry no scheme at all.
+ */
+function wordpress_unsafe_url_error(string $url, string $field = 'url'): ?WP_Error
+{
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+        return null;
+    }
+
+    $sanitized = esc_url_raw($trimmed);
+    if ($sanitized === '') {
+        return new WP_Error(
+            'unsafe_url',
+            sprintf(
+                'The %1$s value is not an acceptable URL. Allowed schemes: %2$s.',
+                $field,
+                implode(', ', wp_allowed_protocols()),
+            ),
+            ['status' => 422],
+        );
+    }
+
+    // esc_url_raw() strips a disallowed scheme rather than rejecting it, which
+    // would silently rewrite "javascript:alert(1)" into something storable.
+    // Comparing schemes catches that instead of trusting the rewrite.
+    $original_scheme = strtolower((string) wp_parse_url($trimmed, PHP_URL_SCHEME));
+    $sanitized_scheme = strtolower((string) wp_parse_url($sanitized, PHP_URL_SCHEME));
+    if ($original_scheme !== '' && $original_scheme !== $sanitized_scheme) {
+        return new WP_Error(
+            'unsafe_url_scheme',
+            sprintf(
+                'The %1$s value uses the disallowed scheme "%2$s". Allowed schemes: %3$s.',
+                $field,
+                $original_scheme,
+                implode(', ', wp_allowed_protocols()),
+            ),
+            ['status' => 422],
+        );
+    }
+
+    return null;
+}
+
+/**
  * Content statuses the core wrappers accept.
  *
  * @var list<string>
@@ -470,6 +550,53 @@ function wordpress_create_capability_error(string $post_type, array $input): ?WP
         return new WP_Error(
             'cannot_assign_author',
             'You are not allowed to attribute content to another user.',
+            ['status' => 403],
+        );
+    }
+
+    return null;
+}
+
+/**
+ * Enforce the publish grant when an update changes a post's status.
+ *
+ * Only a transition into a publicly reachable status is gated. Editing a
+ * published post, or moving it back to draft, needs edit access alone — which
+ * the caller has already been checked for.
+ *
+ * @param \WP_Post $post
+ * @param array<string, mixed> $input Normalized input, short field names.
+ */
+function wordpress_update_status_capability_error(object $post, array $input): ?WP_Error
+{
+    if (!array_key_exists('status', $input)) {
+        return null;
+    }
+
+    $requested = wordpress_resolve_create_status($input['status']);
+    if ($requested === (string) $post->post_status) {
+        return null;
+    }
+    if (!in_array($requested, WPPILOT_CORE_PUBLISHING_STATUSES, strict: true)) {
+        return null;
+    }
+
+    $object = get_post_type_object((string) $post->post_type);
+    if (!$object instanceof WP_Post_Type) {
+        return new WP_Error(
+            'invalid_post_type',
+            sprintf('Post type "%s" is not registered.', (string) $post->post_type),
+            ['status' => 404],
+        );
+    }
+
+    if (!current_user_can((string) $object->cap->publish_posts)) {
+        return new WP_Error(
+            'cannot_publish_post',
+            sprintf(
+                'You are not allowed to publish content of type "%s". Leave the status unchanged or set it to draft.',
+                (string) $post->post_type,
+            ),
             ['status' => 403],
         );
     }

@@ -93,7 +93,22 @@ Yes. **WPPilot → Abilities** lists every registered ability, grouped by provid
 
 = What does WPPilot Pro add? =
 
-Specialized abilities for WooCommerce, page builders, forms, SEO, custom fields, themes and multilingual sites, plus persistent memory across conversations. Pro is a separate paid plugin from wppilot.co and is not required — WPPilot works on its own.
+Pro is for the plugins your site adds on top of WordPress: WooCommerce, page builders, forms, SEO suites, custom fields, themes and multilingual tools, plus persistent memory across conversations and an approval queue. It is a separate paid plugin from wppilot.co and is not required.
+
+WordPress itself is Free. Content, taxonomies, media, comments, revisions, menus, user reads and the allowlisted settings surface are all in this plugin and need no licence, entitlement service or Pro install.
+
+= Which WordPress operations work without Pro? =
+
+* Posts, pages and public custom post types — list, search, read, create, update, trash, restore, and permanently delete with explicit confirmation.
+* Categories, tags and other public taxonomies — discover, list, read, create, update, delete with confirmation, and assign to content.
+* Media — list, read, import from a URL, update metadata and alt text, set and clear featured images, attach and detach, and delete with confirmation.
+* Comments — list, read, reply, edit, approve, hold, spam, unspam, trash, restore, and delete with confirmation.
+* Revisions — list with autosaves distinguished, read against the live post, and restore.
+* Menus — create, rename, delete, add and remove items, reorder, and assign to the theme's navigation locations.
+* Users — privacy-minimized reads.
+* Site information and an explicit settings allowlist.
+
+New content is created as a draft unless you ask for publication explicitly, and publishing is checked against the post type's own capability.
 
 == Screenshots ==
 

@@ -21,10 +21,10 @@ if (!defined('ABSPATH')) {
 }
 
 register_core_ability('wppilot/create-post', [
-    'label' => __('Create Post', domain: 'wppilot-pro'),
+    'label' => __('Create Post', domain: 'wppilot'),
     'description' => __(
         'Creates a WordPress post of any registered post type and returns its ID, permalink, and edit URL. Use this before opening a live builder editor or calling a builder-specific content ability. When Breakdance is active, non-empty `content` / `post_content` is gated and rejected unless the user explicitly confirms the raw WordPress write and the re-call sets `allow_raw_content_on_breakdance_post:true`; leave content empty and use `wppilot/breakdance-set-content` plus the element abilities for a Breakdance page. Accepts both short names (title, slug, status, content, excerpt, parent, author, date) and WordPress-native aliases (post_title, post_name, post_status, post_content, post_excerpt, post_parent, post_author, post_date).',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -146,7 +146,7 @@ register_core_ability('wppilot/create-post', [
         ],
     ],
     'execute_callback' => __NAMESPACE__ . '\wordpress_create_post',
-    'permission_callback' => 'wppilot_permission_callback',
+    'permission_callback' => __NAMESPACE__ . '\\wordpress_core_permission',
     'meta' => [
         'show_in_rest' => true,
         'mcp' => ['public' => true],

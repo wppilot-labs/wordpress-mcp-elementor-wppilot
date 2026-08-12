@@ -19,10 +19,10 @@ if (!defined('ABSPATH')) {
 }
 
 register_core_ability('wppilot/delete-post', [
-    'label' => __('Delete Post', domain: 'wppilot-pro'),
+    'label' => __('Delete Post', domain: 'wppilot'),
     'description' => __(
         'Deletes a WordPress post of any post type. By default moves it to the trash; set force=true to bypass the trash and delete permanently. Identifies the target via `post_id` (short alias: `id`).',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -62,7 +62,7 @@ register_core_ability('wppilot/delete-post', [
         ],
     ],
     'execute_callback' => __NAMESPACE__ . '\wordpress_delete_post',
-    'permission_callback' => 'wppilot_permission_callback',
+    'permission_callback' => __NAMESPACE__ . '\\wordpress_core_permission',
     'meta' => [
         'show_in_rest' => true,
         'mcp' => ['public' => true],
@@ -98,6 +98,22 @@ function wordpress_delete_post(array $input): array|WP_Error
 
     if (!$post) {
         return new WP_Error('not_found', sprintf('Post %d not found.', $post_id));
+    }
+
+    $agent_facing = wordpress_post_type_is_agent_facing((string) $post->post_type);
+    if ($agent_facing !== null) {
+        return $agent_facing;
+    }
+
+    // Object-level, not type-level: WordPress maps `delete_post` through the
+    // post type's own capability object and additionally decides ownership, so
+    // an Author may delete their own draft but not someone else's.
+    if (!current_user_can('delete_post', $post_id)) {
+        return new WP_Error(
+            'cannot_delete_post',
+            sprintf('You are not allowed to delete post %d.', $post_id),
+            ['status' => 403],
+        );
     }
 
     $previous_status = $post->post_status;

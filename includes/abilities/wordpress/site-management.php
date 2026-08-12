@@ -16,10 +16,10 @@ if (!defined('ABSPATH')) {
 }
 
 register_core_ability('wppilot/list-users', [
-    'label' => __('List Users', domain: 'wppilot-pro'),
+    'label' => __('List Users', domain: 'wppilot'),
     'description' => __(
         'Lists WordPress users with bounded pagination, role/search filters, capabilities, and safe profile fields. Passwords and secrets are never returned.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -40,10 +40,10 @@ register_core_ability('wppilot/list-users', [
 ]);
 
 register_core_ability('wppilot/get-user', [
-    'label' => __('Get User', domain: 'wppilot-pro'),
+    'label' => __('Get User', domain: 'wppilot'),
     'description' => __(
         'Returns a WordPress user by ID with roles, safe profile fields, and public capability names. Password hashes, sessions, application passwords, and private user meta are never returned.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -59,10 +59,10 @@ register_core_ability('wppilot/get-user', [
 ]);
 
 register_core_ability('wppilot/create-user', [
-    'label' => __('Create User', domain: 'wppilot-pro'),
+    'label' => __('Create User', domain: 'wppilot'),
     'description' => __(
         'Creates a WordPress account with an explicit role. Critical account creation is blocked by Production Safe and requires explicit confirmation in Developer Full Access.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -86,10 +86,10 @@ register_core_ability('wppilot/create-user', [
 ]);
 
 register_core_ability('wppilot/update-user', [
-    'label' => __('Update User', domain: 'wppilot-pro'),
+    'label' => __('Update User', domain: 'wppilot'),
     'description' => __(
         'Partially updates a WordPress account profile, email, password, or role. Critical account changes are blocked by Production Safe and require explicit confirmation in Developer Full Access.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -113,10 +113,10 @@ register_core_ability('wppilot/update-user', [
 ]);
 
 register_core_ability('wppilot/get-site-settings', [
-    'label' => __('Get Site Settings', domain: 'wppilot-pro'),
+    'label' => __('Get Site Settings', domain: 'wppilot'),
     'description' => __(
         'Returns a curated, non-secret set of WordPress reading, discussion, locale, date, URL, and front-page settings.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'execute_callback' => __NAMESPACE__ . '\\wordpress_get_site_settings',
@@ -125,10 +125,10 @@ register_core_ability('wppilot/get-site-settings', [
 ]);
 
 register_core_ability('wppilot/update-site-settings', [
-    'label' => __('Update Site Settings', domain: 'wppilot-pro'),
+    'label' => __('Update Site Settings', domain: 'wppilot'),
     'description' => __(
         'Partially updates an allowlisted set of ordinary WordPress settings. Secrets, arbitrary options, rewrite internals, and authentication settings are not accepted.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -155,10 +155,10 @@ register_core_ability('wppilot/update-site-settings', [
 ]);
 
 register_core_ability('wppilot/list-extensions', [
-    'label' => __('List Plugins and Themes', domain: 'wppilot-pro'),
+    'label' => __('List Plugins and Themes', domain: 'wppilot'),
     'description' => __(
         'Lists installed plugins and themes with active state, versions, update availability, network activation, and current theme identity. Read-only and does not expose filesystem contents.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => ['type' => 'object', 'default' => [], 'properties' => [], 'additionalProperties' => false],
@@ -171,10 +171,10 @@ register_core_ability('wppilot/list-extensions', [
 ]);
 
 register_core_ability('wppilot/list-menus', [
-    'label' => __('List Navigation Menus', domain: 'wppilot-pro'),
+    'label' => __('List Navigation Menus', domain: 'wppilot'),
     'description' => __(
         'Lists classic WordPress navigation menus and their registered theme locations.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => ['type' => 'object', 'default' => [], 'properties' => [], 'additionalProperties' => false],
@@ -185,10 +185,10 @@ register_core_ability('wppilot/list-menus', [
 ]);
 
 register_core_ability('wppilot/list-menu-items', [
-    'label' => __('List Navigation Menu Items', domain: 'wppilot-pro'),
+    'label' => __('List Navigation Menu Items', domain: 'wppilot'),
     'description' => __(
         'Lists one classic navigation menu as an ordered flat collection with parent relationships, object targets, URLs, labels, and CSS classes.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -204,10 +204,10 @@ register_core_ability('wppilot/list-menu-items', [
 ]);
 
 register_core_ability('wppilot/upsert-menu-item', [
-    'label' => __('Create or Update Menu Item', domain: 'wppilot-pro'),
+    'label' => __('Create or Update Menu Item', domain: 'wppilot'),
     'description' => __(
         'Creates or partially updates a classic navigation menu item. Supports custom URLs and post, page, taxonomy, or other registered object targets.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -236,10 +236,10 @@ register_core_ability('wppilot/upsert-menu-item', [
 ]);
 
 register_core_ability('wppilot/delete-menu-item', [
-    'label' => __('Delete Menu Item', domain: 'wppilot-pro'),
+    'label' => __('Delete Menu Item', domain: 'wppilot'),
     'description' => __(
         'Permanently deletes a classic navigation menu item. Requires explicit confirmation through WPPilot safety enforcement.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -288,7 +288,7 @@ function wordpress_get_user(array $input): array|WP_Error
     $user = get_userdata((int) $input['user_id']);
     return $user instanceof WP_User
         ? wordpress_user_summary($user, include_capabilities: true)
-        : new WP_Error('wppilot_user_not_found', __('User not found.', domain: 'wppilot-pro'));
+        : new WP_Error('wppilot_user_not_found', __('User not found.', domain: 'wppilot'));
 }
 
 /** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
@@ -296,7 +296,7 @@ function wordpress_create_user(array $input): array|WP_Error
 {
     $role = sanitize_key((string) $input['role']);
     if (!array_key_exists($role, wp_roles()->roles)) {
-        return new WP_Error('wppilot_invalid_role', __('The requested role is not registered.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_invalid_role', __('The requested role is not registered.', domain: 'wppilot'));
     }
     $generated = !array_key_exists('password', $input);
     $password = $generated
@@ -337,7 +337,7 @@ function wordpress_update_user(array $input): array|WP_Error
 {
     $user_id = (int) $input['user_id'];
     if (!get_userdata($user_id) instanceof WP_User) {
-        return new WP_Error('wppilot_user_not_found', __('User not found.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_user_not_found', __('User not found.', domain: 'wppilot'));
     }
     $data = ['ID' => $user_id];
     $field_map = [
@@ -360,7 +360,7 @@ function wordpress_update_user(array $input): array|WP_Error
         if (!array_key_exists($role, wp_roles()->roles)) {
             return new WP_Error('wppilot_invalid_role', __(
                 'The requested role is not registered.',
-                domain: 'wppilot-pro',
+                domain: 'wppilot',
             ));
         }
         $data['role'] = $role;
@@ -497,7 +497,7 @@ function wordpress_list_menu_items(array $input): array|WP_Error
 {
     $menu = wp_get_nav_menu_object((int) $input['menu_id']);
     if ($menu === false) {
-        return new WP_Error('wppilot_menu_not_found', __('Navigation menu not found.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_menu_not_found', __('Navigation menu not found.', domain: 'wppilot'));
     }
     $items = wp_get_nav_menu_items($menu->term_id, ['post_status' => 'any']);
     return [
@@ -511,9 +511,19 @@ function wordpress_upsert_menu_item(array $input): array|WP_Error
 {
     $menu_id = (int) $input['menu_id'];
     if (wp_get_nav_menu_object($menu_id) === false) {
-        return new WP_Error('wppilot_menu_not_found', __('Navigation menu not found.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_menu_not_found', __('Navigation menu not found.', domain: 'wppilot'));
     }
     $item_id = (int) ($input['item_id'] ?? 0);
+
+    // A menu item's URL is rendered straight into an href, so a javascript: or
+    // data: value here is stored XSS. Validated before anything is written.
+    if (array_key_exists('url', $input)) {
+        $unsafe = wordpress_unsafe_url_error((string) $input['url']);
+        if ($unsafe !== null) {
+            return $unsafe;
+        }
+    }
+
     $args = [];
     foreach ([
         'title' => 'menu-item-title',
@@ -560,13 +570,13 @@ function wordpress_delete_menu_item(array $input): array|WP_Error
     if (!$item instanceof WP_Post || $item->post_type !== 'nav_menu_item') {
         return new WP_Error('wppilot_menu_item_not_found', __(
             'Navigation menu item not found.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
     if (wp_delete_post($item_id, force_delete: true) === false) {
         return new WP_Error('wppilot_menu_item_delete_failed', __(
             'WordPress could not delete the menu item.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
     return ['item_id' => $item_id, 'deleted' => true];

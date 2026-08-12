@@ -232,7 +232,174 @@ function wppilot_capture_before_image(string $ability_name, array $input): ?arra
     if ($ability_name === 'wppilot/woocommerce-add-order-note') {
         return ['type' => 'order-note-create'];
     }
+    return wppilot_capture_core_before_image($ability_name, $input);
+}
+
+/**
+ * Before-images for the WordPress-core abilities.
+ *
+ * Split from wppilot_capture_before_image() so the core surface can grow without
+ * pushing that function past its complexity budget. Anything whose effect lives
+ * on a post row — terms, featured image, attachment parent, revision restore —
+ * reuses wppilot_snapshot_post(), which already captures post fields, meta, and
+ * every taxonomy assignment together.
+ *
+ * @param array<string, mixed> $input
+ * @return array<string, mixed>|null
+ */
+// @mago-expect lint:cyclomatic-complexity -- One explicit branch per ability is the safety contract.
+function wppilot_capture_core_before_image(string $ability_name, array $input): ?array
+{
+    if (in_array($ability_name, [
+        'wppilot/assign-terms',
+        'wppilot/set-featured-image',
+        'wppilot/remove-featured-image',
+        'wppilot/restore-post',
+    ], strict: true)) {
+        return wppilot_snapshot_post((int) ($input['post_id'] ?? 0));
+    }
+    if (in_array($ability_name, ['wppilot/attach-media', 'wppilot/detach-media'], strict: true)) {
+        return wppilot_snapshot_post((int) ($input['attachment_id'] ?? 0));
+    }
+    if ($ability_name === 'wppilot/restore-revision') {
+        // The write lands on the parent post, so that is what has to be captured.
+        $revision = wp_get_post_revision((int) ($input['revision_id'] ?? 0));
+        return $revision instanceof WP_Post ? wppilot_snapshot_post((int) $revision->post_parent) : null;
+    }
+    if (in_array($ability_name, ['wppilot/update-term', 'wppilot/delete-term'], strict: true)) {
+        return wppilot_snapshot_term((int) ($input['term_id'] ?? 0), (string) ($input['taxonomy'] ?? ''));
+    }
+    if ($ability_name === 'wppilot/update-menu') {
+        return wppilot_snapshot_term((int) ($input['menu_id'] ?? 0), 'nav_menu');
+    }
+    if ($ability_name === 'wppilot/delete-menu') {
+        return ['type' => 'menu-delete', 'menu_id' => (int) ($input['menu_id'] ?? 0)];
+    }
+    if ($ability_name === 'wppilot/create-term' || $ability_name === 'wppilot/create-menu') {
+        return ['type' => 'term-create', 'taxonomy' => (string) ($input['taxonomy'] ?? 'nav_menu')];
+    }
+    if ($ability_name === 'wppilot/create-comment') {
+        return ['type' => 'comment-create'];
+    }
+    if ($ability_name === 'wppilot/update-comment') {
+        return wppilot_snapshot_comment((int) ($input['comment_id'] ?? 0));
+    }
+    if (in_array($ability_name, ['wppilot/moderate-comment', 'wppilot/delete-comment'], strict: true)) {
+        // @mago-expect analysis:mixed-assignment -- WordPress returns WP_Comment|null for OBJECT output.
+        $comment = get_comment((int) ($input['comment_id'] ?? 0));
+        if ($comment instanceof WP_Comment) {
+            $values = ['comment_id' => (int) $comment->comment_ID, 'status' => wp_get_comment_status($comment)];
+            return [
+                'type' => 'comment-status',
+                'values' => $values,
+                'fingerprint' => wppilot_snapshot_fingerprint($values),
+            ];
+        }
+        return null;
+    }
+    if ($ability_name === 'wppilot/assign-menu-location') {
+        $values = array_map('intval', (array) get_nav_menu_locations());
+        return [
+            'type' => 'menu-locations',
+            'values' => $values,
+            'fingerprint' => wppilot_snapshot_fingerprint($values),
+        ];
+    }
+    if ($ability_name === 'wppilot/reorder-menu-items') {
+        return wppilot_snapshot_menu_order((int) ($input['menu_id'] ?? 0));
+    }
     return null;
+}
+
+/**
+ * Capture a term's editable fields, scoped to the taxonomy the caller named.
+ *
+ * @return array<string, mixed>|null
+ */
+function wppilot_snapshot_term(int $term_id, string $taxonomy): ?array
+{
+    if ($term_id <= 0 || $taxonomy === '') {
+        return null;
+    }
+
+    // @mago-expect analysis:mixed-assignment -- get_term returns WP_Term|WP_Error|null.
+    $term = get_term($term_id, $taxonomy);
+    if (!$term instanceof WP_Term) {
+        return null;
+    }
+
+    $values = [
+        'term_id' => (int) $term->term_id,
+        'taxonomy' => (string) $term->taxonomy,
+        'name' => (string) $term->name,
+        'slug' => (string) $term->slug,
+        'description' => (string) $term->description,
+        'parent' => (int) $term->parent,
+    ];
+
+    return ['type' => 'term', 'values' => $values, 'fingerprint' => wppilot_snapshot_fingerprint($values)];
+}
+
+/**
+ * Capture a comment's editable fields.
+ *
+ * The commenter's email and IP are deliberately excluded: the ledger is readable
+ * by any WPPilot administrator, and restoring a comment's text never needs them.
+ *
+ * @return array<string, mixed>|null
+ */
+function wppilot_snapshot_comment(int $comment_id): ?array
+{
+    if ($comment_id <= 0) {
+        return null;
+    }
+
+    // @mago-expect analysis:mixed-assignment -- WordPress returns WP_Comment|null for OBJECT output.
+    $comment = get_comment($comment_id);
+    if (!$comment instanceof WP_Comment) {
+        return null;
+    }
+
+    $values = [
+        'comment_id' => (int) $comment->comment_ID,
+        'content' => (string) $comment->comment_content,
+        'author' => (string) $comment->comment_author,
+    ];
+
+    return ['type' => 'comment', 'values' => $values, 'fingerprint' => wppilot_snapshot_fingerprint($values)];
+}
+
+/**
+ * Capture a menu's item order and nesting so a reorder can be undone exactly.
+ *
+ * @return array<string, mixed>|null
+ */
+function wppilot_snapshot_menu_order(int $menu_id): ?array
+{
+    if ($menu_id <= 0) {
+        return null;
+    }
+
+    $items = wp_get_nav_menu_items($menu_id);
+    if (!is_array($items)) {
+        return null;
+    }
+
+    $values = [];
+    foreach ($items as $item) {
+        $values[] = [
+            'item_id' => (int) $item->ID,
+            'position' => (int) $item->menu_order,
+            'parent_id' => (int) $item->menu_item_parent,
+        ];
+    }
+
+    return [
+        'type' => 'menu-order',
+        'menu_id' => $menu_id,
+        'values' => $values,
+        'fingerprint' => wppilot_snapshot_fingerprint($values),
+    ];
 }
 
 /** @return array<string, mixed>|null */
@@ -363,7 +530,243 @@ function wppilot_build_rollback_payload(string $ability_name, ?array $before, mi
     if (($before['type'] ?? null) === 'comment-status') {
         return ['reversible' => true, 'type' => 'restore-comment-status', 'snapshot' => $before];
     }
+    return wppilot_build_core_rollback_payload($ability_name, $before, $result);
+}
+
+/**
+ * Rollback strategies for the WordPress-core abilities.
+ *
+ * Permanent deletions are declared non-reversible explicitly rather than falling
+ * through to the generic "no strategy registered" message, so the ledger states
+ * the actual reason a change cannot be undone.
+ *
+ * @param array<string, mixed> $before
+ * @return array<string, mixed>
+ */
+// @mago-expect lint:cyclomatic-complexity -- Explicit non-reversible reasons are part of the safety contract.
+function wppilot_build_core_rollback_payload(string $ability_name, array $before, mixed $result): array
+{
+    if ($ability_name === 'wppilot/delete-term') {
+        return [
+            'reversible' => false,
+            'reason' => 'WordPress has no trash for terms, so the term was permanently deleted.',
+        ];
+    }
+    if ($ability_name === 'wppilot/delete-menu') {
+        return [
+            'reversible' => false,
+            'reason' => 'The menu and all of its items were permanently deleted.',
+        ];
+    }
+    if ($ability_name === 'wppilot/delete-comment') {
+        return ['reversible' => false, 'reason' => 'The comment was permanently deleted.'];
+    }
+    if (($before['type'] ?? null) === 'term-create') {
+        $term_id = is_array($result) ? (int) ($result['term_id'] ?? $result['menu_id'] ?? 0) : 0;
+        return (
+            $term_id > 0
+                ? [
+                    'reversible' => true,
+                    'type' => 'delete-created-term',
+                    'term_id' => $term_id,
+                    'taxonomy' => (string) ($before['taxonomy'] ?? ''),
+                ]
+                : ['reversible' => false, 'reason' => 'Created term ID was not returned.']
+        );
+    }
+    if (($before['type'] ?? null) === 'comment-create') {
+        $comment_id = is_array($result) ? (int) ($result['comment_id'] ?? 0) : 0;
+        return (
+            $comment_id > 0
+                ? ['reversible' => true, 'type' => 'delete-created-comment', 'comment_id' => $comment_id]
+                : ['reversible' => false, 'reason' => 'Created comment ID was not returned.']
+        );
+    }
+    if (($before['type'] ?? null) === 'term') {
+        return ['reversible' => true, 'type' => 'restore-term', 'snapshot' => $before];
+    }
+    if (($before['type'] ?? null) === 'comment') {
+        return ['reversible' => true, 'type' => 'restore-comment', 'snapshot' => $before];
+    }
+    if (($before['type'] ?? null) === 'menu-locations') {
+        return ['reversible' => true, 'type' => 'restore-menu-locations', 'snapshot' => $before];
+    }
+    if (($before['type'] ?? null) === 'menu-order') {
+        return ['reversible' => true, 'type' => 'restore-menu-order', 'snapshot' => $before];
+    }
     return ['reversible' => false, 'reason' => 'No rollback strategy is registered for this change.'];
+}
+
+/**
+ * Delete a term created by a rolled-back change.
+ *
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_rollback_created_term(int $term_id, string $taxonomy): array|WP_Error
+{
+    if ($term_id <= 0 || $taxonomy === '') {
+        return new WP_Error('wppilot_rollback_invalid_term', __('Created term is unknown.', domain: 'wppilot'));
+    }
+    // @mago-expect analysis:mixed-assignment -- get_term returns WP_Term|WP_Error|null.
+    $term = get_term($term_id, $taxonomy);
+    if (!$term instanceof WP_Term) {
+        return ['result' => 'already-absent', 'term_id' => $term_id];
+    }
+
+    $deleted = wp_delete_term($term_id, $taxonomy);
+    if (is_wp_error($deleted)) {
+        return $deleted;
+    }
+    if ($deleted !== true) {
+        return new WP_Error('wppilot_rollback_term_failed', __('The term could not be deleted.', domain: 'wppilot'));
+    }
+
+    return ['result' => 'deleted', 'term_id' => $term_id, 'taxonomy' => $taxonomy];
+}
+
+/**
+ * Restore a term's captured fields, verifying the write landed.
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_restore_term_snapshot(array $snapshot): array|WP_Error
+{
+    $values = wppilot_string_keyed_array($snapshot['values'] ?? null);
+    $term_id = (int) ($values['term_id'] ?? 0);
+    $taxonomy = (string) ($values['taxonomy'] ?? '');
+    if ($term_id <= 0 || $taxonomy === '') {
+        return new WP_Error('wppilot_rollback_invalid_term', __('Term snapshot is incomplete.', domain: 'wppilot'));
+    }
+
+    $updated = wp_update_term($term_id, $taxonomy, [
+        'name' => (string) ($values['name'] ?? ''),
+        'slug' => (string) ($values['slug'] ?? ''),
+        'description' => (string) ($values['description'] ?? ''),
+        'parent' => (int) ($values['parent'] ?? 0),
+    ]);
+    if (is_wp_error($updated)) {
+        return $updated;
+    }
+
+    $observed = wppilot_snapshot_term($term_id, $taxonomy);
+    if ($observed === null) {
+        return new WP_Error(
+            'wppilot_rollback_unverified',
+            __('The term could not be re-read after the restore.', domain: 'wppilot'),
+        );
+    }
+
+    return ['result' => 'restored', 'term_id' => $term_id, 'fingerprint' => $observed['fingerprint'] ?? ''];
+}
+
+/**
+ * Restore a comment's captured content.
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_restore_comment_snapshot(array $snapshot): array|WP_Error
+{
+    $values = wppilot_string_keyed_array($snapshot['values'] ?? null);
+    $comment_id = (int) ($values['comment_id'] ?? 0);
+    if ($comment_id <= 0) {
+        return new WP_Error(
+            'wppilot_rollback_invalid_comment',
+            __('Comment snapshot is incomplete.', domain: 'wppilot'),
+        );
+    }
+
+    $updated = wp_update_comment([
+        'comment_ID' => $comment_id,
+        'comment_content' => (string) ($values['content'] ?? ''),
+        'comment_author' => (string) ($values['author'] ?? ''),
+    ], wp_error: true);
+    if (is_wp_error($updated)) {
+        return $updated;
+    }
+
+    return ['result' => 'restored', 'comment_id' => $comment_id];
+}
+
+/**
+ * Restore the theme's navigation-location assignments.
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>
+ */
+function wppilot_restore_menu_locations_snapshot(array $snapshot): array
+{
+    $values = array_map('intval', wppilot_string_keyed_array($snapshot['values'] ?? null));
+    set_theme_mod('nav_menu_locations', $values);
+
+    return ['result' => 'restored', 'locations' => count($values)];
+}
+
+/**
+ * Restore a menu's captured item order and nesting.
+ *
+ * Reports a partial failure honestly rather than claiming a clean rollback: a
+ * half-restored menu order is worse than a reported one, because the operator
+ * would otherwise believe the original order is back.
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_restore_menu_order_snapshot(array $snapshot): array|WP_Error
+{
+    $menu_id = (int) ($snapshot['menu_id'] ?? 0);
+    if ($menu_id <= 0 || wp_get_nav_menu_object($menu_id) === false) {
+        return new WP_Error(
+            'wppilot_rollback_menu_missing',
+            __('The menu no longer exists, so its order cannot be restored.', domain: 'wppilot'),
+        );
+    }
+
+    $restored = 0;
+    /** @var mixed $entry */
+    foreach (wppilot_string_list_of_arrays($snapshot['values'] ?? null) as $entry) {
+        $result = wp_update_nav_menu_item($menu_id, (int) ($entry['item_id'] ?? 0), [
+            'menu-item-position' => (int) ($entry['position'] ?? 0),
+            'menu-item-parent-id' => (int) ($entry['parent_id'] ?? 0),
+        ]);
+        if (is_wp_error($result)) {
+            return new WP_Error('wppilot_rollback_partial', sprintf(
+                /* translators: 1: number of items restored, 2: the underlying error */
+                __(
+                    'The menu order was only partially restored: %1$d items were moved before the failure (%2$s). Re-read the menu before relying on its order.',
+                    domain: 'wppilot',
+                ),
+                $restored,
+                $result->get_error_message(),
+            ));
+        }
+        ++$restored;
+    }
+
+    return ['result' => 'restored', 'menu_id' => $menu_id, 'items' => $restored];
+}
+
+/**
+ * Normalize a stored list of associative arrays.
+ *
+ * @return list<array<string, mixed>>
+ */
+function wppilot_string_list_of_arrays(mixed $value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $rows = [];
+    /** @var mixed $row */
+    foreach ($value as $row) {
+        if (is_array($row)) {
+            $rows[] = wppilot_string_keyed_array($row);
+        }
+    }
+
+    return $rows;
 }
 
 /** @return array<string, mixed>|WP_Error */
@@ -403,6 +806,20 @@ function wppilot_rollback_change(string $id): array|WP_Error
                 $rollback['snapshot'] ?? null,
             )),
             'delete-created-comment' => wppilot_rollback_created_comment((int) ($rollback['comment_id'] ?? 0)),
+            'delete-created-term' => wppilot_rollback_created_term(
+                (int) ($rollback['term_id'] ?? 0),
+                (string) ($rollback['taxonomy'] ?? ''),
+            ),
+            'restore-term' => wppilot_restore_term_snapshot(wppilot_string_keyed_array($rollback['snapshot'] ?? null)),
+            'restore-comment' => wppilot_restore_comment_snapshot(wppilot_string_keyed_array(
+                $rollback['snapshot'] ?? null,
+            )),
+            'restore-menu-locations' => wppilot_restore_menu_locations_snapshot(wppilot_string_keyed_array(
+                $rollback['snapshot'] ?? null,
+            )),
+            'restore-menu-order' => wppilot_restore_menu_order_snapshot(wppilot_string_keyed_array(
+                $rollback['snapshot'] ?? null,
+            )),
             default => new WP_Error('wppilot_rollback_unknown', __('Unknown rollback strategy.', domain: 'wppilot')),
         };
     } catch (Throwable $error) {

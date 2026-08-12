@@ -16,10 +16,10 @@ if (!defined('ABSPATH')) {
 }
 
 register_core_ability('wppilot/list-media', [
-    'label' => __('List Media', domain: 'wppilot-pro'),
+    'label' => __('List Media', domain: 'wppilot'),
     'description' => __(
         'Lists Media Library attachments with bounded pagination, filename/title search, MIME filtering, dimensions, alt text, URLs, and parent content.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -41,10 +41,10 @@ register_core_ability('wppilot/list-media', [
 ]);
 
 register_core_ability('wppilot/get-media', [
-    'label' => __('Get Media', domain: 'wppilot-pro'),
+    'label' => __('Get Media', domain: 'wppilot'),
     'description' => __(
         'Returns one attachment with file metadata, generated sizes, alt text, caption, description, parent, and edit URL.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -60,10 +60,10 @@ register_core_ability('wppilot/get-media', [
 ]);
 
 register_core_ability('wppilot/import-media-url', [
-    'label' => __('Import Media from URL', domain: 'wppilot-pro'),
+    'label' => __('Import Media from URL', domain: 'wppilot'),
     'description' => __(
         'Safely downloads an HTTP(S) asset through WordPress, validates the resulting upload, creates a Media Library attachment, and optionally sets title, caption, alt text, and a parent post.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -85,10 +85,10 @@ register_core_ability('wppilot/import-media-url', [
 ]);
 
 register_core_ability('wppilot/update-media', [
-    'label' => __('Update Media', domain: 'wppilot-pro'),
+    'label' => __('Update Media', domain: 'wppilot'),
     'description' => __(
         'Partially updates an attachment title, caption, description, alt text, or parent without replacing the underlying file.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -111,10 +111,10 @@ register_core_ability('wppilot/update-media', [
 ]);
 
 register_core_ability('wppilot/delete-media', [
-    'label' => __('Delete Media', domain: 'wppilot-pro'),
+    'label' => __('Delete Media', domain: 'wppilot'),
     'description' => __(
         'Permanently deletes a Media Library attachment and its generated files. This is irreversible and requires explicit confirmation through WPPilot safety enforcement.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -178,7 +178,7 @@ function wordpress_get_media(array $input): array|WP_Error
 {
     $attachment = get_post((int) $input['attachment_id']);
     if (!$attachment instanceof WP_Post || $attachment->post_type !== 'attachment') {
-        return new WP_Error('wppilot_media_not_found', __('Media attachment not found.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_media_not_found', __('Media attachment not found.', domain: 'wppilot'));
     }
     $result = wordpress_media_summary($attachment);
     $result['description'] = $attachment->post_content;
@@ -194,7 +194,7 @@ function wordpress_import_media_url(array $input): array|WP_Error
     if ($url === '' || !wp_http_validate_url($url)) {
         return new WP_Error('wppilot_invalid_media_url', __(
             'A safe, public HTTP(S) URL is required.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
     require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -244,7 +244,7 @@ function wordpress_update_media(array $input): array|WP_Error
     $attachment_id = (int) $input['attachment_id'];
     $attachment = get_post($attachment_id);
     if (!$attachment instanceof WP_Post || $attachment->post_type !== 'attachment') {
-        return new WP_Error('wppilot_media_not_found', __('Media attachment not found.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_media_not_found', __('Media attachment not found.', domain: 'wppilot'));
     }
     /** @var array{ID: int, post_title?: string, post_excerpt?: string, post_content?: string, post_parent?: int} $postarr */
     $postarr = ['ID' => $attachment_id];
@@ -281,13 +281,13 @@ function wordpress_delete_media(array $input): array|WP_Error
     $attachment_id = (int) $input['attachment_id'];
     $attachment = get_post($attachment_id);
     if (!$attachment instanceof WP_Post || $attachment->post_type !== 'attachment') {
-        return new WP_Error('wppilot_media_not_found', __('Media attachment not found.', domain: 'wppilot-pro'));
+        return new WP_Error('wppilot_media_not_found', __('Media attachment not found.', domain: 'wppilot'));
     }
     $file = (string) get_attached_file($attachment_id);
     if (wp_delete_attachment($attachment_id, force_delete: true) === false) {
         return new WP_Error('wppilot_media_delete_failed', __(
             'WordPress could not delete the attachment.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
     return ['attachment_id' => $attachment_id, 'deleted' => true, 'former_file' => $file];

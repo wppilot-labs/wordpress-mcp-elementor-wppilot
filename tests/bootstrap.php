@@ -21,4 +21,13 @@ declare(strict_types=1);
 define('ABSPATH', __DIR__ . '/');
 
 require_once __DIR__ . '/doubles/wordpress.php';
-require_once dirname(__DIR__) . '/includes/abilities/wordpress/helpers.php';
+
+// Load the whole WordPress-core module, not just its helpers: registration
+// happens at file scope, so requiring every file is what proves the surface
+// comes up with Free alone — no Pro class, licence check, or entitlement call.
+require_once dirname(__DIR__) . '/includes/abilities/wordpress/bootstrap.php';
+wppilot_load_wordpress_abilities();
+
+// Registrations captured during load are the baseline the suite asserts against.
+// Snapshot them before any test calls WPPilot_Test_State::reset().
+define('WPPILOT_TEST_BOOT_ABILITIES', WPPilot_Test_State::$registered_abilities);

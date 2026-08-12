@@ -16,10 +16,10 @@ if (!defined('ABSPATH')) {
 }
 
 register_core_ability('wppilot/list-content', [
-    'label' => __('List WordPress Content', domain: 'wppilot-pro'),
+    'label' => __('List WordPress Content', domain: 'wppilot'),
     'description' => __(
         'Lists posts, pages, attachments, and custom post types with bounded pagination and search. Returns stable summaries for discovery before a targeted read or edit.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -53,10 +53,10 @@ register_core_ability('wppilot/list-content', [
 ]);
 
 register_core_ability('wppilot/get-content', [
-    'label' => __('Get WordPress Content', domain: 'wppilot-pro'),
+    'label' => __('Get WordPress Content', domain: 'wppilot'),
     'description' => __(
         'Returns a normalized post, page, attachment, or CPT snapshot with content, author, dates, terms, featured image, permalink, edit URL, and optionally non-protected metadata.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -76,10 +76,10 @@ register_core_ability('wppilot/get-content', [
 ]);
 
 register_core_ability('wppilot/search-content', [
-    'label' => __('Search Site Content', domain: 'wppilot-pro'),
+    'label' => __('Search Site Content', domain: 'wppilot'),
     'description' => __(
         'Searches public WordPress content types and returns ranked, bounded excerpts with edit targets. This is a live lexical search and creates no persistent index.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -99,10 +99,10 @@ register_core_ability('wppilot/search-content', [
 ]);
 
 register_core_ability('wppilot/get-page-snapshot', [
-    'label' => __('Get Page Snapshot', domain: 'wppilot-pro'),
+    'label' => __('Get Page Snapshot', domain: 'wppilot'),
     'description' => __(
         'Returns a compact normalized page digest: identity, template, content fingerprints, block outline, builder signals, SEO candidates, and modification state.',
-        domain: 'wppilot-pro',
+        domain: 'wppilot',
     ),
     'category' => 'wordpress',
     'input_schema' => [
@@ -138,7 +138,7 @@ function wordpress_list_content(array $input): array|WP_Error
     if ($post_types === []) {
         return new WP_Error('wppilot_no_valid_post_types', __(
             'No valid post types were requested.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
 
@@ -180,7 +180,7 @@ function wordpress_get_content(array $input): array|WP_Error
     if (!$post instanceof WP_Post || !current_user_can('read_post', $post->ID)) {
         return new WP_Error('wppilot_content_not_found', __(
             'Content was not found or is not readable.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
 
@@ -236,7 +236,7 @@ function wordpress_get_page_snapshot(array $input): array|WP_Error
     if (!$post instanceof WP_Post || !current_user_can('read_post', $post->ID)) {
         return new WP_Error('wppilot_content_not_found', __(
             'Content was not found or is not readable.',
-            domain: 'wppilot-pro',
+            domain: 'wppilot',
         ));
     }
 
