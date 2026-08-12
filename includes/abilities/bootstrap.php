@@ -9,6 +9,9 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
+// Function definitions only — the module registers nothing until its loader runs.
+require_once __DIR__ . '/wordpress/bootstrap.php';
+
 /**
  * Load the Ability execution REST shim only when this WordPress version supports Abilities.
  */
@@ -83,6 +86,8 @@ function wppilot_register_ability_categories(): void
         ]);
     }
 
+    wppilot_register_wordpress_ability_category();
+
     wp_register_ability_category('gutenberg', [
         'label' => __('Gutenberg', domain: 'wppilot'),
         'description' => __(
@@ -129,5 +134,6 @@ function wppilot_register_builtin_abilities(): void
     require_once $dir . 'agent-context.php';
     require_once $dir . 'change-log.php';
     require_once $dir . 'diagnostics.php';
+    wppilot_load_wordpress_abilities();
     wppilot_load_gutenberg_abilities();
 }

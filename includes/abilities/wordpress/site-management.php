@@ -1,0 +1,593 @@
+<?php
+
+// SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+declare(strict_types=1);
+
+namespace WPPilot\Abilities\WordPress;
+
+use WP_Error;
+use WP_Post;
+use WP_User;
+
+if (!defined('ABSPATH')) {
+    exit();
+}
+
+register_core_ability('wppilot/list-users', [
+    'label' => __('List Users', domain: 'wppilot-pro'),
+    'description' => __(
+        'Lists WordPress users with bounded pagination, role/search filters, capabilities, and safe profile fields. Passwords and secrets are never returned.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'default' => [],
+        'properties' => [
+            'search' => ['type' => 'string', 'default' => ''],
+            'role' => ['type' => 'string', 'default' => ''],
+            'page' => ['type' => 'integer', 'minimum' => 1, 'default' => 1],
+            'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 20],
+        ],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_list_users',
+    'permission_callback' => static fn(): bool => current_user_can('list_users'),
+    'meta' => wordpress_core_mcp_meta(readonly: true),
+]);
+
+register_core_ability('wppilot/get-user', [
+    'label' => __('Get User', domain: 'wppilot-pro'),
+    'description' => __(
+        'Returns a WordPress user by ID with roles, safe profile fields, and public capability names. Password hashes, sessions, application passwords, and private user meta are never returned.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => ['user_id' => ['type' => 'integer', 'minimum' => 1]],
+        'required' => ['user_id'],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_get_user',
+    'permission_callback' => static fn(): bool => current_user_can('list_users'),
+    'meta' => wordpress_core_mcp_meta(readonly: true),
+]);
+
+register_core_ability('wppilot/create-user', [
+    'label' => __('Create User', domain: 'wppilot-pro'),
+    'description' => __(
+        'Creates a WordPress account with an explicit role. Critical account creation is blocked by Production Safe and requires explicit confirmation in Developer Full Access.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'username' => ['type' => 'string', 'minLength' => 1],
+            'email' => ['type' => 'string', 'format' => 'email'],
+            'password' => ['type' => 'string', 'minLength' => 12],
+            'role' => ['type' => 'string'],
+            'display_name' => ['type' => 'string'],
+            'first_name' => ['type' => 'string'],
+            'last_name' => ['type' => 'string'],
+        ],
+        'required' => ['username', 'email', 'role'],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_create_user',
+    'permission_callback' => static fn(): bool => current_user_can('create_users') && current_user_can('promote_users'),
+    'meta' => wordpress_core_mcp_meta(readonly: false, destructive: true, idempotent: false),
+]);
+
+register_core_ability('wppilot/update-user', [
+    'label' => __('Update User', domain: 'wppilot-pro'),
+    'description' => __(
+        'Partially updates a WordPress account profile, email, password, or role. Critical account changes are blocked by Production Safe and require explicit confirmation in Developer Full Access.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'user_id' => ['type' => 'integer', 'minimum' => 1],
+            'email' => ['type' => 'string', 'format' => 'email'],
+            'password' => ['type' => 'string', 'minLength' => 12],
+            'role' => ['type' => 'string'],
+            'display_name' => ['type' => 'string'],
+            'first_name' => ['type' => 'string'],
+            'last_name' => ['type' => 'string'],
+        ],
+        'required' => ['user_id'],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_update_user',
+    'permission_callback' => __NAMESPACE__ . '\\wordpress_update_user_permission',
+    'meta' => wordpress_core_mcp_meta(readonly: false, destructive: true),
+]);
+
+register_core_ability('wppilot/get-site-settings', [
+    'label' => __('Get Site Settings', domain: 'wppilot-pro'),
+    'description' => __(
+        'Returns a curated, non-secret set of WordPress reading, discussion, locale, date, URL, and front-page settings.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_get_site_settings',
+    'permission_callback' => static fn(): bool => current_user_can('manage_options'),
+    'meta' => wordpress_core_mcp_meta(readonly: true),
+]);
+
+register_core_ability('wppilot/update-site-settings', [
+    'label' => __('Update Site Settings', domain: 'wppilot-pro'),
+    'description' => __(
+        'Partially updates an allowlisted set of ordinary WordPress settings. Secrets, arbitrary options, rewrite internals, and authentication settings are not accepted.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'blogname' => ['type' => 'string'],
+            'blogdescription' => ['type' => 'string'],
+            'timezone_string' => ['type' => 'string'],
+            'date_format' => ['type' => 'string'],
+            'time_format' => ['type' => 'string'],
+            'start_of_week' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 6],
+            'posts_per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],
+            'show_on_front' => ['type' => 'string', 'enum' => ['posts', 'page']],
+            'page_on_front' => ['type' => 'integer', 'minimum' => 0],
+            'page_for_posts' => ['type' => 'integer', 'minimum' => 0],
+            'default_comment_status' => ['type' => 'string', 'enum' => ['open', 'closed']],
+        ],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_update_site_settings',
+    'permission_callback' => static fn(): bool => current_user_can('manage_options'),
+    'meta' => wordpress_core_mcp_meta(readonly: false),
+]);
+
+register_core_ability('wppilot/list-extensions', [
+    'label' => __('List Plugins and Themes', domain: 'wppilot-pro'),
+    'description' => __(
+        'Lists installed plugins and themes with active state, versions, update availability, network activation, and current theme identity. Read-only and does not expose filesystem contents.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => ['type' => 'object', 'default' => [], 'properties' => [], 'additionalProperties' => false],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_list_extensions',
+    'permission_callback' => static fn(): bool => (
+        current_user_can('activate_plugins') || current_user_can('switch_themes')
+    ),
+    'meta' => wordpress_core_mcp_meta(readonly: true),
+]);
+
+register_core_ability('wppilot/list-menus', [
+    'label' => __('List Navigation Menus', domain: 'wppilot-pro'),
+    'description' => __(
+        'Lists classic WordPress navigation menus and their registered theme locations.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => ['type' => 'object', 'default' => [], 'properties' => [], 'additionalProperties' => false],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_list_menus',
+    'permission_callback' => static fn(): bool => current_user_can('edit_theme_options'),
+    'meta' => wordpress_core_mcp_meta(readonly: true),
+]);
+
+register_core_ability('wppilot/list-menu-items', [
+    'label' => __('List Navigation Menu Items', domain: 'wppilot-pro'),
+    'description' => __(
+        'Lists one classic navigation menu as an ordered flat collection with parent relationships, object targets, URLs, labels, and CSS classes.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => ['menu_id' => ['type' => 'integer', 'minimum' => 1]],
+        'required' => ['menu_id'],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_list_menu_items',
+    'permission_callback' => static fn(): bool => current_user_can('edit_theme_options'),
+    'meta' => wordpress_core_mcp_meta(readonly: true),
+]);
+
+register_core_ability('wppilot/upsert-menu-item', [
+    'label' => __('Create or Update Menu Item', domain: 'wppilot-pro'),
+    'description' => __(
+        'Creates or partially updates a classic navigation menu item. Supports custom URLs and post, page, taxonomy, or other registered object targets.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'menu_id' => ['type' => 'integer', 'minimum' => 1],
+            'item_id' => ['type' => 'integer', 'minimum' => 0, 'default' => 0],
+            'title' => ['type' => 'string'],
+            'url' => ['type' => 'string'],
+            'object' => ['type' => 'string'],
+            'object_id' => ['type' => 'integer', 'minimum' => 0],
+            'type' => ['type' => 'string', 'enum' => ['custom', 'post_type', 'taxonomy', 'post_type_archive']],
+            'parent' => ['type' => 'integer', 'minimum' => 0],
+            'position' => ['type' => 'integer', 'minimum' => 0],
+            'target' => ['type' => 'string'],
+            'classes' => ['type' => 'array', 'items' => ['type' => 'string']],
+            'status' => ['type' => 'string', 'enum' => ['publish', 'draft'], 'default' => 'publish'],
+        ],
+        'required' => ['menu_id'],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_upsert_menu_item',
+    'permission_callback' => static fn(): bool => current_user_can('edit_theme_options'),
+    'meta' => wordpress_core_mcp_meta(readonly: false, idempotent: false),
+]);
+
+register_core_ability('wppilot/delete-menu-item', [
+    'label' => __('Delete Menu Item', domain: 'wppilot-pro'),
+    'description' => __(
+        'Permanently deletes a classic navigation menu item. Requires explicit confirmation through WPPilot safety enforcement.',
+        domain: 'wppilot-pro',
+    ),
+    'category' => 'wordpress',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => ['item_id' => ['type' => 'integer', 'minimum' => 1]],
+        'required' => ['item_id'],
+        'additionalProperties' => false,
+    ],
+    'output_schema' => ['type' => 'object'],
+    'execute_callback' => __NAMESPACE__ . '\\wordpress_delete_menu_item',
+    'permission_callback' => static fn(): bool => current_user_can('edit_theme_options'),
+    'meta' => wordpress_core_mcp_meta(readonly: false, destructive: true, idempotent: false),
+]);
+
+/** @param array<string, mixed> $input @return array<string, mixed> */
+function wordpress_list_users(array $input): array
+{
+    $per_page = min(100, max(1, (int) ($input['per_page'] ?? 20)));
+    $page = max(1, (int) ($input['page'] ?? 1));
+    $args = [
+        'number' => $per_page,
+        'offset' => ($page - 1) * $per_page,
+        'count_total' => true,
+        'orderby' => 'registered',
+        'order' => 'DESC',
+    ];
+    if (trim((string) ($input['search'] ?? '')) !== '') {
+        $args['search'] = '*' . sanitize_text_field((string) $input['search']) . '*';
+        $args['search_columns'] = ['user_login', 'user_email', 'display_name'];
+    }
+    if (trim((string) ($input['role'] ?? '')) !== '') {
+        $args['role'] = sanitize_key((string) $input['role']);
+    }
+    $query = new \WP_User_Query($args);
+    return [
+        'items' => array_map(__NAMESPACE__ . '\\wordpress_user_summary', $query->get_results()),
+        'page' => $page,
+        'per_page' => $per_page,
+        'total' => (int) $query->get_total(),
+    ];
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_get_user(array $input): array|WP_Error
+{
+    $user = get_userdata((int) $input['user_id']);
+    return $user instanceof WP_User
+        ? wordpress_user_summary($user, include_capabilities: true)
+        : new WP_Error('wppilot_user_not_found', __('User not found.', domain: 'wppilot-pro'));
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_create_user(array $input): array|WP_Error
+{
+    $role = sanitize_key((string) $input['role']);
+    if (!array_key_exists($role, wp_roles()->roles)) {
+        return new WP_Error('wppilot_invalid_role', __('The requested role is not registered.', domain: 'wppilot-pro'));
+    }
+    $generated = !array_key_exists('password', $input);
+    $password = $generated
+        ? wp_generate_password(24, special_chars: true, extra_special_chars: true)
+        : (string) $input['password'];
+    $user_id = wp_insert_user([
+        'user_login' => sanitize_user((string) $input['username'], strict: true),
+        'user_email' => sanitize_email((string) $input['email']),
+        'user_pass' => $password,
+        'role' => $role,
+        'display_name' => sanitize_text_field((string) ($input['display_name'] ?? $input['username'])),
+        'first_name' => sanitize_text_field((string) ($input['first_name'] ?? '')),
+        'last_name' => sanitize_text_field((string) ($input['last_name'] ?? '')),
+    ]);
+    if (is_wp_error($user_id)) {
+        return $user_id;
+    }
+    $user = get_userdata((int) $user_id);
+    $result = $user instanceof WP_User ? wordpress_user_summary($user) : ['id' => (int) $user_id];
+    $result['generated_password'] = $generated ? $password : '';
+    $result['password_was_generated'] = $generated;
+    return $result;
+}
+
+/** @param array<string, mixed> $input */
+function wordpress_update_user_permission(array $input): bool
+{
+    $user_id = (int) ($input['user_id'] ?? 0);
+    return (
+        $user_id > 0
+        && current_user_can('edit_user', $user_id)
+        && (!array_key_exists('role', $input) || current_user_can('promote_users'))
+    );
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_update_user(array $input): array|WP_Error
+{
+    $user_id = (int) $input['user_id'];
+    if (!get_userdata($user_id) instanceof WP_User) {
+        return new WP_Error('wppilot_user_not_found', __('User not found.', domain: 'wppilot-pro'));
+    }
+    $data = ['ID' => $user_id];
+    $field_map = [
+        'email' => 'user_email',
+        // @mago-expect lint:no-literal-password -- This is a user-field name, never a credential value.
+        'password' => 'user_pass',
+        'display_name' => 'display_name',
+        'first_name' => 'first_name',
+        'last_name' => 'last_name',
+    ];
+    foreach ($field_map as $source => $target) {
+        if (!array_key_exists($source, $input)) {
+            continue;
+        }
+
+        $data[$target] = $source === 'email' ? sanitize_email((string) $input[$source]) : (string) $input[$source];
+    }
+    if (array_key_exists('role', $input)) {
+        $role = sanitize_key((string) $input['role']);
+        if (!array_key_exists($role, wp_roles()->roles)) {
+            return new WP_Error('wppilot_invalid_role', __(
+                'The requested role is not registered.',
+                domain: 'wppilot-pro',
+            ));
+        }
+        $data['role'] = $role;
+    }
+    $updated = wp_update_user($data);
+    if (is_wp_error($updated)) {
+        return $updated;
+    }
+    $user = get_userdata($user_id);
+    return $user instanceof WP_User ? wordpress_user_summary($user) : ['id' => $user_id];
+}
+
+/** @return array<string, mixed> */
+function wordpress_user_summary(WP_User $user, bool $include_capabilities = false): array
+{
+    $result = [
+        'id' => $user->ID,
+        'username' => $user->user_login,
+        'email' => $user->user_email,
+        'display_name' => $user->display_name,
+        'first_name' => $user->first_name,
+        'last_name' => $user->last_name,
+        'roles' => array_values($user->roles),
+        'registered' => $user->user_registered,
+    ];
+    if ($include_capabilities) {
+        $result['capabilities'] = array_values(array_keys(array_filter($user->allcaps)));
+    }
+    return $result;
+}
+
+/** @return array<string, mixed> */
+function wordpress_get_site_settings(): array
+{
+    $result = [];
+    foreach (array_keys(wordpress_setting_sanitizers()) as $key) {
+        $result[$key] = get_option($key);
+    }
+    $result['home_url'] = home_url('/');
+    $result['site_url'] = site_url('/');
+    $result['locale'] = get_locale();
+    return $result;
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed> */
+function wordpress_update_site_settings(array $input): array
+{
+    $sanitizers = wordpress_setting_sanitizers();
+    $updated = [];
+    foreach ($input as $key => $value) {
+        if (!array_key_exists($key, $sanitizers)) {
+            continue;
+        }
+        $clean = $sanitizers[$key]($value);
+        update_option($key, $clean);
+        $updated[$key] = get_option($key);
+    }
+    return ['updated' => $updated, 'settings' => wordpress_get_site_settings()];
+}
+
+/** @return array<string, callable(mixed): mixed> */
+function wordpress_setting_sanitizers(): array
+{
+    return [
+        'blogname' => static fn(mixed $v): string => sanitize_text_field((string) $v),
+        'blogdescription' => static fn(mixed $v): string => sanitize_text_field((string) $v),
+        'timezone_string' => static fn(mixed $v): string => sanitize_text_field((string) $v),
+        'date_format' => static fn(mixed $v): string => sanitize_text_field((string) $v),
+        'time_format' => static fn(mixed $v): string => sanitize_text_field((string) $v),
+        'start_of_week' => static fn(mixed $v): int => min(6, max(0, (int) $v)),
+        'posts_per_page' => static fn(mixed $v): int => min(100, max(1, (int) $v)),
+        'show_on_front' => static fn(mixed $v): string => (string) $v === 'page' ? 'page' : 'posts',
+        'page_on_front' => static fn(mixed $v): int => max(0, (int) $v),
+        'page_for_posts' => static fn(mixed $v): int => max(0, (int) $v),
+        'default_comment_status' => static fn(mixed $v): string => (string) $v === 'open' ? 'open' : 'closed',
+    ];
+}
+
+/** @return array<string, mixed> */
+function wordpress_list_extensions(): array
+{
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    $updates = get_site_transient('update_plugins');
+    $plugin_updates = is_object($updates) && is_array($updates->response ?? null) ? $updates->response : [];
+    $plugins = [];
+    foreach (get_plugins() as $file => $data) {
+        if (!is_string($file)) {
+            continue;
+        }
+        $plugins[] = [
+            'file' => $file,
+            'name' => (string) ($data['Name'] ?? $file),
+            'version' => (string) ($data['Version'] ?? ''),
+            'active' => is_plugin_active($file),
+            'network_active' => is_plugin_active_for_network($file),
+            'update_version' => array_key_exists($file, $plugin_updates)
+                ? (string) ($plugin_updates[$file]->new_version ?? '')
+                : '',
+        ];
+    }
+    $themes = [];
+    $active = get_stylesheet();
+    foreach (wp_get_themes() as $slug => $theme) {
+        $parent = $theme->parent();
+        $themes[] = [
+            'slug' => $slug,
+            'name' => $theme->get('Name'),
+            'version' => $theme->get('Version'),
+            'active' => $slug === $active,
+            'parent' => $parent !== false ? $parent->get_stylesheet() : '',
+        ];
+    }
+    return ['plugins' => $plugins, 'themes' => $themes, 'active_theme' => $active];
+}
+
+/** @return array<string, mixed> */
+function wordpress_list_menus(): array
+{
+    $locations = get_nav_menu_locations();
+    return [
+        'menus' => array_map(static fn($menu): array => [
+            'id' => (int) $menu->term_id,
+            'name' => (string) $menu->name,
+            'slug' => (string) $menu->slug,
+            'count' => (int) $menu->count,
+            'locations' => array_values(array_keys($locations, (int) $menu->term_id, strict: true)),
+        ], wp_get_nav_menus()),
+        'registered_locations' => get_registered_nav_menus(),
+    ];
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_list_menu_items(array $input): array|WP_Error
+{
+    $menu = wp_get_nav_menu_object((int) $input['menu_id']);
+    if ($menu === false) {
+        return new WP_Error('wppilot_menu_not_found', __('Navigation menu not found.', domain: 'wppilot-pro'));
+    }
+    $items = wp_get_nav_menu_items($menu->term_id, ['post_status' => 'any']);
+    return [
+        'menu' => ['id' => (int) $menu->term_id, 'name' => (string) $menu->name],
+        'items' => array_map(__NAMESPACE__ . '\\wordpress_menu_item_summary', is_array($items) ? $items : []),
+    ];
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_upsert_menu_item(array $input): array|WP_Error
+{
+    $menu_id = (int) $input['menu_id'];
+    if (wp_get_nav_menu_object($menu_id) === false) {
+        return new WP_Error('wppilot_menu_not_found', __('Navigation menu not found.', domain: 'wppilot-pro'));
+    }
+    $item_id = (int) ($input['item_id'] ?? 0);
+    $args = [];
+    foreach ([
+        'title' => 'menu-item-title',
+        'url' => 'menu-item-url',
+        'object' => 'menu-item-object',
+        'type' => 'menu-item-type',
+        'target' => 'menu-item-target',
+        'status' => 'menu-item-status',
+    ] as $source => $target) {
+        if (!array_key_exists($source, $input)) {
+            continue;
+        }
+
+        $args[$target] = (string) $input[$source];
+    }
+    foreach ([
+        'object_id' => 'menu-item-object-id',
+        'parent' => 'menu-item-parent-id',
+        'position' => 'menu-item-position',
+    ] as $source => $target) {
+        if (!array_key_exists($source, $input)) {
+            continue;
+        }
+
+        $args[$target] = (int) $input[$source];
+    }
+    if (array_key_exists('classes', $input)) {
+        $args['menu-item-classes'] = array_map('sanitize_html_class', (array) $input['classes']);
+    }
+    $args['menu-item-status'] ??= 'publish';
+    $updated = wp_update_nav_menu_item($menu_id, $item_id, $args);
+    if (is_wp_error($updated)) {
+        return $updated;
+    }
+    $item = get_post((int) $updated);
+    return $item instanceof WP_Post ? wordpress_menu_item_summary($item) : ['id' => (int) $updated];
+}
+
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_delete_menu_item(array $input): array|WP_Error
+{
+    $item_id = (int) $input['item_id'];
+    $item = get_post($item_id);
+    if (!$item instanceof WP_Post || $item->post_type !== 'nav_menu_item') {
+        return new WP_Error('wppilot_menu_item_not_found', __(
+            'Navigation menu item not found.',
+            domain: 'wppilot-pro',
+        ));
+    }
+    if (wp_delete_post($item_id, force_delete: true) === false) {
+        return new WP_Error('wppilot_menu_item_delete_failed', __(
+            'WordPress could not delete the menu item.',
+            domain: 'wppilot-pro',
+        ));
+    }
+    return ['item_id' => $item_id, 'deleted' => true];
+}
+
+/** @return array<string, mixed> */
+function wordpress_menu_item_summary(object $item): array
+{
+    if ($item instanceof \WP_Post) {
+        $item = wp_setup_nav_menu_item($item);
+    }
+    return [
+        'id' => (int) $item->ID,
+        'title' => (string) $item->title,
+        'url' => (string) $item->url,
+        'type' => (string) $item->type,
+        'object' => (string) $item->object,
+        'object_id' => (int) $item->object_id,
+        'parent' => (int) $item->menu_item_parent,
+        'position' => (int) $item->menu_order,
+        'target' => (string) $item->target,
+        'classes' => array_values(array_filter(array: (array) $item->classes, callback: 'is_string')),
+    ];
+}
