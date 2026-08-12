@@ -156,6 +156,51 @@ final class ProtocolTest extends TestCase
         self::assertNull(\WPPilot\Mcp\validate_modern_headers($headers, $this->modernBody()));
     }
 
+    /**
+     * WP_REST_Request::get_headers() hands back PHP's $_SERVER spelling, where
+     * every hyphen is already an underscore. Matching only the hyphenated name
+     * passed the hand-built fixtures above and failed every real request.
+     */
+    public function testServerStyleUnderscoreHeaderNamesAreAccepted(): void
+    {
+        $headers = [
+            'MCP_PROTOCOL_VERSION' => [VERSION_MODERN],
+            'MCP_METHOD' => ['tools/list'],
+        ];
+
+        self::assertNull(\WPPilot\Mcp\validate_modern_headers($headers, $this->modernBody()));
+    }
+
+    public function testServerStyleUnderscoreNameHeaderIsCompared(): void
+    {
+        $body = $this->modernBody('tools/call', ['name' => 'wppilot_create_post']);
+        $headers = [
+            'MCP_PROTOCOL_VERSION' => [VERSION_MODERN],
+            'MCP_METHOD' => ['tools/call'],
+            'MCP_NAME' => ['wppilot_create_post'],
+        ];
+
+        self::assertNull(\WPPilot\Mcp\validate_modern_headers($headers, $body));
+
+        $headers['MCP_NAME'] = ['spoofed'];
+        $error = \WPPilot\Mcp\validate_modern_headers($headers, $body);
+        self::assertNotNull($error);
+        self::assertSame(-32020, $error['body']['error']['code']);
+    }
+
+    /**
+     * A repeated header arrives from WordPress as a list.
+     */
+    public function testArrayValuedHeadersUseTheFirstValue(): void
+    {
+        $headers = [
+            'MCP_PROTOCOL_VERSION' => [VERSION_MODERN, '2025-11-25'],
+            'MCP_METHOD' => ['tools/list'],
+        ];
+
+        self::assertNull(\WPPilot\Mcp\validate_modern_headers($headers, $this->modernBody()));
+    }
+
     public function testUnsupportedVersionReturnsMinus32022WithSupportedList(): void
     {
         $body = $this->modernBody();
@@ -438,6 +483,24 @@ final class ProtocolTest extends TestCase
 
         $none = build_capabilities(0, 0, 0);
         self::assertSame([], $none);
+    }
+
+    /**
+     * The schema types each capability as an object. An empty PHP array encodes
+     * as `[]`, which a strictly-validating client rejects.
+     */
+    public function testCapabilityValuesEncodeAsJsonObjects(): void
+    {
+        $encoded = json_encode(build_capabilities(10, 2, 0));
+
+        self::assertSame('{"tools":{},"prompts":{}}', $encoded);
+    }
+
+    public function testDiscoverResultEncodesCapabilitiesAsObjects(): void
+    {
+        $encoded = json_encode(build_discover_result(build_capabilities(1, 0, 0), 'production-safe'));
+
+        self::assertStringContainsString('"capabilities":{"tools":{}}', (string) $encoded);
     }
 
     /**

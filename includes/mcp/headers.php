@@ -31,10 +31,23 @@ const BASE64_SENTINEL_PREFIX = '=?base64?';
 const BASE64_SENTINEL_SUFFIX = '?=';
 
 /**
- * Normalize a header map to lowercase keys.
+ * Normalize a header map to lowercase, hyphenated keys.
  *
- * HTTP field names are case-insensitive, so `MCP-Protocol-Version` and
- * `mcp-protocol-version` are the same header and must not be treated as two.
+ * Two normalizations, both required:
+ *
+ * 1. Case. HTTP field names are case-insensitive, so `MCP-Protocol-Version` and
+ *    `mcp-protocol-version` are the same header and must not be treated as two.
+ * 2. Separator. `WP_REST_Request::get_headers()` returns PHP's `$_SERVER`
+ *    spelling, where every hyphen has already become an underscore —
+ *    `MCP-Protocol-Version` arrives as `MCP_PROTOCOL_VERSION`. Matching on the
+ *    hyphenated name alone would miss every real request while still passing a
+ *    test that hand-builds the array.
+ *
+ * Underscores are therefore folded to hyphens. HTTP does permit an underscore
+ * in a field name, but by this point the distinction is already lost — PHP
+ * discards it before the request reaches WordPress — so folding matches what
+ * the client actually sent.
+ *
  * Values are left untouched: method and tool names are case-sensitive.
  *
  * @param array<string, mixed> $headers
@@ -50,7 +63,8 @@ function normalize_headers(array $headers): array
             // an intermediary would have routed on.
             $value = $value[0] ?? '';
         }
-        $normalized[strtolower(trim((string) $name))] = is_scalar($value) ? (string) $value : '';
+        $key = str_replace('_', '-', strtolower(trim((string) $name)));
+        $normalized[$key] = is_scalar($value) ? (string) $value : '';
     }
 
     return $normalized;

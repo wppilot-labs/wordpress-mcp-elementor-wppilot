@@ -38,10 +38,15 @@ if (!defined('ABSPATH')) {
  *   `notifications/message`.
  * - `io.modelcontextprotocol/tasks`: the tasks extension is not implemented.
  *
+ * Each capability value is an stdClass, not an empty PHP array. `json_encode()`
+ * renders an empty array as `[]`, and the schema types these values as objects —
+ * a strictly-validating client rejects `"tools": []` where `"tools": {}` is
+ * required.
+ *
  * @param int $tool_count    Abilities currently exposed as MCP tools.
  * @param int $prompt_count  Skills currently exposed as MCP prompts.
  * @param int $resource_count Resources currently exposed.
- * @return array<string, array<string, mixed>>
+ * @return array<string, object>
  */
 function build_capabilities(int $tool_count, int $prompt_count, int $resource_count): array
 {
@@ -50,13 +55,13 @@ function build_capabilities(int $tool_count, int $prompt_count, int $resource_co
     if ($tool_count > 0) {
         // No `listChanged`: WPPilot does not emit tools/list_changed, and
         // declaring it would promise a notification that never arrives.
-        $capabilities['tools'] = [];
+        $capabilities['tools'] = new \stdClass();
     }
     if ($prompt_count > 0) {
-        $capabilities['prompts'] = [];
+        $capabilities['prompts'] = new \stdClass();
     }
     if ($resource_count > 0) {
-        $capabilities['resources'] = [];
+        $capabilities['resources'] = new \stdClass();
     }
 
     return $capabilities;

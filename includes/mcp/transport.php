@@ -308,15 +308,8 @@ function get_prompt(array $params, mixed $id): array
             continue;
         }
 
-        if (!$ability->has_permission([])) {
-            return error_response(
-                ERROR_INVALID_PARAMS,
-                sprintf('You are not allowed to read prompt: %s', $name),
-                200,
-                $id,
-            );
-        }
-
+        // execute() runs the permission check itself and returns a WP_Error
+        // when the caller may not read this prompt.
         $result = $ability->execute([]);
         if ($result instanceof WP_Error) {
             return error_response(ERROR_INVALID_PARAMS, $result->get_error_message(), 200, $id);
@@ -420,6 +413,29 @@ function call_tool(array $params, mixed $id): array
         }
     }
 
+    // The confirmation contract lives in the safety layer, not in each ability.
+    // On the legacy path it is applied by wppilot_safety_pre_mcp_tool_call(),
+    // which is keyed to the adapter's meta-tool and therefore never fires here.
+    // Reproducing it is not optional: without it a destructive ability that
+    // relies on the profile-level gate rather than its own `confirm` field
+    // would execute unconfirmed under the modern revision only.
+    if (function_exists('wppilot_ability_requires_confirmation') && \wppilot_ability_requires_confirmation($ability)) {
+        if (($arguments['confirm'] ?? null) !== true) {
+            return tool_error(\wppilot_confirmation_required_error($ability), $id);
+        }
+    }
+
+    // `confirm` is a control field, not ability input. Abilities that declare
+    // their own `confirm` property keep it; for the rest it is removed before
+    // execute(), whose schema validation rejects unknown properties.
+    if (
+        array_key_exists('confirm', $arguments)
+        && function_exists('wppilot_ability_schema_has_property')
+        && !\wppilot_ability_schema_has_property($ability, 'confirm')
+    ) {
+        unset($arguments['confirm']);
+    }
+
     if (function_exists('wppilot_rate_pre_ability_execute')) {
         $limited = \wppilot_rate_pre_ability_execute($arguments, $ability, 'mcp');
         if ($limited instanceof WP_Error) {
@@ -430,14 +446,15 @@ function call_tool(array $params, mixed $id): array
         }
     }
 
-    if (!$ability->has_permission($arguments)) {
-        return tool_error(
-            new WP_Error('wppilot_forbidden', 'You are not allowed to run this ability.'),
-            $id,
-        );
-    }
-
-    $result = $ability->execute($arguments);
+    // No separate permission call: WP_Ability::execute() normalizes the input,
+    // validates it against the schema, runs check_permissions(), fires the
+    // ledger's before/after hooks, and validates the output. Duplicating the
+    // permission check here would run it twice and, worse, would drift from
+    // core's contract the moment core changed it.
+    // An ability that declares no input schema rejects any input, including an
+    // empty array, so a no-argument call must pass null rather than []. Core
+    // then skips validation and applies its own defaults.
+    $result = $ability->execute($arguments === [] ? null : $arguments);
     if ($result instanceof WP_Error) {
         return tool_error($result, $id);
     }

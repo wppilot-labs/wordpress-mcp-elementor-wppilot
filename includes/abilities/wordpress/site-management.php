@@ -376,19 +376,42 @@ function wordpress_update_user(array $input): array|WP_Error
 /** @return array<string, mixed> */
 function wordpress_user_summary(WP_User $user, bool $include_capabilities = false): array
 {
+    // Privacy-minimized by default. Display name, avatar, description and
+    // profile URL are already public on a WordPress site; login name, email
+    // address and registration date are not, and an agent summarising a site
+    // has no need for them. They are released only to an account that can
+    // already read them on the Users screen.
     $result = [
         'id' => $user->ID,
-        'username' => $user->user_login,
-        'email' => $user->user_email,
         'display_name' => $user->display_name,
-        'first_name' => $user->first_name,
-        'last_name' => $user->last_name,
-        'roles' => array_values($user->roles),
-        'registered' => $user->user_registered,
+        'description' => (string) $user->description,
+        'url' => (string) $user->user_url,
+        'avatar_url' => (string) get_avatar_url($user->ID),
+        'posts_url' => (string) get_author_posts_url($user->ID),
     ];
+
+    if (!current_user_can('list_users')) {
+        return $result;
+    }
+
+    // Roles describe privilege on this site, so they follow the same gate.
+    $result['username'] = $user->user_login;
+    $result['first_name'] = $user->first_name;
+    $result['last_name'] = $user->last_name;
+    $result['roles'] = array_values($user->roles);
+    $result['registered'] = $user->user_registered;
+
+    // An email address is the most re-identifying field WordPress stores, so it
+    // needs the capability that governs editing accounts, not merely listing
+    // them.
+    if (current_user_can('edit_users')) {
+        $result['email'] = $user->user_email;
+    }
+
     if ($include_capabilities) {
         $result['capabilities'] = array_values(array_keys(array_filter($user->allcaps)));
     }
+
     return $result;
 }
 
