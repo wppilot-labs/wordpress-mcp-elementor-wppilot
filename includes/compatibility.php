@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 /**
  * Internal compatibility contract shared by metadata, startup gates, and agent context.
  */
-define(constant_name: 'WPPILOT_VERSION', value: '1.0.0');
+define(constant_name: 'WPPILOT_VERSION', value: '1.1.0');
 define(constant_name: 'WPPILOT_REST_API_VERSION', value: 1);
 define(constant_name: 'WPPILOT_MINIMUM_WORDPRESS_VERSION', value: '6.9');
 
@@ -36,7 +36,27 @@ function wppilot_rest_api_features(): array
         'agent_context' => true,
         'rest_skills' => true,
         'generalized_execution_shim' => true,
+        // Legacy MCP is served by the bundled adapter; modern MCP by
+        // includes/mcp/. Both are true only because both are wired — see
+        // wppilot_supported_protocol_versions() for what is actually claimed.
+        'mcp_legacy_protocol' => true,
+        'mcp_modern_protocol' => true,
+        // Not implemented, and advertised as false rather than omitted so a
+        // client can tell "absent" from "unsupported": WPPilot has no
+        // change-notification producer, so there is nothing to subscribe to.
+        'mcp_subscriptions' => false,
+        'mcp_tasks_extension' => false,
     ];
+}
+
+/**
+ * MCP protocol revisions this build serves.
+ *
+ * @return list<string>
+ */
+function wppilot_supported_protocol_versions(): array
+{
+    return \WPPilot\Mcp\SUPPORTED_VERSIONS;
 }
 
 /**
@@ -77,6 +97,11 @@ function wppilot_server_compatibility(): array
         'wordpress_version' => wppilot_wordpress_version(),
         'minimum_wordpress_version' => WPPILOT_MINIMUM_WORDPRESS_VERSION,
         'features' => wppilot_rest_api_features(),
+        // Guarded: this block is published from startup gates that can run
+        // before the MCP modules are loaded.
+        'mcp_protocol_versions' => defined('WPPilot\\Mcp\\VERSION_MODERN')
+            ? wppilot_supported_protocol_versions()
+            : [],
     ];
 }
 

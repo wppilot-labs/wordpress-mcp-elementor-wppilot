@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,8 +30,10 @@ Destructive and critical operations require an explicit confirmation flag on top
 
 = Two ways to connect =
 
-* **OAuth 2.1** with PKCE and dynamic client registration — sign in through the browser, no password pasted into a config file.
+* **OAuth 2.1** with PKCE — sign in through the browser, no password pasted into a config file. Client ID Metadata Documents are the preferred registration mechanism, with dynamic client registration kept for clients that do not support them.
 * **Application passwords** — for clients that do not run an OAuth flow.
+
+Both MCP protocol revisions are served during the migration window: the stateless `2026-07-28` and the session-based `2025-11-25`. Existing clients keep working and do not need to reconnect.
 
 Either way, WPPilot generates the exact configuration for your client and shows you where to put it.
 
@@ -93,7 +95,22 @@ Yes. **WPPilot → Abilities** lists every registered ability, grouped by provid
 
 = What does WPPilot Pro add? =
 
-Specialized abilities for WooCommerce, page builders, forms, SEO, custom fields, themes and multilingual sites, plus persistent memory across conversations. Pro is a separate paid plugin from wppilot.co and is not required — WPPilot works on its own.
+Pro is for the plugins your site adds on top of WordPress: WooCommerce, page builders, forms, SEO suites, custom fields, themes and multilingual tools, plus persistent memory across conversations and an approval queue. It is a separate paid plugin from wppilot.co and is not required.
+
+WordPress itself is Free. Content, taxonomies, media, comments, revisions, menus, user reads and the allowlisted settings surface are all in this plugin and need no licence, entitlement service or Pro install.
+
+= Which WordPress operations work without Pro? =
+
+* Posts, pages and public custom post types — list, search, read, create, update, trash, restore, and permanently delete with explicit confirmation.
+* Categories, tags and other public taxonomies — discover, list, read, create, update, delete with confirmation, and assign to content.
+* Media — list, read, import from a URL, update metadata and alt text, set and clear featured images, attach and detach, and delete with confirmation.
+* Comments — list, read, reply, edit, approve, hold, spam, unspam, trash, restore, and delete with confirmation.
+* Revisions — list with autosaves distinguished, read against the live post, and restore.
+* Menus — create, rename, delete, add and remove items, reorder, and assign to the theme's navigation locations.
+* Users — privacy-minimized reads.
+* Site information and an explicit settings allowlist.
+
+New content is created as a draft unless you ask for publication explicitly, and publishing is checked against the post type's own capability.
 
 == Screenshots ==
 
@@ -116,6 +133,18 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.1.0 =
+* The WordPress core surface now ships in the free plugin: content, taxonomies, media, comments, revisions, menus, privacy-minimized user reads, and an allowlisted settings surface. No licence, entitlement service or Pro install is involved. Ability count is 92, up from 42.
+* New content is created as a draft unless publication is requested explicitly. An absent, blank or malformed status resolves to draft before any capability check, so nothing is published by accident.
+* Capabilities come from each post type's and taxonomy's own capability object, so a custom post type declaring its own set is enforced on its own terms. Publishing is checked separately from editing.
+* MCP 2026-07-28 is served alongside 2025-11-25. The new revision is stateless — no handshake, no session. Existing clients are unaffected and do not need to reconnect.
+* Client ID Metadata Documents are now the preferred OAuth registration mechanism, with Dynamic Client Registration kept as a fallback.
+* Security: create, update and delete of content previously ran on a single administrator check and ignored the post type's capabilities and post ownership. Both are now enforced.
+* Security: menu item URLs are validated before storage. A javascript:, data: or vbscript: URL was previously stored verbatim and rendered into a link.
+* Privacy: user reads no longer return email addresses by default. Login name, roles and registration date require the capability to list users; the email address requires the capability to edit them.
+* Comment listings withhold commenter email and IP from accounts that cannot moderate comments.
+* The change ledger covers the new operations, with verified rollback for term edits, comment edits and moderation, menu placement and menu ordering. Permanent deletions are recorded as non-reversible with the reason stated.
+
 = 1.0.0 =
 * Initial public release.
 * MCP server built on the WordPress Abilities API and the official MCP Adapter.
@@ -128,6 +157,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Adds the WordPress core surface to the free plugin and fixes three security defects in content and menu handling, plus a privacy defect in user reads. Your AI client will see roughly twice as many tools after updating. Existing connections keep working and do not need to be re-authorised.
 
 = 1.0.0 =
 First public release.

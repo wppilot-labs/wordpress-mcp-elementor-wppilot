@@ -84,7 +84,11 @@ final class ClientRepository implements ClientRepositoryInterface
                  FROM {$wpdb->prefix}wppilot_oauth_clients
                  WHERE client_id = %s", $clientIdentifier), ARRAY_A);
         if (!is_array($row)) {
-            return null;
+            // Not a locally registered client. Under MCP 2026-07-28 an HTTPS
+            // client_id is a Client ID Metadata Document URL, which is resolved
+            // by fetching it rather than by prior registration. Anything else
+            // is an unknown Dynamic Client Registration identifier.
+            return $this->metadata_document_client($clientIdentifier);
         }
         $entity = new ClientEntity();
         $entity->setIdentifier($row['client_id']);
@@ -96,6 +100,45 @@ final class ClientRepository implements ClientRepositoryInterface
         $entity->setRedirectUri($uris);
         // @mago-expect analysis:mixed-operand
         $entity->setIsConfidential((bool) $row['is_confidential']);
+        return $entity;
+    }
+
+    /**
+     * Resolve an HTTPS client_id by fetching its Client ID Metadata Document.
+     *
+     * Returns null for anything that is not an HTTPS URL, so Dynamic Client
+     * Registration identifiers keep failing closed exactly as before. A fetch
+     * or validation failure also returns null: the caller's contract is
+     * "unknown client", and surfacing the underlying reason here would let an
+     * unauthenticated caller use this endpoint to probe the internal network.
+     *
+     * The document is never written to the clients table. It is authoritative
+     * at its URL, so persisting a copy would let a stale local row outlive a
+     * client that has since changed or withdrawn its redirect URIs.
+     */
+    private function metadata_document_client(string $clientIdentifier): ?ClientEntityInterface
+    {
+        require_once dirname(__DIR__) . '/client-id-metadata.php';
+
+        if (!\WPPilot\OAuth\ClientIdMetadata\is_metadata_document_client_id($clientIdentifier)) {
+            return null;
+        }
+
+        $document = \WPPilot\OAuth\ClientIdMetadata\fetch_client_metadata($clientIdentifier);
+        if (is_wp_error($document)) {
+            return null;
+        }
+
+        $entity = new ClientEntity();
+        $entity->setIdentifier($clientIdentifier);
+        $entity->setName((string) $document['client_name']);
+        /** @var list<string> $uris */
+        $uris = $document['redirect_uris'];
+        $entity->setRedirectUri($uris);
+        // A CIMD client authenticates with PKCE alone: the document is public,
+        // so it can never carry a secret and the client is always public.
+        $entity->setIsConfidential(false);
+
         return $entity;
     }
 

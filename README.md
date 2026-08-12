@@ -2,12 +2,27 @@
 
 **Connect Claude, Codex, Cursor, VS Code and Antigravity to WordPress over the Model Context Protocol — with permissions, confirmations and change evidence that stay on your site.**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
 
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
+
+## MCP protocol support
+
+WPPilot serves both protocol revisions during the migration window:
+
+| Revision | State | How it is served |
+| --- | --- | --- |
+| `2026-07-28` | Stateless. No `initialize`, no session. Each request carries its version and client capabilities in `_meta`. | `includes/mcp/`, dispatched ahead of the adapter |
+| `2025-11-25` | Legacy. `initialize` handshake and `Mcp-Session-Id` sessions. | The bundled MCP Adapter, unchanged |
+
+A request is served under the modern revision **only** when it carries modern per-request `_meta`; everything else reaches the adapter untouched. **Existing users do not need to reconnect** unless their client requires the newer revision.
+
+`server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. Subscriptions, the tasks extension and logging are deliberately not advertised — WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented.
+
+For OAuth, **Client ID Metadata Documents are the preferred registration mechanism**; RFC 7591 Dynamic Client Registration remains available as a compatibility fallback. Application Passwords stay an independent fallback for clients that run no OAuth flow.
 
 It is a control layer, not an AI wrapper. **No AI model is bundled** — external MCP clients bring their own model access, and policy is enforced server-side on your install.
 
@@ -58,9 +73,9 @@ On top of the profile: WordPress user capabilities still apply, individual abili
 
 ## WPPilot Pro — 991 plugin-aware abilities
 
-The free plugin in this repository is the complete MCP foundation: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **42 core abilities**.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **92 abilities**, including the whole WordPress core surface — content, taxonomies, media, comments, revisions, menus, user reads and allowlisted settings. Free needs no licence, entitlement service or Pro install.
 
-[**WPPilot Pro**](https://wppilot.co/pro) adds **991 further abilities across 51 integrations** — typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
+[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 51 integrations** — typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
 | Category | Integrations · `ability count` |
 | --- | --- |

@@ -103,7 +103,7 @@ function wppilot_render_oauth_config_section(string $rest_url): void
     ];
     ?>
     <h2 class="wppilot-step-heading">
-        <span class="wppilot-step-badge">3</span>
+        <span class="wppilot-step-badge">2</span>
         <?php esc_html_e('Connect Your AI Client', domain: 'wppilot'); ?>
     </h2>
 

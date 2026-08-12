@@ -112,7 +112,7 @@ function wppilot_render_enable_toggle(): void
     $profiles = wppilot_safety_profiles();
     ?>
     <h2 class="wppilot-step-heading">
-        <span class="wppilot-step-badge">1</span>
+        <span class="wppilot-step-badge">4</span>
         <?php esc_html_e('Enable AI Abilities', domain: 'wppilot'); ?>
     </h2>
     <form method="post" action="" id="wppilot-settings-form" style="margin: 16px 0 0;">
