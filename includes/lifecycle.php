@@ -85,7 +85,42 @@ function wppilot_activate_current_site(): void
     wppilot_chat_schema_install_current_site();
     wppilot_connections_schema_install();
     wppilot_safety_maybe_install();
+    wppilot_enable_ai_abilities_on_activate();
     wppilot_pro_upsell_on_activate();
+}
+
+/**
+ * Turn AI Abilities on when the plugin is first activated.
+ *
+ * A site that installs an MCP server almost always means to run one, and the
+ * off-by-default state produced a dead endpoint until someone found the toggle.
+ *
+ * Two things this deliberately does not do:
+ *
+ * - It never re-enables a site that turned abilities off. Activation runs again
+ *   on every reactivation and on every new site added to a network, so the
+ *   stored '0' is treated as a decision and left alone. Only a site that has
+ *   never made a choice is switched on.
+ * - It does not bypass the domain lock. Enabling records the host it was
+ *   enabled on, which is what stops a database copied to a staging or clone
+ *   domain from exposing an endpoint there. Cloning still requires a
+ *   deliberate re-enable on the new domain.
+ *
+ * The safety profile is untouched, so a fresh install still comes up on
+ * Production Safe with code execution, filesystem and database access blocked.
+ */
+function wppilot_enable_ai_abilities_on_activate(): void
+{
+    if (!function_exists('wppilot_enable_ai_abilities')) {
+        return;
+    }
+
+    // A stored value of any kind means the operator already chose.
+    if (get_option('wppilot_ai_abilities_enabled', default_value: null) !== null) {
+        return;
+    }
+
+    wppilot_enable_ai_abilities();
 }
 
 /**

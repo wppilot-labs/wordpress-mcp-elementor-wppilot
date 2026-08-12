@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -246,6 +246,17 @@ require_once __DIR__ . '/includes/rest/transport-hardening.php';
 
 add_filter('rest_pre_dispatch', callback: 'wppilot_guard_rest_host', priority: 5, accepted_args: 3);
 add_filter('rest_post_dispatch', callback: 'wppilot_harden_rest_response', priority: 20, accepted_args: 3);
+
+// Dual-era MCP. The bundled adapter serves the legacy, session-based revisions;
+// these modules answer MCP 2026-07-28, which removed the handshake and sessions
+// entirely. The dispatcher only claims a request that carries modern per-request
+// _meta, so legacy traffic reaches the adapter untouched.
+foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $wppilot_mcp_module) {
+    require_once __DIR__ . '/includes/mcp/' . $wppilot_mcp_module . '.php';
+}
+unset($wppilot_mcp_module);
+\WPPilot\Mcp\register_modern_transport();
+
 require_once __DIR__ . '/includes/abilities/bootstrap.php';
 // Self-hosted update checks, for builds distributed from wppilot.co.
 //
@@ -702,6 +713,10 @@ if ($is_enabled && $wppilot_abilities_supported) {
         $config['server_id'] = 'wppilot';
         $config['server_route'] = 'wppilot';
         $config['server_name'] = 'WPPilot';
+        // Without this the adapter's own default is used, and legacy clients
+        // read that from initialize's serverInfo — it reported v1.0.0 for the
+        // whole 1.1.0 cycle because only the mirror servers set a version.
+        $config['server_version'] = 'v' . WPPILOT_VERSION;
         return $config;
     });
 
@@ -796,7 +811,10 @@ function wppilot_create_mirror_mcp_server(
         $route,
         $name,
         $description,
-        'v1.0.0',
+        // Derived, not hardcoded: this is the version legacy clients read from
+        // initialize's serverInfo, and it silently drifted from the plugin
+        // header once already.
+        'v' . WPPILOT_VERSION,
         [\WP\MCP\Transport\HttpTransport::class],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
         \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,

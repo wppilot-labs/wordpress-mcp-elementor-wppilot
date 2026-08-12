@@ -370,6 +370,15 @@ function wppilot_build_standard_configs(string $mcp_servers_json, string $vscode
             ],
             'isShell' => false,
         ],
+        'factory-droid' => [
+            'code' => $mcp_servers_json,
+            'hint' => sprintf($add_to, '<code>mcp.json</code>'),
+            'paths' => [
+                __('Global', domain: 'wppilot') => '~/.factory/mcp.json',
+                __('Project', domain: 'wppilot') => '.factory/mcp.json',
+            ],
+            'isShell' => false,
+        ],
         'vscode' => [
             'code' => $vscode_servers_json,
             'hint' => sprintf($add_to, '<code>mcp.json</code>'),

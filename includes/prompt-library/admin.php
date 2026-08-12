@@ -194,6 +194,56 @@ function render(): void
     <?php // Styles for this screen live in includes/assets/admin.css. ?>
     <script>
     (function () {
+        function fallbackClipboardCopy(text) {
+            return new Promise(function (resolve, reject) {
+                var textarea = document.createElement('textarea');
+                var active = document.activeElement;
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.setAttribute('aria-hidden', 'true');
+                textarea.style.position = 'fixed';
+                textarea.style.top = '-9999px';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                var copied = false;
+                try {
+                    copied = document.execCommand('copy');
+                } catch (error) {
+                    copied = false;
+                }
+
+                document.body.removeChild(textarea);
+                if (active && typeof active.focus === 'function') {
+                    active.focus();
+                }
+                copied ? resolve() : reject(new Error('copy command was rejected'));
+            });
+        }
+
+        // The Prompts screen is independent from Connect and Troubleshoot, so
+        // it must own the helper it calls. Also fall back when the modern API
+        // exists but rejects because of browser permissions or an HTTP origin.
+        if (!window.wppilotClipboardCopy) {
+            window.wppilotClipboardCopy = function (text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    return navigator.clipboard.writeText(text).catch(function () {
+                        return fallbackClipboardCopy(text);
+                    });
+                }
+                return fallbackClipboardCopy(text);
+            };
+        }
+
+        function showCopyState(button, label) {
+            var original = button.getAttribute('data-label') || button.textContent;
+            button.setAttribute('data-label', original);
+            button.textContent = label;
+            setTimeout(function () { button.textContent = original; }, 1800);
+        }
+
         var tabs = document.querySelectorAll('.wppilot-prompt-tab');
         var packs = document.querySelectorAll('.wppilot-prompt-pack');
         tabs.forEach(function (tab) {
@@ -210,11 +260,14 @@ function render(): void
         document.querySelectorAll('.wppilot-prompt-copy').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var body = document.getElementById(btn.getAttribute('data-target'));
-                if (!body || !window.wppilotClipboardCopy) { return; }
+                if (!body) {
+                    showCopyState(btn, btn.getAttribute('data-failed'));
+                    return;
+                }
                 window.wppilotClipboardCopy(body.textContent).then(function () {
-                    var original = btn.textContent;
-                    btn.textContent = btn.getAttribute('data-copied');
-                    setTimeout(function () { btn.textContent = original; }, 1500);
+                    showCopyState(btn, btn.getAttribute('data-copied'));
+                }).catch(function () {
+                    showCopyState(btn, btn.getAttribute('data-failed'));
                 });
             });
         });
@@ -234,6 +287,7 @@ function render_pack(array $pack, bool $licensed): void
     /** @var list<array{title: string, description: string, prompt: string}> $prompts */
     $prompts = is_array($pack['prompts'] ?? null) ? $pack['prompts'] : [];
     $copied = __('Copied', domain: 'wppilot');
+    $copy_failed = __('Copy failed', domain: 'wppilot');
     ?>
     <section class="wppilot-panel">
         <h2 class="wppilot-setting-group__title"><?php echo esc_html((string) $pack['label']); ?></h2>
@@ -285,6 +339,8 @@ function render_pack(array $pack, bool $licensed): void
                             class="button wppilot-prompt-copy"
                             data-target="<?php echo esc_attr($id); ?>"
                             data-copied="<?php echo esc_attr($copied); ?>"
+                            data-failed="<?php echo esc_attr($copy_failed); ?>"
+                            aria-live="polite"
                         ><?php esc_html_e('Copy', domain: 'wppilot'); ?></button>
                     </div>
                     <pre class="wppilot-prompt__body" id="<?php echo esc_attr($id); ?>"><?php

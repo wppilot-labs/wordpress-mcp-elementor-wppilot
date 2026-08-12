@@ -14,6 +14,7 @@ yarn-error.log*
 # installable.
 composer.lock.bak
 .phpunit.result.cache
+.phpunit.cache/
 .phpcs-cache
 
 # Editors and OS
