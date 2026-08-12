@@ -130,13 +130,37 @@ function resolve_pending(): ?array
 }
 
 /** @param array<array-key, mixed> $pending */
+/**
+ * Add the RFC 9207 `iss` parameter to an authorization response redirect.
+ *
+ * A client that talks to more than one authorization server cannot otherwise
+ * tell which one produced a code, so an attacker who controls a second server
+ * can have a code from theirs redeemed at this one. The value is `home_url()`,
+ * the same string published as `issuer` in the authorization-server metadata —
+ * they must stay identical or a conforming client rejects every response.
+ *
+ * Applied to error redirects as well as success, since a mix-up attack works
+ * just as well against an error path.
+ */
+function with_issuer(string $location): string
+{
+    if ($location === '') {
+        return $location;
+    }
+
+    // Not pre-encoded: add_query_arg() runs values through build_query(), and
+    // encoding here as well would deliver a double-escaped issuer that no
+    // conforming client would match against its recorded value.
+    return add_query_arg('iss', home_url(), $location);
+}
+
 function render_post(string $token, array $pending, string $redirect_uri, string $state): void
 {
     check_admin_referer('wppilot_oauth_consent_' . $token);
 
     if (array_key_exists('deny', $_POST)) {
         delete_transient(Authorize\PENDING_PREFIX . $token);
-        wp_redirect(add_query_arg(['error' => 'access_denied', 'state' => $state], $redirect_uri));
+        wp_redirect(with_issuer(add_query_arg(['error' => 'access_denied', 'state' => $state], $redirect_uri)));
         exit();
     }
 
@@ -167,15 +191,15 @@ function render_post(string $token, array $pending, string $redirect_uri, string
         delete_transient(Authorize\PENDING_PREFIX . $token);
         $psr7Response = $server->completeAuthorizationRequest($authRequest, Bridge\new_psr7_response());
 
-        wp_redirect($psr7Response->getHeaderLine('Location'));
+        wp_redirect(with_issuer($psr7Response->getHeaderLine('Location')));
         exit();
     } catch (OAuthServerException $e) {
         delete_transient(Authorize\PENDING_PREFIX . $token);
-        wp_redirect(add_query_arg([
+        wp_redirect(with_issuer(add_query_arg([
             'error' => $e->getErrorType(),
             'error_description' => $e->getMessage(),
             'state' => $state,
-        ], $redirect_uri));
+        ], $redirect_uri)));
         exit();
     } catch (KeyBootstrapError $e) {
         // The generic message below would hide the one failure an operator can act on: this site

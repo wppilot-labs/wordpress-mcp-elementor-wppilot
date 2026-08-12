@@ -145,6 +145,8 @@ function handle_modern(WP_REST_Request $request, array $body): array
         ), $id, $method),
         'tools/list' => success(['tools' => list_tools()], $id, $method),
         'tools/call' => call_tool($params, $id),
+        'prompts/list' => success(['prompts' => list_prompts()], $id, $method),
+        'prompts/get' => get_prompt($params, $id),
         default => method_not_found_error($method, $id),
     };
 }
@@ -203,6 +205,13 @@ function list_tools(): array
             continue;
         }
 
+        // Prompt-type abilities belong to prompts/list. Listing one as a tool
+        // would let a client call it through tools/call and receive prompt
+        // messages where it expected a tool result.
+        if (($mcp['type'] ?? 'tool') === 'prompt') {
+            continue;
+        }
+
         if (function_exists('wppilot_safety_profile_allows_ability') && !\wppilot_safety_profile_allows_ability(
             $ability,
         )) {
@@ -219,6 +228,110 @@ function list_tools(): array
     }
 
     return sort_tools_deterministically($tools);
+}
+
+/**
+ * Return the prompt-type abilities this connection may reach.
+ *
+ * WPPilot's prompts are its skills. They take no arguments, so `arguments` is
+ * always an empty list rather than omitted — a client that treats a missing
+ * key as "unknown" would otherwise prompt the user for input that does not
+ * exist.
+ *
+ * @return list<array<string, mixed>>
+ */
+function list_prompts(): array
+{
+    $prompts = [];
+
+    foreach (prompt_abilities() as $ability) {
+        $prompts[] = [
+            'name' => tool_name($ability->get_name()),
+            'title' => (string) $ability->get_label(),
+            'description' => (string) $ability->get_description(),
+            'arguments' => [],
+        ];
+    }
+
+    return sort_tools_deterministically($prompts);
+}
+
+/**
+ * Every registered prompt-type ability that passes discovery and safety.
+ *
+ * @return list<WP_Ability>
+ */
+function prompt_abilities(): array
+{
+    if (!function_exists('wp_get_abilities')) {
+        return [];
+    }
+
+    $prompts = [];
+
+    /** @var mixed $ability */
+    foreach (wp_get_abilities() as $ability) {
+        if (!$ability instanceof WP_Ability) {
+            continue;
+        }
+        $meta = $ability->get_meta();
+        $meta = is_array($meta) ? $meta : [];
+        $mcp = is_array($meta['mcp'] ?? null) ? $meta['mcp'] : [];
+
+        if (($mcp['public'] ?? false) !== true || ($mcp['type'] ?? 'tool') !== 'prompt') {
+            continue;
+        }
+        if (function_exists('wppilot_safety_profile_allows_ability') && !\wppilot_safety_profile_allows_ability(
+            $ability,
+        )) {
+            continue;
+        }
+
+        $prompts[] = $ability;
+    }
+
+    return $prompts;
+}
+
+/**
+ * Render one prompt.
+ *
+ * @param array<string, mixed> $params
+ * @return array{status: int, body: array<string, mixed>}
+ */
+function get_prompt(array $params, mixed $id): array
+{
+    $name = is_string($params['name'] ?? null) ? $params['name'] : '';
+
+    foreach (prompt_abilities() as $ability) {
+        if (tool_name($ability->get_name()) !== $name) {
+            continue;
+        }
+
+        if (!$ability->has_permission([])) {
+            return error_response(
+                ERROR_INVALID_PARAMS,
+                sprintf('You are not allowed to read prompt: %s', $name),
+                200,
+                $id,
+            );
+        }
+
+        $result = $ability->execute([]);
+        if ($result instanceof WP_Error) {
+            return error_response(ERROR_INVALID_PARAMS, $result->get_error_message(), 200, $id);
+        }
+
+        $messages = is_array($result) && is_array($result['messages'] ?? null) ? $result['messages'] : [];
+
+        return success([
+            'description' => (string) $ability->get_description(),
+            'messages' => $messages,
+        ], $id, 'prompts/get');
+    }
+
+    // Modern moved not-found onto -32602.
+    return error_response(ERROR_INVALID_PARAMS, sprintf('Unknown prompt: %s', $name), 200, $id);
 }
 
 /**
