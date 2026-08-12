@@ -64,6 +64,22 @@ make_zip() {
   exit 1
 }
 
+# Parse every PHP file in a staged tree. The .org variant is produced by editing
+# wppilot.php in place, so a bad edit ships a plugin that fatals on activation
+# and there is no later gate that would catch it — the archive is opaque to
+# `php -l` and to CI once it is a zip.
+verify_tree() {
+  local dir="$1" label="$2" failed=0
+  while IFS= read -r file; do
+    php -l "$file" >/dev/null 2>&1 || { echo "Syntax error in $label: ${file#"$dir/"}" >&2; php -l "$file" >&2; failed=1; }
+  done < <(find "$dir" -name '*.php' -not -path '*/vendor/*')
+  if [ "$failed" -ne 0 ]; then
+    echo "Refusing to package $label with syntax errors." >&2
+    exit 1
+  fi
+  echo "  $label: PHP syntax OK"
+}
+
 BUILD="$ROOT/build"
 rm -rf "$BUILD"
 mkdir -p "$BUILD/wppilot"
@@ -78,6 +94,8 @@ for entry in * .[!.]*; do
     build|dist|node_modules|scripts|src|tests|.git|.github|.gitignore) continue ;;
     package.json|package-lock.json|bun.lockb|tsconfig.json) continue ;;
     composer.json|composer.lock|.phpunit.result.cache|.DS_Store) continue ;;
+    phpunit.xml|phpunit.xml.dist|.phpunit.cache|phpcs.xml|phpcs.xml.dist|mago.toml) continue ;;
+    .gitattributes|.editorconfig) continue ;;
     *.zip) continue ;;
     '*'|'.[!.]*') continue ;;
   esac
@@ -85,6 +103,7 @@ for entry in * .[!.]*; do
 done
 
 # --- Variant 1: self-hosted / GitHub -----------------------------------------
+verify_tree "$BUILD/wppilot" "self-hosted build"
 make_zip "$ROOT/build/wppilot-$VERSION.zip" "$BUILD" wppilot
 echo "  build/wppilot-$VERSION.zip"
 
@@ -93,9 +112,14 @@ ORG="$BUILD/org"
 mkdir -p "$ORG"
 cp -r "$BUILD/wppilot" "$ORG/wppilot"
 
-# Remove the self-hosted updater and its require, then drop the Update URI header.
+# Remove the self-hosted updater and drop the Update URI header.
+#
+# Only the header line is edited. The require in wppilot.php is already wrapped
+# in `if (file_exists(...))`, precisely so deleting the file is safe — and a
+# line-delete on /includes\/updater\.php/ would take that `if` line out too,
+# orphaning its closing brace and shipping a plugin that fatals on load. That is
+# not hypothetical: it is what this script did until 1.1.0.
 rm -f "$ORG/wppilot/includes/updater.php"
-sed -i.bak "/includes\/updater\.php/d" "$ORG/wppilot/wppilot.php"
 sed -i.bak "/^ \* Update URI:/d" "$ORG/wppilot/wppilot.php"
 rm -f "$ORG/wppilot/wppilot.php.bak"
 
@@ -108,6 +132,7 @@ if [ -f "$ORG/wppilot/includes/updater.php" ]; then
   exit 1
 fi
 
+verify_tree "$ORG/wppilot" ".org build"
 make_zip "$ROOT/build/wppilot-$VERSION-org.zip" "$ORG" wppilot
 echo "  build/wppilot-$VERSION-org.zip"
 

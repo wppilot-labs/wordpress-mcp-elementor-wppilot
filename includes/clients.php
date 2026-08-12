@@ -70,6 +70,18 @@ function wppilot_clients_native_oauth(): array
                 domain: 'wppilot',
             ),
         ],
+        // Hosted agents. They connect from their own infrastructure, so the
+        // site must be reachable over public HTTPS — a localhost or LAN URL
+        // cannot work, and no local stdio proxy is available to bridge it.
+        'manus' => [
+            'label' => 'Manus',
+            'match' => ['manus'],
+            'methods' => ['oauth'],
+            'note' => __(
+                'Add WPPilot as an MCP connector in Manus. Manus connects from its own servers, so this site must be reachable over public HTTPS.',
+                domain: 'wppilot',
+            ),
+        ],
         'claude-web' => [
             'label' => __('Claude (web)', domain: 'wppilot'),
             'match' => ['claude-web'],
@@ -99,6 +111,20 @@ function wppilot_clients_native_oauth(): array
             'match' => ['visual studio code', 'vscode'],
             'methods' => ['oauth', 'password'],
             'note' => __('Requires VS Code 1.101 or later for remote MCP with OAuth.', domain: 'wppilot'),
+        ],
+        // Factory's Droid CLI discovers the authorization server, registers via
+        // Dynamic Client Registration, and uses Factory's published client
+        // metadata where the server supports it — so it reaches WPPilot's OAuth
+        // natively. Servers are configured in ~/.factory/mcp.json, or per
+        // project in .factory/mcp.json.
+        'factory-droid' => [
+            'label' => 'Factory Droid',
+            'match' => ['factory', 'droid', 'factory-droid'],
+            'methods' => ['oauth', 'password'],
+            'note' => __(
+                'Add the server with /mcp inside Droid, or put it in ~/.factory/mcp.json.',
+                domain: 'wppilot',
+            ),
         ],
         'github-copilot' => [
             'label' => 'GitHub Copilot',
@@ -136,9 +162,22 @@ function wppilot_clients_native_oauth(): array
 function wppilot_clients_proxied_oauth(): array
 {
     return [
+        // Cognition rebranded Windsurf to Devin Desktop on 2 June 2026 and
+        // redirected windsurf.com to devin.ai/desktop. Existing installs keep
+        // identifying themselves as "windsurf" (and older Codeium builds as
+        // "codeium"), and the rebrand ported MCP connections rather than
+        // resetting them, so both old identifiers stay matched — dropping them
+        // would turn every already-connected editor into an unlabelled row on
+        // the Overview screen.
+        // The registry key stays `windsurf`: it is the lookup key for the
+        // generated config snippet, the OAuth panel, and the pre-registered
+        // OAuth client allowlist, and it is recorded against existing
+        // connections. Renaming it would orphan all of those. Only what the
+        // rebrand actually changed — the display name and the identifiers the
+        // client reports — moves.
         'windsurf' => [
-            'label' => 'Windsurf',
-            'match' => ['windsurf', 'codeium'],
+            'label' => 'Devin Desktop (Windsurf)',
+            'match' => ['devin-desktop', 'devin desktop', 'devin', 'windsurf', 'codeium'],
             'methods' => ['oauth', 'password'],
             'note' => '',
         ],
@@ -149,6 +188,18 @@ function wppilot_clients_proxied_oauth(): array
             'note' => __('Configured as a context server.', domain: 'wppilot'),
         ],
         'cline' => ['label' => 'Cline', 'match' => ['cline'], 'methods' => ['oauth', 'password'], 'note' => ''],
+        // Self-hosted Node agent with native MCP client support since early
+        // 2026. It runs on the operator's own machine or server, so the
+        // mcp-remote proxy this group uses is available to it.
+        'openclaw' => [
+            'label' => 'OpenClaw',
+            'match' => ['openclaw', 'open-claw'],
+            'methods' => ['oauth', 'password'],
+            'note' => __(
+                'Add the server to your OpenClaw MCP configuration and restart the agent.',
+                domain: 'wppilot',
+            ),
+        ],
         'roo-code' => [
             'label' => 'Roo Code',
             'match' => ['roo-code', 'roo code', 'roocode'],

@@ -713,6 +713,10 @@ if ($is_enabled && $wppilot_abilities_supported) {
         $config['server_id'] = 'wppilot';
         $config['server_route'] = 'wppilot';
         $config['server_name'] = 'WPPilot';
+        // Without this the adapter's own default is used, and legacy clients
+        // read that from initialize's serverInfo — it reported v1.0.0 for the
+        // whole 1.1.0 cycle because only the mirror servers set a version.
+        $config['server_version'] = 'v' . WPPILOT_VERSION;
         return $config;
     });
 
