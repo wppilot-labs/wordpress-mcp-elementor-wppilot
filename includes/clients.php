@@ -91,8 +91,23 @@ function wppilot_clients_native_oauth(): array
                 domain: 'wppilot',
             ),
         ],
+        // The desktop app is the entry point OpenAI now recommends, and it adds
+        // remote Streamable HTTP servers from a settings screen rather than a
+        // config file — so it gets no snippet tab, like the other UI-driven
+        // clients. It is listed separately from the CLI because the two are set
+        // up in completely different places and a user following config.toml
+        // instructions inside the app finds nothing to edit.
+        'codex-app' => [
+            'label' => __('Codex (desktop app)', domain: 'wppilot'),
+            'match' => ['codex-app', 'codex desktop', 'codex-desktop'],
+            'methods' => ['oauth'],
+            'note' => __(
+                'In the Codex desktop app open Settings from your account menu, add WPPilot as a remote MCP server, and approve the browser sign-in.',
+                domain: 'wppilot',
+            ),
+        ],
         'codex' => [
-            'label' => 'Codex',
+            'label' => __('Codex CLI', domain: 'wppilot'),
             'match' => ['codex'],
             'methods' => ['oauth', 'password'],
             'note' => __('After adding the server, run codex mcp login to authorise it.', domain: 'wppilot'),
