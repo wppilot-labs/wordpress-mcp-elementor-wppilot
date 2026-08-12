@@ -30,9 +30,11 @@ wppilot_load_wordpress_abilities();
 
 // The MCP protocol layer is deliberately free of WordPress dependencies beyond
 // the ABSPATH guard, so it loads and is exercised here directly.
-foreach (['protocol', 'errors', 'headers', 'results', 'discover'] as $module) {
+foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $module) {
     require_once dirname(__DIR__) . '/includes/mcp/' . $module . '.php';
 }
+
+require_once dirname(__DIR__) . '/includes/oauth/client-id-metadata.php';
 
 // Registrations captured during load are the baseline the suite asserts against.
 // Snapshot them before any test calls WPPilot_Test_State::reset().

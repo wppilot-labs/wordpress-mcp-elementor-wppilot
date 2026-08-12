@@ -1,5 +1,20 @@
 # Architecture
 
+## Protocol eras
+
+WPPilot is a dual-era MCP server.
+
+- **Legacy (`2025-11-25`)** is served by the bundled MCP Adapter: `initialize`, `notifications/initialized`, and `Mcp-Session-Id` sessions, unchanged.
+- **Modern (`2026-07-28`)** is served by `includes/mcp/`. It is stateless — no handshake, no session — and every request carries its protocol version and client capabilities in `_meta`.
+
+`includes/mcp/transport.php` hooks `rest_pre_dispatch` and claims a request **only** when it carries modern per-request `_meta`. Everything else reaches the adapter untouched. Era selection never keys off the `MCP-Protocol-Version` header, because legacy `2025-06-18`+ clients send that header too and routing them into the stateless path would break existing connections.
+
+The adapter is a third-party Composer package. It is never patched: a `composer update` would discard the changes.
+
+Abilities are protocol-independent. Authentication, safety profiles, capability checks, rate limits, and the change ledger run identically in both eras; only the serializer differs, so a modern client cannot reach a weaker code path than a legacy one.
+
+`server/discover` advertises only what is actually registered. Subscriptions, logging, and the tasks extension are never advertised — WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented. Cacheable results carry `cacheScope: "private"`, because the ability list is filtered per user, per safety profile, and per site.
+
 ## Request path
 
 1. WordPress registers typed abilities through `wp_register_ability()`.
@@ -13,7 +28,10 @@ The compact adapter surface keeps client context small while retaining typed sch
 
 ## Base plugin boundaries
 
-- `includes/abilities/`: built-in WordPress and developer abilities.
+- `includes/abilities/`: built-in developer abilities.
+- `includes/abilities/wordpress/`: the typed WordPress-core surface — content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings. Ships in Free and never calls into Pro.
+- `includes/mcp/`: protocol-era classification, the modern dispatcher, the shared error catalog, result decoration, and `server/discover`.
+- `includes/oauth/client-id-metadata.php`: Client ID Metadata Documents, with the SSRF controls that fetching a caller-supplied URL requires.
 - `includes/safety.php`: profiles, risk classification, and explicit-confirmation enforcement.
 - `includes/change-log.php`: bounded audit records, redaction, fingerprints, and verified rollback.
 - `includes/rest/transport-hardening.php`: MCP/REST host validation and response security headers.

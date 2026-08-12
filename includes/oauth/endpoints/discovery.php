@@ -210,6 +210,15 @@ function authorization_server_document(): array
         'code_challenge_methods_supported' => ['S256'],
         'token_endpoint_auth_methods_supported' => ['none'],
         'scopes_supported' => ['mcp'],
+        // MCP 2026-07-28 prefers Client ID Metadata Documents and deprecates
+        // RFC 7591 Dynamic Client Registration. Both are advertised: the
+        // registration_endpoint above stays for clients and flows that do not
+        // support CIMD yet.
+        'client_id_metadata_document_supported' => true,
+        // RFC 9207. Clients validate this against the issuer they recorded
+        // before redeeming a code, which is what stops an authorization
+        // response from one server being replayed at another.
+        'authorization_response_iss_parameter_supported' => true,
     ];
 }
 

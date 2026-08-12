@@ -246,6 +246,17 @@ require_once __DIR__ . '/includes/rest/transport-hardening.php';
 
 add_filter('rest_pre_dispatch', callback: 'wppilot_guard_rest_host', priority: 5, accepted_args: 3);
 add_filter('rest_post_dispatch', callback: 'wppilot_harden_rest_response', priority: 20, accepted_args: 3);
+
+// Dual-era MCP. The bundled adapter serves the legacy, session-based revisions;
+// these modules answer MCP 2026-07-28, which removed the handshake and sessions
+// entirely. The dispatcher only claims a request that carries modern per-request
+// _meta, so legacy traffic reaches the adapter untouched.
+foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $wppilot_mcp_module) {
+    require_once __DIR__ . '/includes/mcp/' . $wppilot_mcp_module . '.php';
+}
+unset($wppilot_mcp_module);
+\WPPilot\Mcp\register_modern_transport();
+
 require_once __DIR__ . '/includes/abilities/bootstrap.php';
 // Self-hosted update checks, for builds distributed from wppilot.co.
 //
