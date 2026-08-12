@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 /**
  * Internal compatibility contract shared by metadata, startup gates, and agent context.
  */
-define(constant_name: 'WPPILOT_VERSION', value: '1.0.0');
+define(constant_name: 'WPPILOT_VERSION', value: '1.1.0');
 define(constant_name: 'WPPILOT_REST_API_VERSION', value: 1);
 define(constant_name: 'WPPILOT_MINIMUM_WORDPRESS_VERSION', value: '6.9');
 

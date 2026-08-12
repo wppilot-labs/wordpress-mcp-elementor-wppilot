@@ -1,4 +1,4 @@
-v1.1.0 - unreleased
+v1.1.0 - 2026/08/13
 * WordPress core abilities now ship in WPPilot Free. Content, taxonomies, media, comments, revisions, menus, user reads, and the allowlisted settings surface work with Free alone, with no Pro plugin, licence, or entitlement service involved. Pro remains the home of plugin-aware integrations: page builders, WooCommerce, forms, SEO suites, custom fields, themes, and multilingual.
 * Added terms and taxonomies: discovery, listing, reading, creation, updates, confirmed deletion, and assignment to content, each enforcing the taxonomy's own manage_terms/edit_terms/delete_terms/assign_terms capability rather than assuming manage_categories.
 * Added comments: listing and reading with commenter email and IP withheld from accounts that cannot moderate, plus creation, editing, approve/hold/spam/unspam/trash/restore moderation, and confirmed permanent deletion.
