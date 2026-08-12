@@ -50,7 +50,7 @@ OAuth-authenticated clients use `/wp-json/mcp/wppilot-oauth`. The older `/wp-jso
 
 ## Supported AI clients
 
-Claude Code · Claude Desktop · Claude on the web · Codex · Cursor · VS Code · GitHub Copilot · Antigravity CLI · Antigravity IDE · Windsurf · Zed · Cline · Roo Code · Kilo Code · Amazon Q · OpenCode
+Claude Code · Claude Desktop · Claude on the web · Codex CLI · Codex desktop app · Cursor · VS Code · GitHub Copilot · Devin Desktop (formerly Windsurf) · Factory Droid · Antigravity CLI · Antigravity IDE · Zed · Cline · Roo Code · Kilo Code · Amazon Q · OpenCode · OpenClaw · Manus
 
 Per-client setup guides: <https://wppilot.co/wordpress-mcp>
 
@@ -71,7 +71,30 @@ Neither is a product licence. WPPilot needs no activation key, entitlement check
 
 On top of the profile: WordPress user capabilities still apply, individual abilities can be switched off, destructive operations require an explicit confirmation flag, writes are rate-limited per credential, and supported changes are recorded in a redacted change ledger with rollback.
 
-## WPPilot Pro — 991 plugin-aware abilities
+## What the free plugin can do
+
+92 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+
+| Domain | Abilities | What it covers |
+| --- | --- | --- |
+| **Content** | `8` | List, search and read posts, pages and public custom post types. Create, update, trash, restore, and permanently delete with explicit confirmation. |
+| **Taxonomies** | `7` | Discover taxonomies, list and read terms, create, update, delete with confirmation, and assign terms to content. |
+| **Media** | `9` | List, read, import from a URL, update metadata and alt text, set and clear featured images, attach and detach, delete with confirmation. |
+| **Comments** | `6` | List and read with commenter email and IP withheld below `moderate_comments`. Reply, edit, approve, hold, spam, unspam, trash, restore, delete with confirmation. |
+| **Menus** | `10` | Create, rename and delete menus, add, update, reorder and remove items, list theme locations and assign menus to them. |
+| **Revisions** | `3` | List with autosaves distinguished, read against the live post, and restore. |
+| **Users** | `4` | Privacy-minimized reads. Login name, roles and registration date need `list_users`; the email address needs `edit_users`. |
+| **Site** | `3` | Site information, an explicit settings allowlist, and installed extensions. |
+| **Gutenberg** | `11` | Block-editor content, staged pending changes and browser finalization for native blocks. |
+| **Design library** | `7` | Typed design tokens, saved designs and activation. |
+| **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
+| **Changes** | `3` | Read the redacted change ledger and roll a change back. |
+| **Diagnostics** | `3` | Scoped health, performance and configuration-security checks. |
+| **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
+
+Content creation is draft-first: an absent, blank or malformed status resolves to `draft` before any capability check, so nothing is published by accident. Capabilities are read from each post type's and taxonomy's own capability object, so a custom type declaring its own set is enforced on its own terms.
+
+## WPPilot Pro — 968 plugin-aware abilities
 
 The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **92 abilities**, including the whole WordPress core surface — content, taxonomies, media, comments, revisions, menus, user reads and allowlisted settings. Free needs no licence, entitlement service or Pro install.
 
@@ -89,7 +112,7 @@ The free plugin in this repository is a complete WordPress MCP server: connectio
 | **Localization** | [Weglot](https://wppilot.co/integrations/weglot) `19` · [Polylang](https://wppilot.co/integrations/polylang) `6` |
 | **Site operations** | [The Events Calendar](https://wppilot.co/integrations/the-events-calendar) `7` · [Paid Memberships Pro](https://wppilot.co/integrations/paid-memberships-pro) `5` · [Tutor LMS](https://wppilot.co/integrations/tutor-lms) `7` · [BuddyPress](https://wppilot.co/integrations/buddypress) `8` |
 | **Developer tools** | [Code Snippets](https://wppilot.co/integrations/code-snippets) `11` · [Bricksforge](https://wppilot.co/integrations/bricksforge) `21` |
-| **WordPress platform** | [WordPress Core](https://wppilot.co/integrations/wordpress) `23` · [Agent Memory](https://wppilot.co/integrations/memory) `4` · [WPPilot Skills](https://wppilot.co/integrations/skills) `1` |
+| **WordPress platform** | [Agent Memory](https://wppilot.co/integrations/memory) `4` · [WPPilot Skills](https://wppilot.co/integrations/skills) `1` |
 
 ### Why plugin-aware matters
 
