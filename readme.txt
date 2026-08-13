@@ -24,16 +24,16 @@ Full documentation is at [wppilot.co](https://wppilot.co).
 
 Every remote call is checked against a safety profile before it runs, on the server, for MCP and REST alike:
 
-* **Production Safe** — the default. Content and configuration work, no raw code execution.
-* **Read Only** — agents can look and report, and change nothing.
-* **Developer Full Access** — adds PHP execution, WP-CLI, filesystem and database access. Intended for development and staging sites.
+* **Production Safe**, the default. Content and configuration work, no raw code execution.
+* **Read Only**. Agents can look and report, and change nothing.
+* **Developer Full Access**: adds PHP execution, WP-CLI, filesystem and database access. Intended for development and staging sites.
 
 Destructive and critical operations require an explicit confirmation flag on top of the profile, and supported changes are recorded in a redacted change ledger you can roll back.
 
 = Two ways to connect =
 
-* **OAuth 2.1** with PKCE — sign in through the browser, no password pasted into a config file. Client ID Metadata Documents are the preferred registration mechanism, with dynamic client registration kept for clients that do not support them.
-* **Application passwords** — for clients that do not run an OAuth flow.
+* **OAuth 2.1** with PKCE, sign in through the browser, no password pasted into a config file. Client ID Metadata Documents are the preferred registration mechanism, with dynamic client registration kept for clients that do not support them.
+* **Application passwords**, for clients that do not run an OAuth flow.
 
 Both MCP protocol revisions are served during the migration window: the stateless `2026-07-28` and the session-based `2025-11-25`. Existing clients keep working and do not need to reconnect.
 
@@ -45,7 +45,7 @@ Claude Code, Claude Desktop, Claude on the web, Codex, Cursor, VS Code, GitHub C
 
 = See what is connected =
 
-The Overview screen names the AI clients actually talking to your site — identified by what each one reported when it connected, not by a label you typed — along with how it authenticated, when it first and last called, and how many requests it has made.
+The Overview screen names the AI clients actually talking to your site, identified by what each one reported when it connected, not by a label you typed, along with how it authenticated, when it first and last called, and how many requests it has made.
 
 = Also included =
 
@@ -61,7 +61,7 @@ The MCP endpoint runs on your own site, and your AI client connects to it direct
 
 WPPilot Chat is different: when you use Chat, WordPress sends the conversation history, selected attachments, site instructions, tool definitions and relevant tool results to the AI provider and model you selected through the WordPress AI Client. That provider is an external service and its own terms and privacy policy apply. WPPilot adds suggested text to WordPress's Privacy Policy Guide and integrates with the personal-data export and erase tools.
 
-When you use OAuth, the client you are connecting registers itself with your site — that traffic is between your site and your own AI client, and no WPPilot server is involved.
+When you use OAuth, the client you are connecting registers itself with your site. That traffic is between your site and your own AI client, and no WPPilot server is involved.
 
 Builds downloaded from wppilot.co check that site for plugin updates. The copy distributed through the WordPress.org directory does not: it is updated by WordPress.org like any other plugin.
 
@@ -85,7 +85,7 @@ Developer Full Access is a different matter: it grants PHP execution, WP-CLI and
 
 = Do I need an OpenAI or Anthropic API key? =
 
-No. WPPilot is the server. Your AI client — Claude, Cursor, Codex or another — connects to it, and that client handles its own model access.
+No. WPPilot is the server. Your AI client, Claude, Cursor, Codex or another, connects to it, and that client handles its own model access.
 
 = Which WordPress and PHP versions are required? =
 
@@ -103,24 +103,24 @@ WordPress itself is Free. Content, taxonomies, media, comments, revisions, menus
 
 = Which WordPress operations work without Pro? =
 
-* Posts, pages and public custom post types — list, search, read, create, update, trash, restore, and permanently delete with explicit confirmation.
-* Categories, tags and other public taxonomies — discover, list, read, create, update, delete with confirmation, and assign to content.
-* Media — list, read, import from a URL, update metadata and alt text, set and clear featured images, attach and detach, and delete with confirmation.
-* Comments — list, read, reply, edit, approve, hold, spam, unspam, trash, restore, and delete with confirmation.
-* Revisions — list with autosaves distinguished, read against the live post, and restore.
-* Menus — create, rename, delete, add and remove items, reorder, and assign to the theme's navigation locations.
-* Users — privacy-minimized reads.
+* Posts, pages and public custom post types: list, search, read, create, update, trash, restore, and permanently delete with explicit confirmation.
+* Categories, tags and other public taxonomies: discover, list, read, create, update, delete with confirmation, and assign to content.
+* Media: list, read, import from a URL, update metadata and alt text, set and clear featured images, attach and detach, and delete with confirmation.
+* Comments: list, read, reply, edit, approve, hold, spam, unspam, trash, restore, and delete with confirmation.
+* Revisions: list with autosaves distinguished, read against the live post, and restore.
+* Menus: create, rename, delete, add and remove items, reorder, and assign to the theme's navigation locations.
+* Users, privacy-minimized reads.
 * Site information and an explicit settings allowlist.
 
 New content is created as a draft unless you ask for publication explicitly, and publishing is checked against the post type's own capability.
 
 == Screenshots ==
 
-1. Overview — the AI clients connected to your site, how they authenticated, and how much they call.
-2. Connect — generated configuration for your AI client, for OAuth or an application password.
-3. Settings — every site-wide switch in one place.
-4. Abilities — every ability exposed to agents, grouped by provider, each one switchable.
-5. Diagnostics — checks that probe the connection the way a client does.
+1. Overview: the AI clients connected to your site, how they authenticated, and how much they call.
+2. Connect, generated configuration for your AI client, for OAuth or an application password.
+3. Settings, every site-wide switch in one place.
+4. Abilities: every ability exposed to agents, grouped by provider, each one switchable.
+5. Diagnostics, checks that probe the connection the way a client does.
 
 == Development ==
 
@@ -129,7 +129,7 @@ Most of WPPilot is plain PHP, readable as shipped. The one compiled asset is the
 To rebuild it from source:
 
 1. Install dependencies: `npm install` (or `bun install`)
-2. Build: `npm run build` — this runs `@wordpress/scripts` against `src/chat/index.tsx` and writes the bundle to `includes/assets/chat/`
+2. Build: `npm run build`. This runs `@wordpress/scripts` against `src/chat/index.tsx` and writes the bundle to `includes/assets/chat/`
 
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
@@ -139,7 +139,7 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * The WordPress core surface now ships in the free plugin: content, taxonomies, media, comments, revisions, menus, privacy-minimized user reads, and an allowlisted settings surface. No licence, entitlement service or Pro install is involved. Ability count is 92, up from 42.
 * New content is created as a draft unless publication is requested explicitly. An absent, blank or malformed status resolves to draft before any capability check, so nothing is published by accident.
 * Capabilities come from each post type's and taxonomy's own capability object, so a custom post type declaring its own set is enforced on its own terms. Publishing is checked separately from editing.
-* MCP 2026-07-28 is served alongside 2025-11-25. The new revision is stateless — no handshake, no session. Existing clients are unaffected and do not need to reconnect.
+* MCP 2026-07-28 is served alongside 2025-11-25. The new revision is stateless, no handshake, no session. Existing clients are unaffected and do not need to reconnect.
 * Client ID Metadata Documents are now the preferred OAuth registration mechanism, with Dynamic Client Registration kept as a fallback.
 * Security: create, update and delete of content previously ran on a single administrator check and ignored the post type's capabilities and post ownership. Both are now enforced.
 * Security: menu item URLs are validated before storage. A javascript:, data: or vbscript: URL was previously stored verbatim and rendered into a link.

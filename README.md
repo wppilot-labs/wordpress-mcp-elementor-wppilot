@@ -1,6 +1,6 @@
-# WPPilot — WordPress MCP Server
+# WPPilot, WordPress MCP Server
 
-**Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build — pages, block layouts, menus, taxonomies, media, SEO metadata — through typed abilities your permissions still govern.**
+**Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build, pages, block layouts, menus, taxonomies, media, SEO metadata, through typed abilities your permissions still govern.**
 
 [![Version](https://img.shields.io/badge/version-1.1.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
@@ -20,11 +20,11 @@ WPPilot serves both protocol revisions during the migration window:
 
 A request is served under the modern revision **only** when it carries modern per-request `_meta`; everything else reaches the adapter untouched. **Existing users do not need to reconnect** unless their client requires the newer revision.
 
-`server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. Subscriptions, the tasks extension and logging are deliberately not advertised — WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented.
+`server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. Subscriptions, the tasks extension and logging are deliberately not advertised, WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented.
 
 For OAuth, **Client ID Metadata Documents are the preferred registration mechanism**; RFC 7591 Dynamic Client Registration remains available as a compatibility fallback. Application Passwords stay an independent fallback for clients that run no OAuth flow.
 
-It is a control layer, not an AI wrapper. **No AI model is bundled** — external MCP clients bring their own model access, and policy is enforced server-side on your install.
+It is a control layer, not an AI wrapper. **No AI model is bundled**: external MCP clients bring their own model access, and policy is enforced server-side on your install.
 
 ## What an agent can actually build
 
@@ -40,18 +40,18 @@ The library is a shortcut, not a dependency. WPPilot ships a **prompt library** 
 Create a new draft page titled "[PAGE TITLE]" using core Gutenberg blocks only.
 
 How the write works, so you do not get halfway and stall:
-1. wppilot/create-post — create the draft first. It defaults to draft; leave it there.
-2. wppilot/gutenberg-create-pending-batch — core blocks cannot be written straight
+1. wppilot/create-post, create the draft first. It defaults to draft; leave it there.
+2. wppilot/gutenberg-create-pending-batch, core blocks cannot be written straight
    from the server, because the block editor's own JavaScript is what validates and
    serialises them.
-3. wppilot/gutenberg-add-pending-change — queue the block tree against the new post.
+3. wppilot/gutenberg-add-pending-change, queue the block tree against the new post.
 4. wppilot/gutenberg-enable-batch-finalization, then
-   wppilot/gutenberg-get-finalization-url — open that link and the batch commits.
+   wppilot/gutenberg-get-finalization-url, open that link and the batch commits.
 ```
 
 That last part is the honest bit: **core blocks are not a headless write**. Anything the block editor validates in JavaScript needs a browser session to finalise, and the prompts say so rather than leaving you stuck at step three.
 
-WPPilot Pro adds plugin-aware modules — page builders, WooCommerce, forms, custom fields, SEO, themes — each with its own ability chains. The full published library is at <https://wppilot.co/prompts>.
+WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom fields, SEO, themes, each with its own ability chains. The full published library is at <https://wppilot.co/prompts>.
 
 - 🌐 Website: <https://wppilot.co>
 - 🧱 What it builds: <https://wppilot.co/build>
@@ -64,7 +64,7 @@ WPPilot Pro adds plugin-aware modules — page builders, WooCommerce, forms, cus
 ## Quick start
 
 1. Download the latest `wppilot.zip` from [Releases](https://github.com/wppilot-labs/wppilot/releases) and install it as `wp-content/plugins/wppilot`.
-   *A GitHub “Source code (zip)” download is **not** installable — it lacks `vendor/` and uses the wrong folder name.*
+   *A GitHub “Source code (zip)” download is **not** installable, it lacks `vendor/` and uses the wrong folder name.*
 2. Activate WPPilot.
 3. Open **WPPilot → Configuration** and leave **Production Safe** selected.
 4. Open **WPPilot → Connect**, choose your AI client, and follow the OAuth or Application Password route.
@@ -123,11 +123,11 @@ On top of the profile: WordPress user capabilities still apply, individual abili
 
 Content creation is draft-first: an absent, blank or malformed status resolves to `draft` before any capability check, so nothing is published by accident. Capabilities are read from each post type's and taxonomy's own capability object, so a custom type declaring its own set is enforced on its own terms.
 
-## WPPilot Pro — 968 plugin-aware abilities
+## WPPilot Pro, 968 plugin-aware abilities
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **92 abilities**, including the whole WordPress core surface — content, taxonomies, media, comments, revisions, menus, user reads and allowlisted settings. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **92 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads and allowlisted settings. Free needs no licence, entitlement service or Pro install.
 
-[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 51 integrations** — typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
+[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 51 integrations**, typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
 | Category | Integrations · `ability count` |
 | --- | --- |
@@ -147,7 +147,7 @@ The free plugin in this repository is a complete WordPress MCP server: connectio
 
 A page builder does not store a page as HTML. It stores an element tree, references to shared classes and design tokens, template rules and dynamic bindings. Writing generated markup into that store is how a layout stops opening in its own editor.
 
-Pro gives the agent that builder's own vocabulary — `bricks-patch-elements`, `elementor-create-atomic-widget`, `divi-apply-global-preset`, `etch-get-query-preview` — so it can read a schema before it proposes a change.
+Pro gives the agent that builder's own vocabulary: `bricks-patch-elements`, `elementor-create-atomic-widget`, `divi-apply-global-preset`, `etch-get-query-preview`, so it can read a schema before it proposes a change.
 
 ### Page-builder guides
 
@@ -165,10 +165,10 @@ Pro gives the agent that builder's own vocabulary — `bricks-patch-elements`, `
 
 ### Beyond integrations
 
-- **Persistent agent memory** — approved context that carries between sessions, so an agent does not relearn your stack every conversation.
-- **Human approval queue** — holds an agent write until a person approves it, with email notification. The agent receives a structured “pending” response, not a false success.
-- **Integration health reporting** — see which modules loaded, which were skipped, and why.
-- **Plugin-aware skill packs** — guided sequences that encode the read-before-write workflow for the plugins you run.
+- **Persistent agent memory**, approved context that carries between sessions, so an agent does not relearn your stack every conversation.
+- **Human approval queue**, holds an agent write until a person approves it, with email notification. The agent receives a structured “pending” response, not a false success.
+- **Integration health reporting**: see which modules loaded, which were skipped, and why.
+- **Plugin-aware skill packs**, guided sequences that encode the read-before-write workflow for the plugins you run.
 
 [Compare Free vs Pro](https://wppilot.co/free-vs-pro) · [Pricing](https://wppilot.co/pricing) · [All integrations](https://wppilot.co/integrations)
 
@@ -202,7 +202,7 @@ In-repo: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/SAFETY.md`](do
 
 ## Security
 
-Report suspected vulnerabilities privately — see [SECURITY.md](SECURITY.md). Do not open a public issue for a vulnerability, and never include production credentials or customer data.
+Report suspected vulnerabilities privately, see [SECURITY.md](SECURITY.md). Do not open a public issue for a vulnerability, and never include production credentials or customer data.
 
 ## Licence
 
