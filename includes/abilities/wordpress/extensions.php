@@ -1251,17 +1251,64 @@ function wordpress_extension_to_array(mixed $record): array
 function wordpress_directory_summary(array $record): array
 {
     return [
-        'slug' => (string) ($record['slug'] ?? ''),
-        'name' => wp_strip_all_tags((string) ($record['name'] ?? '')),
-        'version' => (string) ($record['version'] ?? ''),
-        'author' => wp_strip_all_tags((string) ($record['author'] ?? '')),
-        'short_description' => wp_strip_all_tags((string) ($record['short_description'] ?? '')),
+        'slug' => wordpress_directory_text($record['slug'] ?? ''),
+        'name' => wp_strip_all_tags(wordpress_directory_text($record['name'] ?? '')),
+        'version' => wordpress_directory_text($record['version'] ?? ''),
+        'author' => wp_strip_all_tags(wordpress_directory_author($record['author'] ?? '')),
+        'short_description' => wp_strip_all_tags(wordpress_directory_text($record['short_description'] ?? '')),
         'rating' => (float) ($record['rating'] ?? 0),
         'num_ratings' => (int) ($record['num_ratings'] ?? 0),
-        'active_installs' => (int) ($record['active_installs'] ?? 0),
-        'last_updated' => (string) ($record['last_updated'] ?? ''),
-        'requires' => (string) ($record['requires'] ?? ''),
-        'requires_php' => (string) ($record['requires_php'] ?? ''),
-        'homepage' => (string) ($record['homepage'] ?? ''),
+        // Themes report `downloaded` where plugins report `active_installs`.
+        'active_installs' => (int) ($record['active_installs'] ?? $record['downloaded'] ?? 0),
+        'last_updated' => wordpress_directory_text($record['last_updated'] ?? ''),
+        'requires' => wordpress_directory_text($record['requires'] ?? ''),
+        'requires_php' => wordpress_directory_text($record['requires_php'] ?? ''),
+        'homepage' => wordpress_directory_text($record['homepage'] ?? ''),
     ];
+}
+
+/**
+ * Flatten one directory field to a string.
+ *
+ * The two endpoints disagree about types for the same field. `requires` comes
+ * back as `false` when an extension declares no minimum, and the themes
+ * endpoint answers with arrays where the plugins endpoint answers with strings.
+ * Casting those directly emits an "Array to string conversion" warning and
+ * hands the agent the literal word "Array".
+ */
+function wordpress_directory_text(mixed $value): string
+{
+    if (is_string($value)) {
+        return $value;
+    }
+    // A "declared nothing" field is false, which must read as empty rather than
+    // as the "" / "1" a bool cast produces.
+    if (is_bool($value) || $value === null) {
+        return '';
+    }
+
+    return is_scalar($value) ? (string) $value : '';
+}
+
+/**
+ * Resolve the author field.
+ *
+ * The plugins endpoint returns an HTML link; the themes endpoint returns a
+ * record of the author's WordPress.org profile.
+ */
+function wordpress_directory_author(mixed $value): string
+{
+    if (!is_array($value) && !is_object($value)) {
+        return wordpress_directory_text($value);
+    }
+
+    $author = wordpress_extension_to_array($value);
+    foreach (['display_name', 'author', 'user_nicename', 'author_name'] as $key) {
+        $candidate = wordpress_directory_text($author[$key] ?? '');
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+
+    return '';
 }

@@ -357,6 +357,71 @@ final class ExtensionLifecycleTest extends TestCase
     }
 
     /**
+     * The themes endpoint returns the author as a profile record where the
+     * plugins endpoint returns an HTML link. Casting that to string emitted
+     * "Array to string conversion" and handed the agent the word "Array" as
+     * the author of every theme.
+     */
+    public function testThemeAuthorRecordIsFlattenedToAName(): void
+    {
+        $summary = wordpress_directory_summary([
+            'slug' => 'twentytwenty',
+            'author' => [
+                'user_nicename' => 'wordpressdotorg',
+                'display_name' => 'WordPress.org',
+                'profile' => 'https://profiles.wordpress.org/wordpressdotorg/',
+            ],
+        ]);
+
+        self::assertSame('WordPress.org', $summary['author']);
+    }
+
+    public function testAuthorFallsBackThroughTheProfileKeys(): void
+    {
+        self::assertSame(
+            'wordpressdotorg',
+            wordpress_directory_summary(['author' => ['user_nicename' => 'wordpressdotorg']])['author'],
+        );
+        self::assertSame('', wordpress_directory_summary(['author' => []])['author']);
+    }
+
+    /**
+     * `requires` is `false`, not a string, when an extension declares no
+     * minimum. A bool cast would turn that into "1" or "".
+     */
+    #[DataProvider('nonStringDirectoryFields')]
+    public function testNonStringFieldsBecomeEmptyStrings(mixed $value): void
+    {
+        $summary = wordpress_directory_summary(['requires' => $value, 'requires_php' => $value]);
+
+        self::assertSame('', $summary['requires']);
+        self::assertSame('', $summary['requires_php']);
+    }
+
+    /** @return array<string, array{0: mixed}> */
+    public static function nonStringDirectoryFields(): array
+    {
+        return [
+            'false' => [false],
+            'true' => [true],
+            'null' => [null],
+            'array' => [['6.0']],
+        ];
+    }
+
+    /**
+     * Themes report `downloaded` where plugins report `active_installs`.
+     */
+    public function testThemeDownloadCountFillsTheInstallField(): void
+    {
+        self::assertSame(9_000, wordpress_directory_summary(['downloaded' => 9_000])['active_installs']);
+        self::assertSame(
+            5_000,
+            wordpress_directory_summary(['active_installs' => 5_000, 'downloaded' => 9_000])['active_installs'],
+        );
+    }
+
+    /**
      * The directory API answers with objects on one endpoint and arrays on
      * another, depending on the requested fields.
      */
