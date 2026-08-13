@@ -207,6 +207,15 @@ function wppilot_ability_name_is_critical(string $name): bool
     return false;
 }
 
+/**
+ * Names that read as ordinary writes but are not.
+ *
+ * The extension-lifecycle fragments are listed individually rather than as a
+ * bare `update-` or `activate-` prefix: those would sweep in update-post,
+ * update-media, update-term, activate-design and every other routine content
+ * write, and confirmation-gating those would make normal editing unusable.
+ * `activate-plugin` covers `deactivate-plugin` as a substring.
+ */
 function wppilot_ability_name_is_destructive(string $name): bool
 {
     foreach ([
@@ -218,6 +227,13 @@ function wppilot_ability_name_is_destructive(string $name): bool
         'restore-',
         'apply-site',
         'uninstall',
+        // Extension lifecycle: no code is fetched or written, so these stay out
+        // of the critical list and remain usable on Production Safe — but each
+        // one can take a live site down, so none of them runs unconfirmed.
+        'activate-plugin',
+        'update-plugin',
+        'update-theme',
+        'switch-theme',
     ] as $fragment) {
         if (str_contains($name, $fragment)) {
             return true;

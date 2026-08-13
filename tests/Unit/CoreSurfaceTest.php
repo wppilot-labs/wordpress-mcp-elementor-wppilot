@@ -45,7 +45,7 @@ final class CoreSurfaceTest extends TestCase
     public function testCoreSurfaceRegistersWithFreeAlone(): void
     {
         self::assertNotEmpty(WPPILOT_TEST_BOOT_ABILITIES);
-        self::assertCount(50, WPPILOT_TEST_BOOT_ABILITIES);
+        self::assertCount(61, WPPILOT_TEST_BOOT_ABILITIES);
     }
 
     public function testNoAbilityIsRegisteredTwice(): void
@@ -99,6 +99,12 @@ final class CoreSurfaceTest extends TestCase
             // Users and settings.
             'wppilot/list-users', 'wppilot/get-user',
             'wppilot/get-site-settings', 'wppilot/update-site-settings',
+            // Plugins and themes.
+            'wppilot/list-extensions', 'wppilot/search-extensions', 'wppilot/get-extension',
+            'wppilot/activate-plugin', 'wppilot/deactivate-plugin', 'wppilot/update-plugin',
+            'wppilot/install-plugin', 'wppilot/delete-plugin',
+            'wppilot/switch-theme', 'wppilot/update-theme',
+            'wppilot/install-theme', 'wppilot/delete-theme',
         ];
 
         return array_combine($names, array_map(static fn(string $n): array => [$n], $names));

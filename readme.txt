@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -111,6 +111,7 @@ WordPress itself is Free. Content, taxonomies, media, comments, revisions, menus
 * Menus: create, rename, delete, add and remove items, reorder, and assign to the theme's navigation locations.
 * Users, privacy-minimized reads.
 * Site information and an explicit settings allowlist.
+* Plugins and themes: search the WordPress.org directory, read one in detail, activate, deactivate, update, and switch themes. Installing and deleting are Developer Full Access only, because they write executable code to the server.
 
 New content is created as a draft unless you ask for publication explicitly, and publishing is checked against the post type's own capability.
 
@@ -134,6 +135,15 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.2.0 =
+* Plugins and themes can now be managed, not just listed. Eleven new abilities: search the WordPress.org directory, read one plugin or theme in detail, activate, deactivate, update, switch themes, install and delete. Ability count is 103, up from 92.
+* Installing and deleting write executable code to the server, so they are treated like PHP execution: blocked on Production Safe and Read Only, available in Developer Full Access with explicit confirmation.
+* Activating, deactivating, updating and switching themes fetch nothing and write no files, so they work on a live site — but each one can take a site down, so all four require explicit confirmation. Ordinary content editing is unaffected.
+* An install leaves the plugin inactive and the theme unswitched, so the review step is a separate, separately confirmed call.
+* Sites with DISALLOW_FILE_MODS set, or without direct filesystem access, get a named refusal explaining what to fix instead of a stalled or partial install.
+* Security: WPPilot cannot deactivate or delete itself, an active plugin cannot be deleted before it is deactivated, and the active theme and its parent cannot be deleted. Slugs, plugin files and package URLs are validated before use.
+* Activation, deactivation and theme switches are recorded in the change ledger and can be rolled back. Installs, updates and deletions are recorded as non-reversible, each stating why and how to undo it manually.
 
 = 1.1.0 =
 * The WordPress core surface now ships in the free plugin: content, taxonomies, media, comments, revisions, menus, privacy-minimized user reads, and an allowlisted settings surface. No licence, entitlement service or Pro install is involved. Ability count is 92, up from 42.
@@ -159,6 +169,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Adds plugin and theme management to the free plugin. Installing and deleting stay off Production Safe; activating, updating and switching themes work there with explicit confirmation. Existing connections keep working and do not need to be re-authorised.
 
 = 1.1.0 =
 Adds the WordPress core surface to the free plugin and fixes three security defects in content and menu handling, plus a privacy defect in user reads. Your AI client will see roughly twice as many tools after updating. Existing connections keep working and do not need to be re-authorised.
