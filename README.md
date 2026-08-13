@@ -1,6 +1,6 @@
 # WPPilot — WordPress MCP Server
 
-**Connect Claude, Codex, Cursor, VS Code and Antigravity to WordPress over the Model Context Protocol — with permissions, confirmations and change evidence that stay on your site.**
+**Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build — pages, block layouts, menus, taxonomies, media, SEO metadata — through typed abilities your permissions still govern.**
 
 [![Version](https://img.shields.io/badge/version-1.1.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
@@ -26,7 +26,34 @@ For OAuth, **Client ID Metadata Documents are the preferred registration mechani
 
 It is a control layer, not an AI wrapper. **No AI model is bundled** — external MCP clients bring their own model access, and policy is enforced server-side on your install.
 
+## What an agent can actually build
+
+One prompt from you becomes hundreds of typed calls from the agent, each checked against your WordPress capabilities and the active safety profile before it runs.
+
+Free covers the core surface: posts and pages, block-editor content, taxonomies, menus and menu locations, media with alt text, users, site settings including the front page, plus design documents, skills and a change ledger with rollback.
+
+The prompts ship with it. WPPilot has a **prompt library** in wp-admin, and the prompts name the abilities they call rather than describing an outcome and hoping:
+
+```text
+Create a new draft page titled "[PAGE TITLE]" using core Gutenberg blocks only.
+
+How the write works, so you do not get halfway and stall:
+1. wppilot/create-post — create the draft first. It defaults to draft; leave it there.
+2. wppilot/gutenberg-create-pending-batch — core blocks cannot be written straight
+   from the server, because the block editor's own JavaScript is what validates and
+   serialises them.
+3. wppilot/gutenberg-add-pending-change — queue the block tree against the new post.
+4. wppilot/gutenberg-enable-batch-finalization, then
+   wppilot/gutenberg-get-finalization-url — open that link and the batch commits.
+```
+
+That last part is the honest bit: **core blocks are not a headless write**. Anything the block editor validates in JavaScript needs a browser session to finalise, and the prompts say so rather than leaving you stuck at step three.
+
+WPPilot Pro adds plugin-aware modules — page builders, WooCommerce, forms, custom fields, SEO, themes — each with its own ability chains. The full published library is at <https://wppilot.co/prompts>.
+
 - 🌐 Website: <https://wppilot.co>
+- 🧱 What it builds: <https://wppilot.co/build>
+- 💬 Prompt library: <https://wppilot.co/prompts>
 - 📚 Documentation: <https://wppilot.co/docs>
 - 🔌 Client setup guides: <https://wppilot.co/wordpress-mcp>
 

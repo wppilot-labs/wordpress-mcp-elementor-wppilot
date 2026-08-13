@@ -12,9 +12,11 @@ Connect Claude, Cursor, Codex and other AI clients to your WordPress site over M
 
 == Description ==
 
-WPPilot turns your WordPress site into an MCP (Model Context Protocol) server, so AI clients can read and edit it directly instead of you copying content back and forth.
+WPPilot turns your WordPress site into an MCP (Model Context Protocol) server, so the AI client you already use can build in it directly instead of handing you code to paste. Pages, block-editor content, menus, taxonomies, media, SEO metadata: one prompt from you becomes hundreds of typed calls from the agent, each checked against your WordPress capabilities before it runs.
 
 It is built on the WordPress Abilities API and the official MCP Adapter, and it ships a compact tool set for discovery, inspection and execution rather than a sprawl of one-off endpoints.
+
+A prompt library ships in wp-admin. The prompts name the abilities they call, in order, so a build does not stall halfway through with no explanation.
 
 Full documentation is at [wppilot.co](https://wppilot.co).
 
