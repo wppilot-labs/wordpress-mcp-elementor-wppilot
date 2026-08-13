@@ -261,9 +261,25 @@ function gutenberg_pack(): array
             ],
             [
                 'title' => __('Build a landing page', domain: 'wppilot'),
-                'description' => __('A complete page from a one-line brief.', domain: 'wppilot'),
+                'description' => __('The real chain, including the browser step core blocks require.', domain: 'wppilot'),
                 'prompt' => __(
-                    "Create a new draft page titled \"[PAGE TITLE]\" using core Gutenberg blocks only.\n\nStructure:\n- Hero: heading, one-sentence subheading, primary call-to-action button\n- Three feature columns, each with a heading and two sentences\n- A short social-proof section\n- Closing call-to-action\n\nRules:\n- Leave it as a draft. Do not publish.\n- Use real, specific copy about [WHAT THE PAGE IS FOR] — no lorem ipsum.\n- Use only core blocks so it works on any theme.\n- When you are done, give me the edit link.",
+                    "Create a new draft page titled \"[PAGE TITLE]\" using core Gutenberg blocks only.\n\nHow the write works, so you do not get halfway and stall:\n1. wppilot/create-post — create the draft first. It defaults to draft; leave it there.\n2. wppilot/gutenberg-create-pending-batch — core blocks cannot be written straight from the server, because the block editor's own JavaScript is what validates and serialises them.\n3. wppilot/gutenberg-add-pending-change — queue the block tree against the new post.\n4. wppilot/gutenberg-enable-batch-finalization, then wppilot/gutenberg-get-finalization-url — send me that link. I open it in a browser and the batch commits.\n\nBlocks to use, and nothing else:\ncore/group, core/columns, core/column, core/heading, core/paragraph, core/buttons, core/button, core/image, core/list, core/separator, core/spacer, core/quote, core/cover.\n\nStructure:\n- Hero: core/cover or core/group with an H1, one supporting sentence, one core/buttons\n- Three core/columns, each a core/heading H3 plus two sentences\n- A core/quote with a real, attributed quotation — or omit the section entirely\n- Closing core/group with the same call to action as the hero\n\nRules:\n- Real, specific copy about [WHAT THE PAGE IS FOR]. No filler text, no invented statistics, no fake testimonials.\n- Anything I have not told you — prices, credentials, client names, numbers — goes in as [CONFIRM: what is missing].\n- Set the H1 once. Every other heading is H2 or lower, in order.\n- Do not publish, and do not touch the theme, the menu or any other page.\n\nWhen the batch is queued, give me the finalization link and tell me exactly what is in it.",
+                    domain: 'wppilot',
+                ),
+            ],
+            [
+                'title' => __('Inventory a page before editing it', domain: 'wppilot'),
+                'description' => __('Read-only. Safe on a live site, and it prevents most bad edits.', domain: 'wppilot'),
+                'prompt' => __(
+                    "Inventory the page [PAGE TITLE] before anything is changed. Read only — make no writes in this run.\n\nCall in this order:\n1. wppilot/get-content — the stored post and its metadata\n2. wppilot/gutenberg-get-content — the parsed block tree\n3. wppilot/get-page-snapshot — what the page actually renders\n4. wppilot/list-revisions — how recently it was edited and by whom\n\nReport back:\n- The block tree, summarised section by section, naming the actual block types used\n- Any block that is not a core block, and which plugin registers it\n- Any block holding content that should be shared instead of duplicated\n- Broken or empty blocks, missing image alt text, heading levels out of order\n- Anything that would break if this page were rebuilt from scratch\n\nDo not propose fixes yet. I want the picture first.",
+                    domain: 'wppilot',
+                ),
+            ],
+            [
+                'title' => __('Check what is waiting in the Block Editor Queue', domain: 'wppilot'),
+                'description' => __('When a queued change never landed, this is how you find out why.', domain: 'wppilot'),
+                'prompt' => __(
+                    "Tell me the state of the Block Editor Queue on this site.\n\nCall:\n1. wppilot/gutenberg-list-pending-batches — every batch and its status\n2. wppilot/gutenberg-get-pending-batch — the contents of any batch that is not finalised\n3. wppilot/gutenberg-get-finalizer-runtime — whether the finalizer can actually run here\n\nFor each unfinalised batch, tell me:\n- Which post or template it targets, and whether that target still exists\n- What the change would do, in plain language\n- Which agent or session created it, and when\n- Whether it is safe to discard\n\nDo not finalise, delete or modify anything. Queued changes are not live until the whole batch commits, so an old batch is a decision waiting for me, not a fault.",
                     domain: 'wppilot',
                 ),
             ],
