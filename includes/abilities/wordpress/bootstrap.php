@@ -67,5 +67,6 @@ function wppilot_load_wordpress_abilities(): void
     require_once $dir . 'media.php';
     require_once $dir . 'media-attachments.php';
     require_once $dir . 'site-management.php';
+    require_once $dir . 'extensions.php';
     require_once $dir . 'menus.php';
 }

@@ -20,6 +20,12 @@ declare(strict_types=1);
 
 define('ABSPATH', __DIR__ . '/');
 
+// The plugin-file constants the real plugin defines at load. The extension
+// abilities read them to refuse deactivating or deleting WPPilot itself, so the
+// suite needs them to exercise that refusal.
+define('WPPILOT_PLUGIN_FILE', ABSPATH . 'wp-content/plugins/wppilot/wppilot.php');
+define('WPPILOT_PRO_FILE', ABSPATH . 'wp-content/plugins/wppilot-pro/wppilot-pro.php');
+
 require_once __DIR__ . '/doubles/wordpress.php';
 
 // Load the whole WordPress-core module, not just its helpers: registration
@@ -37,5 +43,8 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
 require_once dirname(__DIR__) . '/includes/oauth/client-id-metadata.php';
 
 // Registrations captured during load are the baseline the suite asserts against.
-// Snapshot them before any test calls WPPilot_Test_State::reset().
+// Snapshot them before any test calls WPPilot_Test_State::reset(). The full
+// registration arguments are kept alongside the names so a test can assert on
+// the annotations a profile decision is made from.
 define('WPPILOT_TEST_BOOT_ABILITIES', WPPilot_Test_State::$registered_abilities);
+define('WPPILOT_TEST_BOOT_REGISTRATIONS', WPPilot_Test_State::$registrations);

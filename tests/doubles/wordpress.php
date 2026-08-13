@@ -39,6 +39,11 @@ final class WPPilot_Test_State
 
     public static bool $wppilot_enabled = true;
 
+    public static bool $multisite = false;
+
+    /** @var array<string, array<string, string>> */
+    public static array $plugins = [];
+
     public static function reset(): void
     {
         self::$post_types = [];
@@ -49,6 +54,8 @@ final class WPPilot_Test_State
         self::$taxonomies = [];
         self::$logged_in = true;
         self::$wppilot_enabled = true;
+        self::$multisite = false;
+        self::$plugins = [];
     }
 
     /**
@@ -271,6 +278,76 @@ if (!function_exists('wp_parse_url')) {
     function wp_parse_url(string $url, int $component = -1): mixed
     {
         return parse_url($url, $component);
+    }
+}
+
+if (!function_exists('validate_file')) {
+    /**
+     * Reproduces WordPress's traversal check: 0 is "acceptable path", and each
+     * non-zero code is one of the rejections the real function reports.
+     *
+     * @param list<string> $allowed_files
+     */
+    function validate_file(string $file, array $allowed_files = []): int
+    {
+        if ($allowed_files !== [] && in_array($file, $allowed_files, true)) {
+            return 0;
+        }
+        if (str_contains($file, '..')) {
+            return 1;
+        }
+        if (preg_match('#^[A-Za-z]:#', $file) === 1) {
+            return 2;
+        }
+        if (str_starts_with($file, './')) {
+            return 3;
+        }
+
+        return 0;
+    }
+}
+
+if (!function_exists('wp_normalize_path')) {
+    function wp_normalize_path(string $path): string
+    {
+        return preg_replace('#/+#', '/', str_replace('\\', '/', $path)) ?? $path;
+    }
+}
+
+if (!function_exists('plugin_basename')) {
+    function plugin_basename(string $file): string
+    {
+        $file = wp_normalize_path($file);
+
+        return ltrim((string) preg_replace('#^.*/plugins/#', '', $file), '/');
+    }
+}
+
+if (!function_exists('is_multisite')) {
+    function is_multisite(): bool
+    {
+        return WPPilot_Test_State::$multisite;
+    }
+}
+
+if (!function_exists('get_plugins')) {
+    /** @return array<string, array<string, string>> */
+    function get_plugins(): array
+    {
+        return WPPilot_Test_State::$plugins;
+    }
+}
+
+if (!function_exists('wp_strip_all_tags')) {
+    /**
+     * Mirrors WordPress: script and style elements lose their contents as well
+     * as their tags, everything else keeps its text.
+     */
+    function wp_strip_all_tags(string $text): string
+    {
+        $text = (string) preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', $text);
+
+        return trim(strip_tags($text));
     }
 }
 
