@@ -222,7 +222,7 @@ Tone: plain and specific. Do not invent shipping times, prices or return windows
 
     $rules = __('Rules for the whole build:
 - Create everything as drafts. Publish nothing without asking me.
-- Real, specific copy for this business — never lorem ipsum.
+- Real, specific copy for this business — never filler text.
 - Use the site\'s existing theme, colours and fonts.
 - Add each page to the main navigation in the order listed.
 - Anything you are not certain of goes in as [CONFIRM: …] rather than a plausible guess.
@@ -362,7 +362,7 @@ function content_pack(): array
                 'title' => __('Prepare a site for handover', domain: 'wppilot'),
                 'description' => __('The checklist before you give a client the keys.', domain: 'wppilot'),
                 'prompt' => __(
-                    "I am handing this site over to a client. Check and report on:\n\n- Placeholder content still live (lorem ipsum, \"Sample Page\", default tagline)\n- Pages with no SEO title or description\n- Missing favicon or site icon\n- Default \"Hello world\" post or default comment still present\n- Admin accounts that should be removed\n- Whether search engine visibility is switched on\n\nReport only. I will decide what to change.",
+                    "I am handing this site over to a client. Check and report on:\n\n- Filler text still live, plus the default \"Sample Page\" and the untouched site tagline\n- Pages with no SEO title or description\n- Missing favicon or site icon\n- Default \"Hello world\" post or default comment still present\n- Admin accounts that should be removed\n- Whether search engine visibility is switched on\n\nReport only. I will decide what to change.",
                     domain: 'wppilot',
                 ),
             ],
