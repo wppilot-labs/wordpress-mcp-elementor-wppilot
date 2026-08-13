@@ -308,7 +308,55 @@ function wppilot_capture_core_before_image(string $ability_name, array $input): 
     if ($ability_name === 'wppilot/reorder-menu-items') {
         return wppilot_snapshot_menu_order((int) ($input['menu_id'] ?? 0));
     }
+    if (in_array($ability_name, ['wppilot/activate-plugin', 'wppilot/deactivate-plugin'], strict: true)) {
+        return wppilot_snapshot_plugin_state((string) ($input['file'] ?? ''));
+    }
+    if ($ability_name === 'wppilot/switch-theme') {
+        $values = ['stylesheet' => get_stylesheet(), 'template' => get_template()];
+        return [
+            'type' => 'active-theme',
+            'values' => $values,
+            'fingerprint' => wppilot_snapshot_fingerprint($values),
+        ];
+    }
+    if (in_array($ability_name, [
+        'wppilot/install-plugin',
+        'wppilot/install-theme',
+        'wppilot/update-plugin',
+        'wppilot/update-theme',
+        'wppilot/delete-plugin',
+        'wppilot/delete-theme',
+    ], strict: true)) {
+        // No before-image is possible — these move files on disk — but the
+        // marker still reaches the rollback builder, which then states the real
+        // reason instead of the generic "no strategy registered".
+        return ['type' => 'extension-files'];
+    }
     return null;
+}
+
+/**
+ * Capture whether a plugin is active, per-site and network-wide.
+ *
+ * Activation state is the whole before-image: the files are untouched by
+ * activate/deactivate, so restoring the flag restores the change.
+ *
+ * @return array<string, mixed>|null
+ */
+function wppilot_snapshot_plugin_state(string $file): ?array
+{
+    if ($file === '') {
+        return null;
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    $values = [
+        'file' => $file,
+        'active' => is_plugin_active($file),
+        'network_active' => is_plugin_active_for_network($file),
+    ];
+
+    return ['type' => 'plugin-state', 'values' => $values, 'fingerprint' => wppilot_snapshot_fingerprint($values)];
 }
 
 /**
@@ -594,7 +642,34 @@ function wppilot_build_core_rollback_payload(string $ability_name, array $before
     if (($before['type'] ?? null) === 'menu-order') {
         return ['reversible' => true, 'type' => 'restore-menu-order', 'snapshot' => $before];
     }
+    if (($before['type'] ?? null) === 'plugin-state') {
+        return ['reversible' => true, 'type' => 'restore-plugin-state', 'snapshot' => $before];
+    }
+    if (($before['type'] ?? null) === 'active-theme') {
+        return ['reversible' => true, 'type' => 'restore-active-theme', 'snapshot' => $before];
+    }
+    if (($before['type'] ?? null) === 'extension-files') {
+        return ['reversible' => false, 'reason' => wppilot_extension_files_rollback_reason($ability_name)];
+    }
     return ['reversible' => false, 'reason' => 'No rollback strategy is registered for this change.'];
+}
+
+/**
+ * Why a plugin/theme file operation cannot be undone from the ledger.
+ *
+ * Each reason names the manual path back, because "not reversible" alone tells
+ * an operator nothing about what to do next.
+ */
+function wppilot_extension_files_rollback_reason(string $ability_name): string
+{
+    return match ($ability_name) {
+        'wppilot/install-plugin' => 'Files were written to the server. Remove the plugin with wppilot/delete-plugin.',
+        'wppilot/install-theme' => 'Files were written to the server. Remove the theme with wppilot/delete-theme.',
+        'wppilot/update-plugin', 'wppilot/update-theme' => 'The previous version was overwritten and is not retained. Reinstall the earlier release from its own source.',
+        'wppilot/delete-plugin' => 'The plugin files were permanently deleted. Reinstall it with wppilot/install-plugin.',
+        'wppilot/delete-theme' => 'The theme files were permanently deleted. Reinstall it with wppilot/install-theme.',
+        default => 'This operation changed files on the server and is not automatically reversible.',
+    };
 }
 
 /**
@@ -701,6 +776,88 @@ function wppilot_restore_menu_locations_snapshot(array $snapshot): array
     set_theme_mod('nav_menu_locations', $values);
 
     return ['result' => 'restored', 'locations' => count($values)];
+}
+
+/**
+ * Put a plugin back into its captured activation state.
+ *
+ * Reactivation runs the plugin's activation hooks again, which is what the
+ * original activation did too — the alternative, a silent flag flip, leaves a
+ * plugin marked active with none of its setup performed.
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_restore_plugin_state_snapshot(array $snapshot): array|WP_Error
+{
+    $values = wppilot_string_keyed_array($snapshot['values'] ?? null);
+    $file = (string) ($values['file'] ?? '');
+    if ($file === '') {
+        return new WP_Error('wppilot_rollback_invalid_plugin', __(
+            'The captured plugin file is missing from the change record.',
+            domain: 'wppilot',
+        ));
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    if (!array_key_exists($file, get_plugins())) {
+        return new WP_Error('wppilot_rollback_target_missing', __(
+            'The plugin is no longer installed, so its activation state cannot be restored.',
+            domain: 'wppilot',
+        ));
+    }
+
+    $network_active = ($values['network_active'] ?? false) === true;
+    $was_active = ($values['active'] ?? false) === true || $network_active;
+
+    if ($was_active) {
+        $activated = activate_plugin($file, redirect: '', network_wide: $network_active, silent: false);
+        if (is_wp_error($activated)) {
+            return $activated;
+        }
+    } else {
+        deactivate_plugins([$file], silent: false, network_wide: $network_active ? true : null);
+    }
+
+    $now_active = is_plugin_active($file) || is_plugin_active_for_network($file);
+
+    return [
+        'file' => $file,
+        'active' => $now_active,
+        'verified' => $now_active === $was_active,
+    ];
+}
+
+/**
+ * Switch back to the theme that was active before the change.
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_restore_active_theme_snapshot(array $snapshot): array|WP_Error
+{
+    $values = wppilot_string_keyed_array($snapshot['values'] ?? null);
+    $stylesheet = (string) ($values['stylesheet'] ?? '');
+    if ($stylesheet === '') {
+        return new WP_Error('wppilot_rollback_invalid_theme', __(
+            'The captured theme is missing from the change record.',
+            domain: 'wppilot',
+        ));
+    }
+    if (!wp_get_theme($stylesheet)->exists()) {
+        return new WP_Error('wppilot_rollback_target_missing', __(
+            'The previously active theme is no longer installed, so it cannot be restored.',
+            domain: 'wppilot',
+        ));
+    }
+
+    switch_theme($stylesheet);
+
+    return [
+        'stylesheet' => $stylesheet,
+        'active' => get_stylesheet(),
+        'verified' => get_stylesheet() === $stylesheet,
+    ];
 }
 
 /**
@@ -818,6 +975,12 @@ function wppilot_rollback_change(string $id): array|WP_Error
                 $rollback['snapshot'] ?? null,
             )),
             'restore-menu-order' => wppilot_restore_menu_order_snapshot(wppilot_string_keyed_array(
+                $rollback['snapshot'] ?? null,
+            )),
+            'restore-plugin-state' => wppilot_restore_plugin_state_snapshot(wppilot_string_keyed_array(
+                $rollback['snapshot'] ?? null,
+            )),
+            'restore-active-theme' => wppilot_restore_active_theme_snapshot(wppilot_string_keyed_array(
                 $rollback['snapshot'] ?? null,
             )),
             default => new WP_Error('wppilot_rollback_unknown', __('Unknown rollback strategy.', domain: 'wppilot')),

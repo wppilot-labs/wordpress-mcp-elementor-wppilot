@@ -95,14 +95,14 @@ Neither is a product licence. WPPilot needs no activation key, entitlement check
 | Profile | What it allows |
 | --- | --- |
 | **Read Only** | Discovery and inspection. Every state-changing ability is blocked. |
-| **Production Safe** | Normal content, design, SEO, forms and commerce work. Blocks raw PHP, WP-CLI, filesystem, database, plugin/theme installation and temporary admin access. |
+| **Production Safe** | Normal content, design, SEO, forms and commerce work, plus plugin activation and updates with confirmation. Blocks raw PHP, WP-CLI, filesystem, database, plugin/theme installation and deletion, and temporary admin access. |
 | **Developer Full Access** | Every enabled ability, including privileged surfaces. Critical calls still require explicit confirmation. |
 
 On top of the profile: WordPress user capabilities still apply, individual abilities can be switched off, destructive operations require an explicit confirmation flag, writes are rate-limited per credential, and supported changes are recorded in a redacted change ledger with rollback.
 
 ## What the free plugin can do
 
-92 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+103 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -114,6 +114,7 @@ On top of the profile: WordPress user capabilities still apply, individual abili
 | **Revisions** | `3` | List with autosaves distinguished, read against the live post, and restore. |
 | **Users** | `4` | Privacy-minimized reads. Login name, roles and registration date need `list_users`; the email address needs `edit_users`. |
 | **Site** | `3` | Site information, an explicit settings allowlist, and installed extensions. |
+| **Plugins and themes** | `11` | Search the WordPress.org directory and read one extension in detail. Activate, deactivate, update and switch themes with explicit confirmation. Install and delete are Developer Full Access only: they write executable code to the server. |
 | **Gutenberg** | `11` | Block-editor content, staged pending changes and browser finalization for native blocks. |
 | **Design library** | `7` | Typed design tokens, saved designs and activation. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
@@ -125,7 +126,7 @@ Content creation is draft-first: an absent, blank or malformed status resolves t
 
 ## WPPilot Pro, 968 plugin-aware abilities
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **92 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads and allowlisted settings. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, diagnostics, change evidence and **103 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 51 integrations**, typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
