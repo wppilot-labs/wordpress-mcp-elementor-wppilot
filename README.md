@@ -32,7 +32,9 @@ One prompt from you becomes hundreds of typed calls from the agent, each checked
 
 Free covers the core surface: posts and pages, block-editor content, taxonomies, menus and menu locations, media with alt text, users, site settings including the front page, plus design documents, skills and a change ledger with rollback.
 
-The prompts ship with it. WPPilot has a **prompt library** in wp-admin, and the prompts name the abilities they call rather than describing an outcome and hoping:
+**You do not have to phrase anything in a particular way.** A client's first call is discovery, and WPPilot answers with every ability registered on your install plus a catalogue of the skills available for them, carrying one instruction: if a skill matches the request, load its full instructions before starting the work. So "rebuild the pricing page and keep our spacing" already pulls in the right build skill, the element schemas and your existing design tokens without you naming any of it. Write your own prompts; the routing is on the site.
+
+The library is a shortcut, not a dependency. WPPilot ships a **prompt library** in wp-admin for the jobs people run most, and those prompts name the abilities they call rather than describing an outcome and hoping:
 
 ```text
 Create a new draft page titled "[PAGE TITLE]" using core Gutenberg blocks only.
