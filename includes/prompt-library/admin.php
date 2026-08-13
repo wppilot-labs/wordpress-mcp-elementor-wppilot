@@ -17,7 +17,7 @@ use WPPilot\PromptLibrary;
  * has stopped being a library and started being an app nobody asked for.
  *
  * Locked packs are shown, not hidden. Someone on the free plugin should be able
- * to see that the Elementor prompts exist and what they cover — that is the
+ * to see that the Elementor prompts exist and what they cover. That is the
  * honest version of an upsell, and it is also the answer to "does Pro have
  * anything for my builder?".
  */
@@ -321,8 +321,7 @@ function render_pack(array $pack, bool $licensed): void
                 <?php foreach ($prompts as $prompt) { ?>
                     <li>
                         <strong><?php echo esc_html($prompt['title']); ?></strong>
-                        <?php if ($prompt['description'] !== '') { ?>
-                            — <?php echo esc_html($prompt['description']); ?>
+                        <?php if ($prompt['description'] !== '') { ?>, <?php echo esc_html($prompt['description']); ?>
                         <?php } ?>
                     </li>
                 <?php } ?>

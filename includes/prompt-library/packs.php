@@ -11,7 +11,7 @@ namespace WPPilot\PromptLibrary;
  * The prompt library: ready-made things to say to an agent.
  *
  * WPPilot exposes 70 abilities, and the hardest part of using it is not the
- * connection — it is knowing what to ask for. "Rewrite my homepage" gets a
+ * connection. It is knowing what to ask for. "Rewrite my homepage" gets a
  * shrug; a prompt that names the page, the tone, the constraints and the
  * approval step gets work done. This library is that difference, written down.
  *
@@ -25,8 +25,8 @@ namespace WPPilot\PromptLibrary;
  * absent.
  *
  * To add prompts: append to the array in gutenberg_pack() here, or hook the
- * filter from anywhere else. A pack is data — slug, label, group, and a list of
- * prompts — with no behaviour to keep in step.
+ * filter from anywhere else. A pack is data: slug, label, group, and a list of
+ * prompts, with no behaviour to keep in step.
  */
 
 if (!defined('ABSPATH')) {
@@ -172,7 +172,7 @@ function normalize_prompts(mixed $raw_prompts): array
  * The hardest prompt to write is the first one on an empty site: "build me an
  * accounting firm's website" is too vague to act on, and the result is a
  * five-page site of adjectives. This spells out the pages, the sections in
- * each, the tone, and the approval points — which is the difference between a
+ * each, the tone, and the approval points, which is the difference between a
  * demo and something a client could look at.
  *
  * One prompt covers every kind of business rather than one prompt per industry.
@@ -180,7 +180,7 @@ function normalize_prompts(mixed $raw_prompts): array
  * plans travel with it, so adding "law firm" later is one line here instead of
  * a new pack in every builder.
  *
- * $builder_line is the editor-specific instruction — the single sentence that
+ * $builder_line is the editor-specific instruction, the single sentence that
  * decides whether the output is editable in the tool the customer actually
  * uses, or a pile of blocks they cannot touch.
  */
@@ -192,15 +192,15 @@ function full_site_brief(string $builder_line): string
     );
 
     $plans = __(
-        'Page plan — use the one matching the site type, and adapt it:
+        'Page plan: use the one matching the site type, and adapt it:
 
 ACCOUNTING / PROFESSIONAL SERVICES
 Home · Services (bookkeeping, tax, payroll, advisory) · About + team credentials · Pricing (three tiers, "from" prices) · Contact · Privacy Policy
-Tone: precise, calm, trustworthy. No hype. Never invent tax figures, rates, deadlines or regulatory claims — write [CONFIRM: …] instead.
+Tone: precise, calm, trustworthy. No hype. Never invent tax figures, rates, deadlines or regulatory claims, write [CONFIRM: …] instead.
 
 RESTAURANT / HOSPITALITY
 Home (hours prominent) · Menu (sections, prices, dietary markers) · About + chef · Book a table · Contact (hours per day, parking, accessibility)
-Tone: warm but concrete — describe food by ingredient and preparation, not adjectives. Hours, menu and booking must be one click from anywhere.
+Tone: warm but concrete, describe food by ingredient and preparation, not adjectives. Hours, menu and booking must be one click from anywhere.
 
 AGENCY / STUDIO
 Home · Services (what is included, process, timeline) · Work (three case studies: problem, approach, result) · About · Contact with budget and timeline fields
@@ -212,17 +212,17 @@ Tone: reassuring and plain; assume the reader is anxious. Make no claims about o
 
 PORTFOLIO / INDIVIDUAL
 Home · Work (four projects: brief, approach, outcome) · About · Contact
-Tone: first person, direct, short sentences. Keep it small — the job is to show work.
+Tone: first person, direct, short sentences. Keep it small. The job is to show work.
 
 E-COMMERCE
 Home · Shop landing · About · Shipping & returns · FAQ · Contact
-Tone: plain and specific. Do not invent shipping times, prices or return windows — use [CONFIRM: …].',
+Tone: plain and specific. Do not invent shipping times, prices or return windows, use [CONFIRM: …].',
         domain: 'wppilot',
     );
 
     $rules = __('Rules for the whole build:
 - Create everything as drafts. Publish nothing without asking me.
-- Real, specific copy for this business — never filler text.
+- Real, specific copy for this business, never filler text.
 - Use the site\'s existing theme, colours and fonts.
 - Add each page to the main navigation in the order listed.
 - Anything you are not certain of goes in as [CONFIRM: …] rather than a plausible guess.
@@ -263,7 +263,7 @@ function gutenberg_pack(): array
                 'title' => __('Build a landing page', domain: 'wppilot'),
                 'description' => __('The real chain, including the browser step core blocks require.', domain: 'wppilot'),
                 'prompt' => __(
-                    "Create a new draft page titled \"[PAGE TITLE]\" using core Gutenberg blocks only.\n\nHow the write works, so you do not get halfway and stall:\n1. wppilot/create-post — create the draft first. It defaults to draft; leave it there.\n2. wppilot/gutenberg-create-pending-batch — core blocks cannot be written straight from the server, because the block editor's own JavaScript is what validates and serialises them.\n3. wppilot/gutenberg-add-pending-change — queue the block tree against the new post.\n4. wppilot/gutenberg-enable-batch-finalization, then wppilot/gutenberg-get-finalization-url — send me that link. I open it in a browser and the batch commits.\n\nBlocks to use, and nothing else:\ncore/group, core/columns, core/column, core/heading, core/paragraph, core/buttons, core/button, core/image, core/list, core/separator, core/spacer, core/quote, core/cover.\n\nStructure:\n- Hero: core/cover or core/group with an H1, one supporting sentence, one core/buttons\n- Three core/columns, each a core/heading H3 plus two sentences\n- A core/quote with a real, attributed quotation — or omit the section entirely\n- Closing core/group with the same call to action as the hero\n\nRules:\n- Real, specific copy about [WHAT THE PAGE IS FOR]. No filler text, no invented statistics, no fake testimonials.\n- Anything I have not told you — prices, credentials, client names, numbers — goes in as [CONFIRM: what is missing].\n- Set the H1 once. Every other heading is H2 or lower, in order.\n- Do not publish, and do not touch the theme, the menu or any other page.\n\nWhen the batch is queued, give me the finalization link and tell me exactly what is in it.",
+                    "Create a new draft page titled \"[PAGE TITLE]\" using core Gutenberg blocks only.\n\nHow the write works, so you do not get halfway and stall:\n1. wppilot/create-post, create the draft first. It defaults to draft; leave it there.\n2. wppilot/gutenberg-create-pending-batch: core blocks cannot be written straight from the server, because the block editor's own JavaScript is what validates and serialises them.\n3. wppilot/gutenberg-add-pending-change, queue the block tree against the new post.\n4. wppilot/gutenberg-enable-batch-finalization, then wppilot/gutenberg-get-finalization-url, send me that link. I open it in a browser and the batch commits.\n\nBlocks to use, and nothing else:\ncore/group, core/columns, core/column, core/heading, core/paragraph, core/buttons, core/button, core/image, core/list, core/separator, core/spacer, core/quote, core/cover.\n\nStructure:\n- Hero: core/cover or core/group with an H1, one supporting sentence, one core/buttons\n- Three core/columns, each a core/heading H3 plus two sentences\n- A core/quote with a real, attributed quotation, or omit the section entirely\n- Closing core/group with the same call to action as the hero\n\nRules:\n- Real, specific copy about [WHAT THE PAGE IS FOR]. No filler text, no invented statistics, no fake testimonials.\n- Anything I have not told you, prices, credentials, client names, numbers, goes in as [CONFIRM: what is missing].\n- Set the H1 once. Every other heading is H2 or lower, in order.\n- Do not publish, and do not touch the theme, the menu or any other page.\n\nWhen the batch is queued, give me the finalization link and tell me exactly what is in it.",
                     domain: 'wppilot',
                 ),
             ],
@@ -271,7 +271,7 @@ function gutenberg_pack(): array
                 'title' => __('Inventory a page before editing it', domain: 'wppilot'),
                 'description' => __('Read-only. Safe on a live site, and it prevents most bad edits.', domain: 'wppilot'),
                 'prompt' => __(
-                    "Inventory the page [PAGE TITLE] before anything is changed. Read only — make no writes in this run.\n\nCall in this order:\n1. wppilot/get-content — the stored post and its metadata\n2. wppilot/gutenberg-get-content — the parsed block tree\n3. wppilot/get-page-snapshot — what the page actually renders\n4. wppilot/list-revisions — how recently it was edited and by whom\n\nReport back:\n- The block tree, summarised section by section, naming the actual block types used\n- Any block that is not a core block, and which plugin registers it\n- Any block holding content that should be shared instead of duplicated\n- Broken or empty blocks, missing image alt text, heading levels out of order\n- Anything that would break if this page were rebuilt from scratch\n\nDo not propose fixes yet. I want the picture first.",
+                    "Inventory the page [PAGE TITLE] before anything is changed. Read only, make no writes in this run.\n\nCall in this order:\n1. wppilot/get-content, the stored post and its metadata\n2. wppilot/gutenberg-get-content, the parsed block tree\n3. wppilot/get-page-snapshot, what the page actually renders\n4. wppilot/list-revisions, how recently it was edited and by whom\n\nReport back:\n- The block tree, summarised section by section, naming the actual block types used\n- Any block that is not a core block, and which plugin registers it\n- Any block holding content that should be shared instead of duplicated\n- Broken or empty blocks, missing image alt text, heading levels out of order\n- Anything that would break if this page were rebuilt from scratch\n\nDo not propose fixes yet. I want the picture first.",
                     domain: 'wppilot',
                 ),
             ],
@@ -279,7 +279,7 @@ function gutenberg_pack(): array
                 'title' => __('Check what is waiting in the Block Editor Queue', domain: 'wppilot'),
                 'description' => __('When a queued change never landed, this is how you find out why.', domain: 'wppilot'),
                 'prompt' => __(
-                    "Tell me the state of the Block Editor Queue on this site.\n\nCall:\n1. wppilot/gutenberg-list-pending-batches — every batch and its status\n2. wppilot/gutenberg-get-pending-batch — the contents of any batch that is not finalised\n3. wppilot/gutenberg-get-finalizer-runtime — whether the finalizer can actually run here\n\nFor each unfinalised batch, tell me:\n- Which post or template it targets, and whether that target still exists\n- What the change would do, in plain language\n- Which agent or session created it, and when\n- Whether it is safe to discard\n\nDo not finalise, delete or modify anything. Queued changes are not live until the whole batch commits, so an old batch is a decision waiting for me, not a fault.",
+                    "Tell me the state of the Block Editor Queue on this site.\n\nCall:\n1. wppilot/gutenberg-list-pending-batches, every batch and its status\n2. wppilot/gutenberg-get-pending-batch, the contents of any batch that is not finalised\n3. wppilot/gutenberg-get-finalizer-runtime, whether the finalizer can actually run here\n\nFor each unfinalised batch, tell me:\n- Which post or template it targets, and whether that target still exists\n- What the change would do, in plain language\n- Which agent or session created it, and when\n- Whether it is safe to discard\n\nDo not finalise, delete or modify anything. Queued changes are not live until the whole batch commits, so an old batch is a decision waiting for me, not a fault.",
                     domain: 'wppilot',
                 ),
             ],
@@ -338,7 +338,7 @@ function content_pack(): array
                 'title' => __('Weekly site report', domain: 'wppilot'),
                 'description' => __('What changed, what needs attention.', domain: 'wppilot'),
                 'prompt' => __(
-                    "Give me a short report on this WordPress site:\n\n- Content published or updated in the last 7 days\n- Drafts that have sat untouched for more than 30 days\n- Pending comments\n- Plugins and themes with updates available\n- Anything that looks broken or misconfigured\n\nRead only — change nothing. Keep it under 300 words.",
+                    "Give me a short report on this WordPress site:\n\n- Content published or updated in the last 7 days\n- Drafts that have sat untouched for more than 30 days\n- Pending comments\n- Plugins and themes with updates available\n- Anything that looks broken or misconfigured\n\nRead only, change nothing. Keep it under 300 words.",
                     domain: 'wppilot',
                 ),
             ],
