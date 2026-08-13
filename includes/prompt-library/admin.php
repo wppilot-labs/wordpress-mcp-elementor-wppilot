@@ -110,6 +110,12 @@ function render(): void
             'Ready-made instructions for your AI client. Copy one, edit the parts in brackets, and paste it wherever you talk to your agent.',
             domain: 'wppilot',
         ); ?></p>
+        <?php // These are a shortcut, not the interface. Nobody should read this
+              // screen and conclude their own wording will not work. ?>
+        <p class="description" style="margin:-6px 0 18px;max-width:70ch;"><?php esc_html_e(
+            'You do not have to use any of these. Your agent asks this site what it can do before it starts, and loads the right skill on its own, so asking in your own words works just as well. These are here to save you the first hour.',
+            domain: 'wppilot',
+        ); ?></p>
 
         <?php if ($packs === []) {
             ?>
