@@ -66,6 +66,7 @@ WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom
 - 💬 Prompt library: <https://wppilot.co/prompts>
 - 📚 Documentation: <https://wppilot.co/docs>
 - 🔌 Client setup guides: <https://wppilot.co/wordpress-mcp>
+- 𝕏 Release notes and build demos: <https://x.com/WPPilotMCP>
 
 ---
 
