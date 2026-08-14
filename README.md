@@ -2,12 +2,20 @@
 
 **Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build, pages, block layouts, menus, taxonomies, media, SEO metadata, through typed abilities your permissions still govern.**
 
-[![Version](https://img.shields.io/badge/version-1.1.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
+[![Version](https://img.shields.io/badge/version-1.2.1-142017)](https://github.com/wppilot-labs/wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
 
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
+
+### Looking for an Elementor, Divi or Beaver Builder MCP server?
+
+This is it, with one server instead of one per plugin. The free plugin here is the WordPress MCP server: connection, authentication, safety and the whole core surface. [WPPilot Pro](https://wppilot.co/pro) adds the builder-aware layer on top of the same endpoint, so an agent that connects once can work in whichever editor the site actually uses:
+
+[Elementor MCP](https://wppilot.co/mcp-for-elementor) · [Bricks MCP](https://wppilot.co/mcp-for-bricks) · [Divi MCP](https://wppilot.co/mcp-for-divi) · [Beaver Builder MCP](https://wppilot.co/mcp-for-beaver-builder) · [Oxygen MCP](https://wppilot.co/mcp-for-oxygen) · [Breakdance MCP](https://wppilot.co/mcp-for-breakdance) · [WPBakery MCP](https://wppilot.co/mcp-for-wpbakery) · [Etch MCP](https://wppilot.co/mcp-for-etch) · [Mosaic MCP](https://wppilot.co/mcp-for-mosaic)
+
+Beyond page builders, Pro also covers WooCommerce, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Yoast SEO, Rank Math, AIOSEO, SEOPress, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [51 integrations](#wppilot-pro-968-plugin-aware-abilities).
 
 ## MCP protocol support
 
@@ -174,6 +182,32 @@ Pro gives the agent that builder's own vocabulary: `bricks-patch-elements`, `ele
 [Compare Free vs Pro](https://wppilot.co/free-vs-pro) · [Pricing](https://wppilot.co/pricing) · [All integrations](https://wppilot.co/integrations)
 
 > WPPilot Pro is a commercial plugin and is not distributed from this repository.
+
+## FAQ
+
+**Is this a WordPress MCP server or an MCP client?**
+A server. Your site exposes typed WordPress abilities over MCP at `https://example.com/wp-json/mcp/wppilot`, and the AI client you already use connects to it. No model is bundled and no key is stored here; the client brings its own model access.
+
+**Does it work with Elementor, Bricks, Divi, Beaver Builder, Oxygen, Breakdance, WPBakery, Etch or Mosaic?**
+Yes, through [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware abilities on the same endpoint. A page builder stores an element tree, shared classes, design tokens and dynamic bindings rather than HTML, so Pro gives the agent that builder's own vocabulary instead of writing markup into a store that will not open in its editor.
+
+**Do I need Pro to use this?**
+No. The free plugin in this repository is a complete WordPress MCP server with 103 abilities, and it needs no licence, activation key or entitlement service. Pro is additive.
+
+**How does it relate to the WordPress Abilities API and the official MCP Adapter?**
+It is built on both. The Abilities API is where abilities are registered, and the MCP Adapter is bundled to serve the legacy protocol revision. WPPilot adds the parts an adapter does not: authentication, safety profiles, confirmation gates, rate limiting, a change ledger with rollback, and the abilities themselves.
+
+**Which AI clients can connect?**
+Claude Code, Claude Desktop, Claude on the web, Codex CLI and desktop, Cursor, VS Code, GitHub Copilot, Devin Desktop, Factory Droid, Antigravity CLI and IDE, Zed, Cline, Roo Code, Kilo Code, Amazon Q, OpenCode, OpenClaw and Manus. Setup guides: <https://wppilot.co/wordpress-mcp>.
+
+**Is it safe to point an agent at a production site?**
+That is what the safety model is for. Read Only blocks every write, Production Safe blocks raw PHP, WP-CLI, filesystem, database and extension installation, destructive calls require an explicit confirmation flag, WordPress capabilities still apply on top, and supported changes are recorded in a ledger you can roll back. Start on Read Only and verify one call before enabling any write.
+
+**Can an agent write native Gutenberg blocks?**
+Partly, and the plugin says so rather than failing silently. Core blocks are validated and serialised by the block editor's own JavaScript, so writes are staged as a pending batch and finalised through a browser session.
+
+**Is it on WordPress.org?**
+No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. Install `wppilot-<version>.zip` from [Releases](https://github.com/wppilot-labs/wppilot/releases); the GitHub "Source code" archive is not installable.
 
 ## Requirements
 
