@@ -1,3 +1,9 @@
+v1.2.1 - 2026/08/14
+* Fixed search-extensions against the themes directory. themes_api() returns author as a WordPress.org profile record where plugins_api() returns an HTML link, so the string cast raised "Array to string conversion" on every theme search and handed the agent the literal word "Array" as the author.
+* An extension that declares no minimum WordPress version reports requires as false, not as a string. The bool cast turned that into "1" or "", so wordpress_directory_text() now flattens it to an empty value that reads as no requirement.
+* Theme records report downloaded where plugin records report active_installs, so every theme came back with zero installs. Both keys are read now.
+* The unit doubles could not have caught this: they never called the real plugins_api() or themes_api(), and a hand-written fixture would have encoded the same wrong assumption about the payload shape. Found by running the abilities against a real WordPress 6.9.4 install. Seven unit tests cover it.
+
 v1.2.0 - 2026/08/14
 * Added the plugin and theme lifecycle to WPPilot Free. Agents can search the WordPress.org directory, read one plugin or theme in detail, activate, deactivate, update, switch themes, install, and delete. Previously the only extension ability was list-extensions, so an agent could see what was installed and change none of it.
 * Eleven new abilities: search-extensions, get-extension, activate-plugin, deactivate-plugin, update-plugin, update-theme, switch-theme, install-plugin, install-theme, delete-plugin, delete-theme. Free ability count is now 103, up from 92.
