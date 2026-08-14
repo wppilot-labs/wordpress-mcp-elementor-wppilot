@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +136,11 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.2.1 =
+* Fixed extension search against the themes directory. It returns the author as a profile record where the plugins directory returns a link, so every theme search raised an "Array to string conversion" warning and reported the author as the literal word "Array".
+* An extension that declares no minimum WordPress version reports it as false, not as text. That was rendered as "1" or as an empty string; it now reads as no requirement.
+* Theme results report a download count where plugin results report active installs, so theme popularity came back as zero. Both are read now.
+
 = 1.2.0 =
 * Plugins and themes can now be managed, not just listed. Eleven new abilities: search the WordPress.org directory, read one plugin or theme in detail, activate, deactivate, update, switch themes, install and delete. Ability count is 103, up from 92.
 * Installing and deleting write executable code to the server, so they are treated like PHP execution: blocked on Production Safe and Read Only, available in Developer Full Access with explicit confirmation.
@@ -169,6 +174,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.2.1 =
+Fixes theme search, which reported every author as "Array" and every download count as zero on 1.2.0. Recommended for anyone using the plugin and theme abilities. No new abilities, no permission changes, and existing connections keep working.
 
 = 1.2.0 =
 Adds plugin and theme management to the free plugin. Installing and deleting stay off Production Safe; activating, updating and switching themes work there with explicit confirmation. Existing connections keep working and do not need to be re-authorised.
