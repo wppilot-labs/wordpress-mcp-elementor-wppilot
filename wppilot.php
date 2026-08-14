@@ -506,7 +506,7 @@ if (
     require_once __DIR__ . '/includes/skills/dev-mock.php';
 }
 
-// Add "Community" link to the plugin row meta on the Plugins page.
+// Add "Community" and "X" links to the plugin row meta on the Plugins page.
 add_filter(
     'plugin_row_meta',
     /** @param string[] $plugin_meta */
@@ -515,6 +515,10 @@ add_filter(
             $plugin_meta[] =
                 '<a href="https://www.facebook.com/groups/wppilot" target="_blank" rel="noopener noreferrer">'
                 . esc_html__('Community', domain: 'wppilot')
+                . '</a>';
+            $plugin_meta[] =
+                '<a href="https://x.com/WPPilotMCP" target="_blank" rel="noopener noreferrer">'
+                . esc_html__('X', domain: 'wppilot')
                 . '</a>';
         }
         return $plugin_meta;
