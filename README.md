@@ -15,6 +15,8 @@ This is it, with one server instead of one per plugin. The free plugin here is t
 
 [Elementor MCP](https://wppilot.co/mcp-for-elementor) · [Bricks MCP](https://wppilot.co/mcp-for-bricks) · [Divi MCP](https://wppilot.co/mcp-for-divi) · [Beaver Builder MCP](https://wppilot.co/mcp-for-beaver-builder) · [Oxygen MCP](https://wppilot.co/mcp-for-oxygen) · [Breakdance MCP](https://wppilot.co/mcp-for-breakdance) · [WPBakery MCP](https://wppilot.co/mcp-for-wpbakery) · [Etch MCP](https://wppilot.co/mcp-for-etch) · [Mosaic MCP](https://wppilot.co/mcp-for-mosaic)
 
+Per-builder detail, with the full ability list and the data model behind it: [beaver-builder-mcp](https://github.com/wppilot-labs/beaver-builder-mcp) · [divi-mcp](https://github.com/wppilot-labs/divi-mcp) · [oxygen-builder-mcp](https://github.com/wppilot-labs/oxygen-builder-mcp)
+
 Beyond page builders, Pro also covers WooCommerce, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Yoast SEO, Rank Math, AIOSEO, SEOPress, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [51 integrations](#wppilot-pro-968-plugin-aware-abilities).
 
 ## MCP protocol support
