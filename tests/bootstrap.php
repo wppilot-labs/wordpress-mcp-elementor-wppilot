@@ -42,6 +42,11 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
 
 require_once dirname(__DIR__) . '/includes/oauth/client-id-metadata.php';
 
+// The change ledger registers nothing at file scope, so it loads here purely for
+// its before-image capture: that code calls WordPress functions taking arguments
+// by reference, and only a real call proves the call sites still satisfy them.
+require_once dirname(__DIR__) . '/includes/change-log.php';
+
 // Registrations captured during load are the baseline the suite asserts against.
 // Snapshot them before any test calls WPPilot_Test_State::reset(). The full
 // registration arguments are kept alongside the names so a test can assert on

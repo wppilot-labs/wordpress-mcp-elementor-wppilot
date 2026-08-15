@@ -221,16 +221,17 @@ function wordpress_restore_revision(array $input): array|WP_Error
 
     $post_id = (int) $parent->ID;
 
+    // wp_restore_post_revision() answers null on error, false when the revision
+    // carried no restorable fields, and the post id on success. Only a positive
+    // id is a restore that landed: reading false as success reported a revision
+    // as restored while the post was never written.
     $restored = wp_restore_post_revision($revision_id);
-    if ($restored === null) {
+    if (!is_int($restored) || $restored <= 0) {
         return new WP_Error(
             'restore_revision_failed',
             sprintf('Revision %1$d could not be restored onto post %2$d.', $revision_id, $post_id),
             ['status' => 500],
         );
-    }
-    if (is_wp_error($restored)) {
-        return $restored;
     }
 
     $current = get_post($post_id);

@@ -125,6 +125,69 @@ function wppilot_connection_credential(string $method, int $user_id): ?array
 }
 
 /**
+ * Which agent is behind the current request.
+ *
+ * The WordPress user is not an agent identity. Claude Code, Cursor and Codex all
+ * connect as the same administrator on most sites, so a ledger entry naming only
+ * the user cannot answer which of them made a change. The credential can: an
+ * OAuth client id or an application-password UUID is issued per agent and stays
+ * stable across that agent's requests.
+ *
+ * Resolved once, at the MCP entry point, because that is the only place the
+ * pieces are reachable — the credential comes from request-local OAuth state or
+ * WordPress' application-password global, and the client name needs the
+ * WP_REST_Request. The change ledger reads it back later in the same request.
+ *
+ * Anything that is not an authenticated MCP request — wp-admin, WP-CLI, cron, or
+ * another plugin calling an ability directly — keeps `direct`, so a write with no
+ * agent behind it is never credited to the last agent seen.
+ *
+ * @param array{method: string, credential: string, label: string, client: string, client_version: string}|null $set
+ *     Resolved identity, set by the MCP entry point only.
+ * @return array{method: string, credential: string, label: string, client: string, client_version: string}
+ */
+function wppilot_current_agent(?array $set = null): array
+{
+    /** @var array{method: string, credential: string, label: string, client: string, client_version: string} $agent */
+    static $agent = [
+        'method' => 'direct',
+        'credential' => '',
+        'label' => '',
+        'client' => '',
+        'client_version' => '',
+    ];
+
+    if ($set !== null) {
+        $agent = $set;
+    }
+
+    return $agent;
+}
+
+/**
+ * Build the agent identity for an authenticated MCP request.
+ *
+ * An empty credential is left empty rather than filled in with the user: a blank
+ * reads as "not attributable", where a user id would read as a positive claim
+ * about which agent acted.
+ *
+ * @param array{name: string, version: string} $client
+ * @return array{method: string, credential: string, label: string, client: string, client_version: string}
+ */
+function wppilot_resolve_agent(string $method, int $user_id, array $client): array
+{
+    $credential = wppilot_connection_credential($method, $user_id);
+
+    return [
+        'method' => $method,
+        'credential' => $credential === null ? '' : $credential['key'],
+        'label' => $credential === null ? '' : $credential['label'],
+        'client' => $client['name'],
+        'client_version' => $client['version'],
+    ];
+}
+
+/**
  * The display name of an application password, falling back to its short UUID.
  */
 function wppilot_connection_password_label(int $user_id, string $uuid): string

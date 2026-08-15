@@ -37,9 +37,16 @@ function record_mcp_request(mixed $result, mixed $server, WP_REST_Request $reque
         return $result;
     }
 
+    $user_id = get_current_user_id();
+    $client = \wppilot_connection_client($request);
+
     // Per-credential record for the Overview screen. Unthrottled on purpose: it
     // is a single upsert, and the request count is only useful if it counts.
-    \wppilot_record_connection($method, get_current_user_id(), \wppilot_connection_client($request));
+    \wppilot_record_connection($method, $user_id, $client);
+
+    // Hand the same identity to the change ledger, which runs later in this
+    // request and cannot resolve it for itself: it never sees the request.
+    \wppilot_current_agent(\wppilot_resolve_agent($method, $user_id, $client));
 
     // @mago-expect analysis:mixed-assignment
     $stored = get_option('wppilot_mcp_last_request', default_value: []);

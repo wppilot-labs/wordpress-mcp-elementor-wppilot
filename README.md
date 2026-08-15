@@ -109,6 +109,8 @@ Neither is a product licence. WPPilot needs no activation key, entitlement check
 
 On top of the profile: WordPress user capabilities still apply, individual abilities can be switched off, destructive operations require an explicit confirmation flag, writes are rate-limited per credential, and supported changes are recorded in a redacted change ledger with rollback.
 
+Every ledger entry names the agent behind the write, not only the WordPress user. Claude Code, Cursor and Codex usually connect as the same administrator, so the user alone cannot answer which of them made a change: the OAuth client id or application-password UUID can, and it is what the ledger records, alongside the client name the agent introduced itself with. A write with no agent behind it — wp-admin, WP-CLI, cron — is recorded as `direct` rather than credited to the last agent seen. OAuth client ids are stored hashed.
+
 ## What the free plugin can do
 
 103 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
@@ -127,7 +129,7 @@ On top of the profile: WordPress user capabilities still apply, individual abili
 | **Gutenberg** | `11` | Block-editor content, staged pending changes and browser finalization for native blocks. |
 | **Design library** | `7` | Typed design tokens, saved designs and activation. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
-| **Changes** | `3` | Read the redacted change ledger and roll a change back. |
+| **Changes** | `3` | Read the redacted change ledger, attributed to the agent credential that made each write, and roll a change back. |
 | **Diagnostics** | `3` | Scoped health, performance and configuration-security checks. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 

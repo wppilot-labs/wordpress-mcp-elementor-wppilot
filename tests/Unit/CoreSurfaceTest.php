@@ -15,6 +15,7 @@ use WPPilot_Test_State;
 
 use function WPPilot\Abilities\WordPress\wordpress_core_permission;
 use function WPPilot\Abilities\WordPress\wordpress_core_permission_for;
+use function WPPilot\Abilities\WordPress\wordpress_restore_revision;
 use function WPPilot\Abilities\WordPress\wordpress_revision_is_autosave;
 use function WPPilot\Abilities\WordPress\wordpress_taxonomy_is_agent_facing;
 use function WPPilot\Abilities\WordPress\wordpress_unsafe_url_error;
@@ -363,5 +364,89 @@ final class CoreSurfaceTest extends TestCase
         $revision->post_name = '12-revision-v1';
 
         self::assertFalse(wordpress_revision_is_autosave($revision));
+    }
+
+    /**
+     * wp_restore_post_revision() answers false when the revision carried no
+     * restorable fields. Nothing was written, so the ability has to say so:
+     * reporting success here told an agent the post had been rolled back to a
+     * revision it still does not match.
+     */
+    public function testRestoreRevisionRefusesWhenNoFieldsWereRestored(): void
+    {
+        WPPilot_Test_State::$capabilities = ['edit_post'];
+        WPPilot_Test_State::add_revision(revision_id: 21, parent_id: 7);
+        WPPilot_Test_State::$restore_result = false;
+
+        $result = wordpress_restore_revision(['revision_id' => 21]);
+
+        self::assertInstanceOf(WP_Error::class, $result);
+        self::assertSame('restore_revision_failed', $result->get_error_code());
+    }
+
+    public function testRestoreRevisionRefusesWhenRestoreErrored(): void
+    {
+        WPPilot_Test_State::$capabilities = ['edit_post'];
+        WPPilot_Test_State::add_revision(revision_id: 21, parent_id: 7);
+        WPPilot_Test_State::$restore_result = null;
+
+        $result = wordpress_restore_revision(['revision_id' => 21]);
+
+        self::assertInstanceOf(WP_Error::class, $result);
+        self::assertSame('restore_revision_failed', $result->get_error_code());
+    }
+
+    /**
+     * wp_update_post() answers 0 rather than an error when the write is refused,
+     * and wp_restore_post_revision() passes that straight through. A zero id is
+     * not a post.
+     */
+    public function testRestoreRevisionRefusesZeroPostId(): void
+    {
+        WPPilot_Test_State::$capabilities = ['edit_post'];
+        WPPilot_Test_State::add_revision(revision_id: 21, parent_id: 7);
+        WPPilot_Test_State::$restore_result = 0;
+
+        $result = wordpress_restore_revision(['revision_id' => 21]);
+
+        self::assertInstanceOf(WP_Error::class, $result);
+    }
+
+    public function testRestoreRevisionReportsTheParentPostOnSuccess(): void
+    {
+        WPPilot_Test_State::$capabilities = ['edit_post'];
+        WPPilot_Test_State::add_revision(revision_id: 21, parent_id: 7);
+        WPPilot_Test_State::$restore_result = 7;
+
+        $result = wordpress_restore_revision(['revision_id' => 21]);
+
+        self::assertIsArray($result);
+        self::assertSame(7, $result['post_id']);
+        self::assertSame(21, $result['revision_id']);
+        self::assertFalse($result['was_autosave']);
+    }
+
+    /**
+     * wp_get_post_revision() takes its first argument by reference, so handing it
+     * anything that is not a variable is a fatal Error on PHP 8, not a notice.
+     * The ledger captures a before-image on every ability call, so that fatal took
+     * wppilot/restore-revision down entirely. The double declares the parameter by
+     * reference for exactly this reason: calling it is the assertion.
+     */
+    public function testRestoreRevisionBeforeImageCapturesTheParentPost(): void
+    {
+        WPPilot_Test_State::add_revision(revision_id: 21, parent_id: 7);
+
+        $before = \wppilot_capture_core_before_image('wppilot/restore-revision', ['revision_id' => 21]);
+
+        self::assertIsArray($before);
+        self::assertSame('post', $before['type']);
+    }
+
+    public function testRestoreRevisionBeforeImageIsEmptyForAnUnknownRevision(): void
+    {
+        $before = \wppilot_capture_core_before_image('wppilot/restore-revision', ['revision_id' => 999]);
+
+        self::assertNull($before);
     }
 }

@@ -44,6 +44,19 @@ final class WPPilot_Test_State
     /** @var array<string, array<string, string>> */
     public static array $plugins = [];
 
+    /** @var array<int, WP_Post> */
+    public static array $posts = [];
+
+    /** @var array<int, WP_Post> */
+    public static array $revisions = [];
+
+    /**
+     * What wp_restore_post_revision() answers. WordPress returns the post id on
+     * success, false when the revision carried no restorable fields, and null on
+     * error, so the doubles have to be able to produce all three.
+     */
+    public static int|false|null $restore_result = null;
+
     public static function reset(): void
     {
         self::$post_types = [];
@@ -56,6 +69,27 @@ final class WPPilot_Test_State
         self::$wppilot_enabled = true;
         self::$multisite = false;
         self::$plugins = [];
+        self::$posts = [];
+        self::$revisions = [];
+        self::$restore_result = null;
+    }
+
+    /**
+     * Register a revision and the parent post it belongs to.
+     */
+    public static function add_revision(int $revision_id, int $parent_id): void
+    {
+        $parent = new WP_Post();
+        $parent->ID = $parent_id;
+        $parent->post_title = 'Parent';
+        $parent->post_status = 'publish';
+        self::$posts[$parent_id] = $parent;
+
+        $revision = new WP_Post();
+        $revision->ID = $revision_id;
+        $revision->post_parent = $parent_id;
+        $revision->post_name = $parent_id . '-revision-v1';
+        self::$revisions[$revision_id] = $revision;
     }
 
     /**
@@ -212,6 +246,73 @@ if (!function_exists('current_user_can')) {
     function current_user_can(string $capability): bool
     {
         return in_array($capability, WPPilot_Test_State::$capabilities, true);
+    }
+}
+
+if (!function_exists('get_post')) {
+    /**
+     * Honours ARRAY_A, which the ledger's before-image capture asks for.
+     */
+    function get_post(int $post_id, string $output = 'OBJECT'): WP_Post|array|null
+    {
+        $post = WPPilot_Test_State::$posts[$post_id] ?? null;
+        if ($post === null) {
+            return null;
+        }
+
+        return $output === 'ARRAY_A' ? get_object_vars($post) : $post;
+    }
+}
+
+if (!function_exists('get_post_meta')) {
+    /** @return array<string, list<string>> */
+    function get_post_meta(int $post_id): array
+    {
+        return [];
+    }
+}
+
+if (!function_exists('get_object_taxonomies')) {
+    /** @return list<string> */
+    function get_object_taxonomies(string $post_type, string $output = 'names'): array
+    {
+        return [];
+    }
+}
+
+if (!function_exists('wp_get_object_terms')) {
+    /**
+     * @param array<string, string> $args
+     * @return list<int>
+     */
+    function wp_get_object_terms(int $object_id, string $taxonomy, array $args = []): array
+    {
+        return [];
+    }
+}
+
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode(mixed $value): string|false
+    {
+        return json_encode($value);
+    }
+}
+
+if (!function_exists('wp_get_post_revision')) {
+    /**
+     * Takes its argument by reference, as WordPress does, so a call site that
+     * hands it a non-variable is caught here rather than in production.
+     */
+    function wp_get_post_revision(int &$post): ?WP_Post
+    {
+        return WPPilot_Test_State::$revisions[$post] ?? null;
+    }
+}
+
+if (!function_exists('wp_restore_post_revision')) {
+    function wp_restore_post_revision(int $revision_id): int|false|null
+    {
+        return WPPilot_Test_State::$restore_result;
     }
 }
 
