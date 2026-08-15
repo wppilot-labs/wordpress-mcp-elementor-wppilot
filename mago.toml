@@ -1,0 +1,35 @@
+# Static analysis for WPPilot.
+#
+# mago ships in require-dev but had no configuration, so `mago lint` answered
+# "No files found to lint" and the tool never ran. It earns its place: the
+# analyzer found the by-reference fatal in the change ledger that shipped in
+# 1.2.1, and the dead is_wp_error() branch behind it.
+#
+#   composer install
+#   php vendor/bin/mago lint       # style and complexity
+#   php vendor/bin/mago analyze    # types and call contracts
+#
+# php-version is the plugin's declared floor, from the `Requires PHP` header in
+# wppilot.php and readme.txt. It is set here so that writing an enum, a readonly
+# property or a `never` return — all PHP 8.1 — is reported rather than shipped to
+# sites the plugin claims to support.
+php-version = "8.0"
+
+[source]
+paths = ["includes"]
+
+# WordPress itself, and the runtime dependencies, are read for their signatures
+# but never analysed as WPPilot's own code. Without the stubs every core call
+# reports as undefined and the real findings drown: 7,727 errors against 341.
+#
+# Integrations Pro detects at runtime — WooCommerce and the rest — have no stubs
+# here on purpose. Free must not assume they exist, and their absence in the
+# report is the honest picture of what Free compiles against.
+includes = [
+    "vendor/php-stubs/wordpress-stubs/wordpress-stubs.php",
+    "vendor/wordpress",
+    "vendor/automattic",
+    "vendor/league",
+    "vendor/psr",
+    "vendor/nyholm",
+]

@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.2.1
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +136,13 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.3.0 =
+* Fixed restoring a revision, which could not run at all on 1.1.0 through 1.2.1. Every call failed with a fatal error before the post was touched. Nothing else was affected, and no other ability shared the fault.
+* The same ability reported success when the restore had not written anything. A revision with no restorable fields, or a write WordPress refused, both came back as though the post had been rolled back. Failure is now reported as failure.
+* The change ledger now names the agent behind each write, not only the WordPress user. Claude Code, Cursor and Codex usually connect as the same administrator, so entries could not say which of them made a change. Each entry now carries the OAuth client or application password used, and the client name and version it introduced itself with.
+* Changes made outside an AI client — in wp-admin, over WP-CLI, or by another plugin — are recorded as direct rather than attributed to the last agent that connected. OAuth client identifiers are stored hashed.
+* Ability count is unchanged at 103. No permission changes, and existing connections keep working.
+
 = 1.2.1 =
 * Fixed extension search against the themes directory. It returns the author as a profile record where the plugins directory returns a link, so every theme search raised an "Array to string conversion" warning and reported the author as the literal word "Array".
 * An extension that declares no minimum WordPress version reports it as false, not as text. That was rendered as "1" or as an empty string; it now reads as no requirement.
@@ -174,6 +181,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.3.0 =
+Fixes restoring a revision, which failed with a fatal error on every call from 1.1.0 onward and, behind that, reported a restore that never happened as successful. Recommended for everyone. Change ledger entries now name the agent that made each write, so a site connected by more than one AI client can tell them apart. No new abilities, no permission changes, and existing connections keep working.
 
 = 1.2.1 =
 Fixes theme search, which reported every author as "Array" and every download count as zero on 1.2.0. Recommended for anyone using the plugin and theme abilities. No new abilities, no permission changes, and existing connections keep working.
