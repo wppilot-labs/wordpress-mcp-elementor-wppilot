@@ -9,7 +9,7 @@ Report suspected vulnerabilities privately through the contact channel published
 - Use HTTPS for remotely reachable sites and revoke connected apps that are no longer needed.
 - Grant AI access only to a WordPress account with the minimum capabilities required.
 - Maintain tested backups before enabling mutation workflows.
-- Review the WPPilot change ledger and WordPress/WooCommerce logs after consequential operations.
+- Review the WPPilot change ledger and WordPress/WooCommerce logs after consequential operations. Ledger entries name the agent credential behind each write, so a site connected by more than one AI client can attribute a change to one of them rather than to the shared WordPress account.
 - Treat Developer Full Access as privileged server administration access.
 
 WPPilot's diagnostics inspect selected WordPress and PHP configuration. They are not a malware scanner, penetration test, compliance certification, accounting audit, or availability monitor.

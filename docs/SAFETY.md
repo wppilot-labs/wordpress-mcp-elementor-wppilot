@@ -80,3 +80,5 @@ Safety is enforced identically under both MCP revisions. The modern dispatcher r
 The ledger retains at most 500 records and is also capped by total serialized size. Secrets and sensitive metadata are redacted or excluded. Before images are bounded. Rollback is offered only for supported operations and succeeds only when the observed result matches the expected fingerprint.
 
 Permanent deletion, payment refunds, and other irreversible external side effects are recorded as non-reversible.
+
+Each record names the agent behind the write as well as the WordPress user. The user is not an agent identity — several AI clients usually connect as the same administrator — so the credential is what distinguishes them: an OAuth client id, stored hashed, or an application-password UUID. The client name and version the agent introduced itself with are recorded alongside it. Writes that arrive outside an authenticated MCP request, from wp-admin, WP-CLI or another plugin, are recorded as `direct` rather than attributed to the last agent seen.
