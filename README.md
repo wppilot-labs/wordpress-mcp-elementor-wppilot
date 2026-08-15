@@ -2,7 +2,7 @@
 
 **Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build, pages, block layouts, menus, taxonomies, media, SEO metadata, through typed abilities your permissions still govern.**
 
-[![Version](https://img.shields.io/badge/version-1.2.1-142017)](https://github.com/wppilot-labs/wppilot/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
