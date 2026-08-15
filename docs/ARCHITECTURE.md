@@ -22,18 +22,19 @@ Abilities are protocol-independent. Authentication, safety profiles, capability 
 3. An authenticated client discovers public abilities, reads one ability's schema, and executes it through the adapter's compact meta-tool.
 4. WPPilot applies the manual ability policy and active safety profile before execution.
 5. The target ability performs its WordPress capability check and validates its schema.
-6. The change ledger records a redacted before/after fingerprint for supported state changes.
+6. The change ledger records a redacted before/after fingerprint for supported state changes, attributed to the agent credential the request arrived on.
 
 The compact adapter surface keeps client context small while retaining typed schemas for every target operation.
 
 ## Base plugin boundaries
 
 - `includes/abilities/`: built-in developer abilities.
-- `includes/abilities/wordpress/`: the typed WordPress-core surface — content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings. Ships in Free and never calls into Pro.
+- `includes/abilities/wordpress/`: the typed WordPress-core surface — content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings, and the plugin and theme lifecycle. Ships in Free and never calls into Pro.
 - `includes/mcp/`: protocol-era classification, the modern dispatcher, the shared error catalog, result decoration, and `server/discover`.
 - `includes/oauth/client-id-metadata.php`: Client ID Metadata Documents, with the SSRF controls that fetching a caller-supplied URL requires.
 - `includes/safety.php`: profiles, risk classification, and explicit-confirmation enforcement.
 - `includes/change-log.php`: bounded audit records, redaction, fingerprints, and verified rollback.
+- `includes/connections.php`: per-credential connection records, and the agent identity the ledger attributes writes to. Resolved once at the MCP entry point, because the credential and the client name are only reachable while the request is.
 - `includes/rest/transport-hardening.php`: MCP/REST host validation and response security headers.
 - `includes/oauth/`: OAuth authorization server, token repositories, discovery, and connected-app management.
 - `includes/abilities/diagnostics.php`: scoped health, performance, and configuration-security checks.
