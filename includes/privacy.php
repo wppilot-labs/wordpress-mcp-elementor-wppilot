@@ -21,7 +21,7 @@ function wppilot_add_privacy_policy_content(): void
     $content =
         '<p>'
         . wp_kses_post(__(
-            'WPPilot stores AI-client connection history, the associated WordPress user, client identity, request counts, and last-used times. When WPPilot Chat is used, it stores chat sessions, messages, image attachments, tool calls, and tool results in this site’s database.',
+            'WPPilot stores AI-client connection history, the associated WordPress user, client identity, request counts, and last-used times. Its change ledger records each write an AI client makes, with the WordPress user, the agent credential identifier and client name behind it, and a redacted summary of the change. When WPPilot Chat is used, it stores chat sessions, messages, image attachments, tool calls, and tool results in this site’s database.',
             domain: 'wppilot',
         ))
         . '</p>';

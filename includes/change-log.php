@@ -132,6 +132,9 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result)
             precision: 2,
         ),
         'user' => ['id' => (int) $user->ID, 'login' => (string) $user->user_login],
+        // Which agent, not just which WordPress user. Several agents share one
+        // administrator on most sites, so the user alone cannot attribute a write.
+        'agent' => function_exists('wppilot_current_agent') ? wppilot_current_agent() : [],
         'input' => $pending['input_summary'] ?? [],
         'input_sha256' => (string) ($pending['input_sha256'] ?? ''),
         'result' => wppilot_result_summary($result),
@@ -263,7 +266,11 @@ function wppilot_capture_core_before_image(string $ability_name, array $input): 
     }
     if ($ability_name === 'wppilot/restore-revision') {
         // The write lands on the parent post, so that is what has to be captured.
-        $revision = wp_get_post_revision((int) ($input['revision_id'] ?? 0));
+        // wp_get_post_revision() takes its first parameter by reference, so the id
+        // has to reach it as a variable: handing it the cast expression directly
+        // raised "Only variables should be passed by reference" on every capture.
+        $revision_id = (int) ($input['revision_id'] ?? 0);
+        $revision = wp_get_post_revision($revision_id);
         return $revision instanceof WP_Post ? wppilot_snapshot_post((int) $revision->post_parent) : null;
     }
     if (in_array($ability_name, ['wppilot/update-term', 'wppilot/delete-term'], strict: true)) {

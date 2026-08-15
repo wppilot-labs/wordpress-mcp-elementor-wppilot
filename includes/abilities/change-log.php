@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 wp_register_ability('wppilot/list-changes', [
     'label' => __('List WPPilot Changes', domain: 'wppilot'),
     'description' => __(
-        'Lists the verified WPPilot change ledger newest first, including ability, actor, risk, timing, rollback availability, and rollback state. Secrets are redacted at write time.',
+        'Lists the verified WPPilot change ledger newest first, including ability, actor, the agent credential and client behind the write, risk, timing, rollback availability, and rollback state. Secrets are redacted at write time.',
         domain: 'wppilot',
     ),
     'category' => 'changes',
@@ -99,6 +99,7 @@ function wppilot_change_public_summary(array $entry): array
         // @mago-expect analysis:invalid-type-cast -- Ledger durations are stored internally as floats.
         'duration_ms' => (float) ($entry['duration_ms'] ?? 0),
         'user' => $entry['user'] ?? [],
+        'agent' => $entry['agent'] ?? [],
         'reversible' => ($rollback['reversible'] ?? false) === true,
         'rollback_reason' => (string) ($rollback['reason'] ?? ''),
         'rolled_back' => ($entry['rolled_back'] ?? false) === true,
