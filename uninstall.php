@@ -48,6 +48,7 @@ function wppilot_uninstall_tables(): array
     return [
         $wpdb->prefix . 'wppilot_chat_sessions',
         $wpdb->prefix . 'wppilot_connections',
+        $wpdb->prefix . 'wppilot_tokens',
         $wpdb->prefix . 'wppilot_oauth_clients',
         $wpdb->prefix . 'wppilot_oauth_auth_codes',
         $wpdb->prefix . 'wppilot_oauth_access_tokens',
@@ -67,6 +68,8 @@ function wppilot_uninstall_options(): array
         'wppilot_chat_schema_version',
         // includes/connections.php
         'wppilot_connections_schema_version',
+        // includes/tokens.php
+        'wppilot_tokens_schema_version',
         // Legacy pre-table chat storage.
         'wppilot_chat_sessions',
         // includes/oauth/

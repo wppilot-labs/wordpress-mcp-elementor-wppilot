@@ -84,6 +84,7 @@ function wppilot_activate_current_site(): void
 {
     wppilot_chat_schema_install_current_site();
     wppilot_connections_schema_install();
+    wppilot_tokens_schema_install();
     wppilot_safety_maybe_install();
     wppilot_enable_ai_abilities_on_activate();
     wppilot_pro_upsell_on_activate();

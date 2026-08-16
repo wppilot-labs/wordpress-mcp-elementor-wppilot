@@ -36,7 +36,8 @@ The compact adapter surface keeps client context small while retaining typed sch
 - `includes/change-log.php`: bounded audit records, redaction, fingerprints, and verified rollback.
 - `includes/connections.php`: per-credential connection records, and the agent identity the ledger attributes writes to. Resolved once at the MCP entry point, because the credential and the client name are only reachable while the request is.
 - `includes/rest/transport-hardening.php`: MCP/REST host validation and response security headers.
-- `includes/oauth/`: OAuth authorization server, token repositories, discovery, and connected-app management.
+- `includes/oauth/`: OAuth authorization server, token repositories, discovery, and connected-app management. `middleware.php` also routes the Bearer path: a credential carrying the `wpp_` prefix is validated as an access token, anything else as an OAuth JWT.
+- `includes/tokens.php`: long-lived access tokens — minting, SHA-256 digest storage, expiry, and revocation. The third connection method, for callers that can run neither a browser sign-in nor HTTP Basic.
 - `includes/abilities/diagnostics.php`: scoped health, performance, and configuration-security checks.
 - `includes/abilities/bootstrap.php`: ability categories and loaders.
 

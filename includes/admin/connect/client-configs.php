@@ -338,7 +338,11 @@ function wppilot_build_configs(string $rest_url, string $username, string $displ
         ],
     ];
 
-    return array_merge(wppilot_build_standard_configs($mcp_servers_json, $vscode_servers_json), $special);
+    return array_merge(
+        wppilot_build_standard_configs($mcp_servers_json, $vscode_servers_json),
+        wppilot_build_cli_agent_configs($mcp_servers_json),
+        $special,
+    );
 }
 
 /**
@@ -468,6 +472,58 @@ function wppilot_build_standard_configs(string $mcp_servers_json, string $vscode
                 __('Global', domain: 'wppilot') => '~/.gemini/config/mcp_config.json',
                 __('Workspace', domain: 'wppilot') => '.agents/mcp_config.json',
             ],
+            'isShell' => false,
+        ],
+    ];
+}
+
+/**
+ * The newer coding CLIs, which all take the same stdio server object.
+ *
+ * Split from the list above only to keep either function readable. They are
+ * grouped because the application-password route launches a local helper, so the
+ * differences these clients have over a remote URL — Qwen and Gemini insisting on
+ * `httpUrl`, ZCode using a manager screen — do not arise on this route at all.
+ *
+ * @return array<string, array{code: string, hint: string, paths: array<string, string>, isShell: bool}>
+ */
+function wppilot_build_cli_agent_configs(string $mcp_servers_json): array
+{
+    /* translators: %s: config file name wrapped in <code> tags */
+    $add_to = __('Add to %s.', domain: 'wppilot');
+
+    return [
+        'kimi-cli' => [
+            'code' => $mcp_servers_json,
+            'hint' => sprintf($add_to, '<code>mcp.json</code>'),
+            'paths' => [__('Global', domain: 'wppilot') => '~/.kimi/mcp.json'],
+            'isShell' => false,
+        ],
+        // Qwen Code and Gemini CLI put MCP servers in settings.json. The
+        // `httpUrl` quirk both share applies to remote servers only; this route
+        // launches a local process, so the ordinary command/args shape is right.
+        'qwen-code' => [
+            'code' => $mcp_servers_json,
+            'hint' => sprintf($add_to, '<code>settings.json</code>'),
+            'paths' => [
+                __('Global', domain: 'wppilot') => '~/.qwen/settings.json',
+                __('Project', domain: 'wppilot') => '.qwen/settings.json',
+            ],
+            'isShell' => false,
+        ],
+        'gemini-cli' => [
+            'code' => $mcp_servers_json,
+            'hint' => sprintf($add_to, '<code>settings.json</code>'),
+            'paths' => [
+                __('Global', domain: 'wppilot') => '~/.gemini/settings.json',
+                __('Project', domain: 'wppilot') => '.gemini/settings.json',
+            ],
+            'isShell' => false,
+        ],
+        'zcode' => [
+            'code' => $mcp_servers_json,
+            'hint' => __('Add through ZCode\'s MCP server manager, choosing the stdio transport.', domain: 'wppilot'),
+            'paths' => [],
             'isShell' => false,
         ],
     ];

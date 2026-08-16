@@ -93,6 +93,11 @@ function wppilot_connections_schema_install(): void
  */
 function wppilot_connection_credential(string $method, int $user_id): ?array
 {
+    // @mago-expect lint:no-insecure-comparison -- transport slug, not a secret.
+    if ($method === 'token') {
+        return wppilot_connection_token_credential();
+    }
+
     if ($method === 'oauth') {
         $identity = function_exists('WPPilot\\OAuth\\Middleware\\request_oauth_identity')
             ? \WPPilot\OAuth\Middleware\request_oauth_identity()
@@ -122,6 +127,33 @@ function wppilot_connection_credential(string $method, int $user_id): ?array
     }
 
     return ['key' => $uuid, 'label' => wppilot_connection_password_label($user_id, $uuid)];
+}
+
+/**
+ * The credential identity of an access-token request.
+ *
+ * An access token is its own credential: the row id is stable for the life of the
+ * token, and the name its creator gave it is what the Overview screen should show
+ * rather than a row number. The id travels on the request-local identity the
+ * middleware recorded, prefixed `token-` there so it can never collide with an
+ * OAuth client key.
+ *
+ * @return array{key: string, label: string}|null
+ */
+function wppilot_connection_token_credential(): ?array
+{
+    $identity = function_exists('WPPilot\\OAuth\\Middleware\\request_oauth_identity')
+        ? \WPPilot\OAuth\Middleware\request_oauth_identity()
+        : null;
+    $client_id = is_array($identity) && is_string($identity['client_id'] ?? null) ? $identity['client_id'] : '';
+    if (!str_starts_with($client_id, 'token-')) {
+        return null;
+    }
+
+    $token_id = (int) substr($client_id, offset: strlen('token-'));
+    $name = $token_id > 0 ? wppilot_token_name($token_id) : '';
+
+    return ['key' => $client_id, 'label' => $name !== '' ? $name : __('Access token', domain: 'wppilot')];
 }
 
 /**

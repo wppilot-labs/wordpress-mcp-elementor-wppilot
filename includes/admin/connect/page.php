@@ -43,8 +43,13 @@ function wppilot_render_connect_page(): void
     $existing_error = is_wp_error($existing_result) ? $existing_result : null;
     $existing_password = is_string($existing_result) ? $existing_result : null;
 
+    $token_result = $mcp_ready ? wppilot_handle_create_token() : null;
+    $token_error = is_wp_error($token_result) ? $token_result : null;
+    $new_token = is_string($token_result) ? $token_result : null;
+
     $result_message = match ($_GET['wppilot_result'] ?? null) {
         'revoked' => __('Application password revoked.', domain: 'wppilot'),
+        'token_revoked' => __('Access token revoked.', domain: 'wppilot'),
         default => null,
     };
 
@@ -61,12 +66,17 @@ function wppilot_render_connect_page(): void
             domain: 'wppilot',
         ); ?></p>
 
-        <?php // State first — what is connected — then the means to change it. ?>
-        <?php wppilot_render_dashboard_sections(); ?>
-
-        <?php // Renders only while Pro is inactive; see includes/admin/pro-upsell.php. ?>
-        <?php wppilot_render_pro_upsell_card(); ?>
-
+        <?php /*
+         * The setup comes first, the readout second.
+         *
+         * This screen was ordered state-then-action: five stat panels, the client
+         * list, the licence and the ability inventory, and only then the steps
+         * that connect something. That is the right order for someone checking on
+         * a site they already set up, and the wrong one for everybody else —
+         * arriving with nothing connected meant scrolling past every panel to
+         * reach the only thing that could change that, and the panels are most
+         * informative once a client has actually connected.
+         */ ?>
         <h2 class="wppilot-section-break"><?php esc_html_e('Connect a client', domain: 'wppilot'); ?></h2>
 
         <?php wppilot_render_mcp_dependency_inline_notice($mcp_dependency_error); ?>
@@ -114,24 +124,49 @@ function wppilot_render_connect_page(): void
              * someone wants to turn the endpoint off.
              */ ?>
             <div class="wppilot-connect-section">
-                <?php wppilot_render_method_chooser($new_password, $existing_password, $existing_error); ?>
+                <?php wppilot_render_method_chooser(
+                    $new_password,
+                    $existing_password,
+                    $existing_error,
+                    $new_token,
+                    $token_error,
+                ); ?>
             </div>
 
             <div class="wppilot-connect-section" id="wppilot-step3"<?php echo
-                $new_password !== null || $existing_password !== null ? '' : ' hidden'
+                $new_password !== null || $existing_password !== null || $new_token !== null ? '' : ' hidden'
             ; ?>>
-                <?php wppilot_render_connect_client_section($new_password, $existing_password, $existing_error); ?>
+                <?php wppilot_render_connect_client_section(
+                    $new_password,
+                    $existing_password,
+                    $existing_error,
+                    $new_token,
+                    $token_error,
+                ); ?>
             </div>
 
             <div class="wppilot-connect-section">
                 <?php wppilot_render_verify_step(); ?>
             </div>
+        <?php endif; ?>
 
-            <?php /* The off switch and the safety profile, after the steps that connect a client. */ ?>
+        <?php wppilot_render_dashboard_sections(); ?>
+
+        <?php // Renders only while Pro is inactive; see includes/admin/pro-upsell.php. ?>
+        <?php wppilot_render_pro_upsell_card(); ?>
+
+        <?php if ($mcp_ready): ?>
+            <?php /*
+             * Last on the page, deliberately. It is the off switch and the
+             * safety profile — settings for a connection that already exists,
+             * not a step in making one — so it sits after both the setup and the
+             * readout rather than between them.
+             */ ?>
             <div class="wppilot-connect-section">
                 <?php wppilot_render_enable_toggle(); ?>
             </div>
         <?php endif; ?>
+
         <?php if (!$mcp_ready && wppilot_get_mcp_passwords() !== []): ?>
             <?php wppilot_render_manage_passwords_section(context: 'disabled'); ?>
         <?php endif; ?>
@@ -207,16 +242,23 @@ function wppilot_render_connect_page(): void
 }
 
 /**
- * Two-card chooser between OAuth and Application password. Security-first: OAuth is the
- * recommended card everywhere except a local site served over self-signed HTTPS, where the
- * browser sign-in would hit an unverifiable certificate; there the password flow (no browser
- * step) is recommended instead. Both panels are rendered; JS shows one at a time (defaulting
- * to the recommended one) and degrades to both visible without JS.
+ * Three-card chooser between OAuth, Application password, and Access token. Security-first:
+ * OAuth is the recommended card everywhere except a local site served over self-signed HTTPS,
+ * where the browser sign-in would hit an unverifiable certificate; there the password flow (no
+ * browser step) is recommended instead. Every panel is rendered; JS shows one at a time
+ * (defaulting to the recommended one) and degrades to all visible without JS.
+ *
+ * The access token is never the recommended card. It is the most powerful credential of the
+ * three — long-lived, and carried in a header a client will happily write to a config file — so
+ * it is offered as the answer to a specific problem (a caller that cannot run a browser sign-in)
+ * rather than presented as the easy default.
  */
 function wppilot_render_method_chooser(
     ?string $new_password,
     ?string $existing_password = null,
     ?WP_Error $existing_error = null,
+    ?string $new_token = null,
+    ?WP_Error $token_error = null,
 ): void {
     // Security-first: recommend OAuth (no secret in the config, mcp scope, revocable) in
     // every case except a local site on self-signed HTTPS, where the browser cannot verify
@@ -229,18 +271,160 @@ function wppilot_render_method_chooser(
     // App password carries the recommendation only in the local self-signed case (OAuth available,
     // but the browser cannot verify the cert). On a public HTTP site nothing is recommended.
     $password_recommended = $oauth_available && !$oauth_recommended;
-    $password_active = wppilot_password_method_preselected($new_password, $existing_password, $existing_error);
+    $token_active = wppilot_token_method_preselected($new_token, $token_error);
+    // A token action this request wins the initial panel; otherwise the password
+    // rules are unchanged from before the third method existed.
+    $password_active =
+        !$token_active && wppilot_password_method_preselected($new_password, $existing_password, $existing_error);
     $has_password = $new_password !== null || $existing_password !== null;
-    $badge_label = $oauth_recommended
-        ? esc_html__('Recommended for your setup', domain: 'wppilot')
-        : esc_html__('Recommended for your local setup', domain: 'wppilot');
-    $badge = '<span class="wppilot-recommended-badge">' . $badge_label . '</span>';
+    // What the page opens on: whatever happened this request, else the
+    // recommended method. The script downgrades a password default to something
+    // renderable when no password exists yet.
+    $default_method = 'oauth';
+    if ($token_active) {
+        $default_method = 'token';
+    } elseif ($password_active || !$oauth_available) {
+        $default_method = 'password';
+    }
     ?>
     <h2 class="wppilot-step-heading">
         <span class="wppilot-step-badge">1</span>
         <?php esc_html_e('Choose your authentication method', domain: 'wppilot'); ?>
     </h2>
 
+    <?php wppilot_render_method_cards(
+        $oauth_available,
+        $oauth_recommended,
+        $password_recommended,
+        $password_active,
+        $token_active,
+    ); ?>
+
+    <div class="wppilot-method-panel" data-panel="oauth" hidden>
+        <?php wppilot_render_oauth_panel(); ?>
+    </div>
+    <div class="wppilot-method-panel" data-panel="password"<?php echo $password_active ? '' : ' hidden'; ?>>
+        <?php wppilot_render_password_step($new_password, $existing_password, $existing_error); ?>
+        <?php wppilot_render_manage_passwords_section(); ?>
+    </div>
+    <div class="wppilot-method-panel" data-panel="token"<?php echo $token_active ? '' : ' hidden'; ?>>
+        <?php wppilot_render_token_step($new_token, $token_error); ?>
+        <?php wppilot_render_manage_tokens_section(); ?>
+    </div>
+    <div class="wppilot-method-panel" data-panel="webapps" hidden>
+        <?php wppilot_render_web_apps_step(); ?>
+    </div>
+
+    <noscript>
+        <style>.wppilot-method-panel[hidden], #wppilot-step3[hidden] { display: block; }</style>
+    </noscript>
+
+    <script>
+    (function () {
+        var hasPassword = <?php echo $has_password ? 'true' : 'false'; ?>;
+        var oauthAvailable = <?php echo $oauth_available ? 'true' : 'false'; ?>;
+        var defaultMethod = <?php echo wppilot_script_json($default_method); ?>;
+        // Re-query on every click so panels rendered in later containers (the step 3 section) are
+        // toggled too. Step 3 opens for OAuth and for the access token immediately — both render a
+        // usable snippet with a labelled placeholder — and for the password method only once a
+        // password exists (otherwise the whole step 3 section stays hidden).
+        function apply(method) {
+            document.querySelectorAll('.wppilot-method-card').forEach(function (c) {
+                c.classList.toggle('is-active', c.getAttribute('data-method') === method);
+            });
+            document.querySelectorAll('.wppilot-method-panel').forEach(function (p) {
+                p.hidden = p.getAttribute('data-panel') !== method;
+            });
+            var step3 = document.getElementById('wppilot-step3');
+            var visible = method === 'oauth'
+                || method === 'token'
+                || method === 'webapps'
+                || (method === 'password' && hasPassword);
+            if (step3) { step3.hidden = !visible; }
+        }
+        document.querySelectorAll('.wppilot-method-card').forEach(function (card) {
+            card.addEventListener('click', function () { apply(card.getAttribute('data-method')); });
+        });
+
+        // Open on a method rather than on nothing. With no selection the whole of
+        // step 2 stayed hidden, so the page read 1, 3, 4 — a numbered sequence
+        // with a hole in it, which looks like a bug and hides the part that
+        // actually connects a client. The application-password panel has nothing
+        // to show until a password exists, so it is not used as the opening
+        // choice in that state.
+        // Deferred to DOM ready on purpose. This script is inline and runs while
+        // the document is still parsing, and the section it has to reveal —
+        // step 2 — is further down the page. Running now would call
+        // getElementById on an element the parser has not reached, silently do
+        // nothing, and leave the page reading 1, 3, 4 exactly as before.
+        function selectInitialMethod() {
+            var initial = defaultMethod;
+            if (initial === 'password' && !hasPassword) {
+                initial = oauthAvailable ? 'oauth' : 'token';
+            }
+            apply(initial);
+
+            // The Overview links here with a method already chosen. Without this
+            // the link lands on whichever panel the server picked, which for a
+            // visitor who clicked "Create an access token" is the wrong one.
+            var requested = (window.location.hash || '').replace('#wppilot-', '').replace('-method', '');
+                if (['oauth', 'password', 'token', 'webapps'].indexOf(requested) !== -1) {
+                var card = document.querySelector('.wppilot-method-card[data-method="' + requested + '"]');
+                if (card && !card.disabled) {
+                    apply(requested);
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', selectInitialMethod);
+        } else {
+            selectInitialMethod();
+        }
+    })();
+    </script>
+
+    <?php if ($new_token !== null): ?>
+    <script>
+    (function () {
+        // Creating a token posts the page back, and the browser restores the top
+        // of the document — but the token is revealed several screens down, shown
+        // once, and never recoverable. Landing above it is how someone loses the
+        // only copy. Focus as well as scroll, so a screen reader lands there too.
+        var box = document.getElementById('wppilot-token-created');
+        if (!box) { return; }
+        box.setAttribute('tabindex', '-1');
+        window.requestAnimationFrame(function () {
+            box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            box.focus({ preventScroll: true });
+        });
+    }());
+    </script>
+    <?php endif; ?>
+    <?php
+}
+
+/**
+ * The three method cards.
+ *
+ * Split from the chooser because it holds all the branching — an availability
+ * test, two recommendation badges, and three active states — while the chooser
+ * itself is about which panel is open. Together they were one function deciding
+ * two unrelated things.
+ */
+function wppilot_render_method_cards(
+    bool $oauth_available,
+    bool $oauth_recommended,
+    bool $password_recommended,
+    bool $password_active,
+    bool $token_active,
+): void {
+    $badge_label = $oauth_recommended
+        ? esc_html__('Recommended for your setup', domain: 'wppilot')
+        : esc_html__('Recommended for your local setup', domain: 'wppilot');
+    $badge = '<span class="wppilot-recommended-badge">' . $badge_label . '</span>';
+    ?>
     <div class="wppilot-method-cards">
         <?php if ($oauth_available): ?>
         <button
@@ -293,42 +477,38 @@ function wppilot_render_method_chooser(
                 domain: 'wppilot',
             ); ?></span>
         </button>
+        <button
+            type="button"
+            class="wppilot-method-card<?php echo $token_active ? ' is-active' : ''; ?>"
+            data-method="token"
+        >
+            <span class="wppilot-method-title">
+                <?php esc_html_e('Access token', domain: 'wppilot'); ?>
+            </span>
+            <span class="description"><?php esc_html_e(
+                'A bearer token for callers with no browser: the Claude and OpenAI APIs, scripts, cron.',
+                domain: 'wppilot',
+            ); ?></span>
+        </button>
+        <?php /*
+         * Not a fourth credential — a fourth way of arriving. Someone whose AI is
+         * a browser tab does not know yet whether they want OAuth or a token, and
+         * should not have to guess one before finding out their app is supported.
+         */ ?>
+        <button
+            type="button"
+            class="wppilot-method-card"
+            data-method="webapps"
+        >
+            <span class="wppilot-method-title">
+                <?php esc_html_e('Web apps', domain: 'wppilot'); ?>
+            </span>
+            <span class="description"><?php esc_html_e(
+                'ChatGPT, Claude, Perplexity, Le Chat, Manus — pick the app and follow its own steps.',
+                domain: 'wppilot',
+            ); ?></span>
+        </button>
     </div>
-
-    <div class="wppilot-method-panel" data-panel="oauth" hidden>
-        <?php wppilot_render_oauth_panel(); ?>
-    </div>
-    <div class="wppilot-method-panel" data-panel="password"<?php echo $password_active ? '' : ' hidden'; ?>>
-        <?php wppilot_render_password_step($new_password, $existing_password, $existing_error); ?>
-        <?php wppilot_render_manage_passwords_section(); ?>
-    </div>
-
-    <noscript>
-        <style>.wppilot-method-panel[hidden], #wppilot-step3[hidden] { display: block; }</style>
-    </noscript>
-
-    <script>
-    (function () {
-        var hasPassword = <?php echo $has_password ? 'true' : 'false'; ?>;
-        // Re-query on every click so panels rendered in later containers (the step 3 section) are
-        // toggled too. Step 3 opens for OAuth immediately, and for the password method only once a
-        // password exists (otherwise the whole step 3 section stays hidden).
-        function apply(method) {
-            document.querySelectorAll('.wppilot-method-card').forEach(function (c) {
-                c.classList.toggle('is-active', c.getAttribute('data-method') === method);
-            });
-            document.querySelectorAll('.wppilot-method-panel').forEach(function (p) {
-                p.hidden = p.getAttribute('data-panel') !== method;
-            });
-            var step3 = document.getElementById('wppilot-step3');
-            var visible = method === 'oauth' || (method === 'password' && hasPassword);
-            if (step3) { step3.hidden = !visible; }
-        }
-        document.querySelectorAll('.wppilot-method-card').forEach(function (card) {
-            card.addEventListener('click', function () { apply(card.getAttribute('data-method')); });
-        });
-    })();
-    </script>
     <?php
 }
 
@@ -342,8 +522,12 @@ function wppilot_render_connect_client_section(
     ?string $new_password,
     ?string $existing_password,
     ?WP_Error $existing_error,
+    ?string $new_token = null,
+    ?WP_Error $token_error = null,
 ): void {
-    $password_active = wppilot_password_method_preselected($new_password, $existing_password, $existing_error);
+    $token_active = wppilot_token_method_preselected($new_token, $token_error);
+    $password_active =
+        !$token_active && wppilot_password_method_preselected($new_password, $existing_password, $existing_error);
     $has_password = $new_password !== null || $existing_password !== null;
     $rest_url = rest_url('mcp/wppilot');
     // OAuth lives on its own MCP server so the canonical route above stays Application-Password-only
@@ -359,6 +543,14 @@ function wppilot_render_connect_client_section(
         <?php if ($has_password): ?>
             <?php wppilot_render_config_section($rest_url, $username, $display_password); ?>
         <?php endif; ?>
+    </div>
+    <?php /* The token reaches the canonical endpoint — the same URL the application-password
+     * snippets use. See WPPilot\OAuth\Middleware\is_any_mcp_route(). */ ?>
+    <div class="wppilot-method-panel" data-panel="token"<?php echo $token_active ? '' : ' hidden'; ?>>
+        <?php wppilot_render_token_config_section($rest_url, $new_token); ?>
+    </div>
+    <div class="wppilot-method-panel" data-panel="webapps" hidden>
+        <?php wppilot_render_web_apps_config_section($oauth_rest_url, $rest_url, $new_token); ?>
     </div>
     <?php
 }
@@ -546,6 +738,7 @@ function wppilot_render_config_section(string $rest_url, string $username, strin
 
     <div id="wppilot-manual-config" hidden style="display:none; margin-top:14px;">
         <?php wppilot_render_json_config_block(); ?>
+        <?php wppilot_render_agent_prompt_block('wppilot-password', method: 'password'); ?>
         <p style="margin:10px 0 4px;">
             <button
                 type="button"
@@ -637,6 +830,15 @@ function wppilot_render_config_section(string $rest_url, string $username, strin
         var usernameValue = <?php
 
         echo wppilot_script_json($username); ?>;
+        var passwordEndpointUrl = <?php
+
+        echo wppilot_script_json($rest_url); ?>;
+        var passwordAuthLine = <?php
+
+        echo wppilot_script_json(wppilot_agent_prompt_auth_line('password')); ?>;
+        var passwordNotes = <?php
+
+        echo wppilot_script_json(wppilot_agent_prompt_password_notes()); ?>;
 
         function renderPaste() {
             var text = pasteTemplate.split(namePlaceholder).join(mcpName);
@@ -680,6 +882,20 @@ function wppilot_render_config_section(string $rest_url, string $username, strin
                 );
             }
             document.getElementById('wppilot-config-hint').innerHTML = cfg.hint;
+
+            // Built from the same cfg the snippet above came from, so the prompt
+            // can never describe a client other than the selected tab.
+            window.wppilotAgentPrompt('wppilot-password', {
+                clientLabel: clientLabels[client] || client,
+                serverName: mcpName,
+                url: passwordEndpointUrl,
+                authLine: passwordAuthLine,
+                code: code,
+                paths: cfg.paths,
+                isShell: cfg.isShell,
+                hasSecret: true,
+                notes: passwordNotes
+            });
 
             var mergeNote = document.getElementById('wppilot-config-merge-note');
             if (mergeNote) { mergeNote.style.display = cfg.isShell ? 'none' : ''; }

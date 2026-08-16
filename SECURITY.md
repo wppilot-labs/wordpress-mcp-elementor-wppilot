@@ -5,7 +5,8 @@ Report suspected vulnerabilities privately through the contact channel published
 ## Deployment guidance
 
 - Keep Production Safe selected unless broader access is intentional.
-- Prefer OAuth over credentials embedded in client configuration.
+- Prefer OAuth over credentials embedded in client configuration. An application password or access token written into a client config is a bearer credential in a plaintext file, and an access token is the longest-lived of the three — give one an expiry, scope it to a purpose you can name, and revoke it when that purpose ends.
+- Treat an access token as equal to the account that created it. It borrows that user's capabilities on every request, so the smallest account that can do the job is the one that should hold it.
 - Use HTTPS for remotely reachable sites and revoke connected apps that are no longer needed.
 - Grant AI access only to a WordPress account with the minimum capabilities required.
 - Maintain tested backups before enabling mutation workflows.

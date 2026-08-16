@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,10 +30,11 @@ Every remote call is checked against a safety profile before it runs, on the ser
 
 Destructive and critical operations require an explicit confirmation flag on top of the profile, and supported changes are recorded in a redacted change ledger you can roll back.
 
-= Two ways to connect =
+= Three ways to connect =
 
 * **OAuth 2.1** with PKCE, sign in through the browser, no password pasted into a config file. Client ID Metadata Documents are the preferred registration mechanism, with dynamic client registration kept for clients that do not support them.
 * **Application passwords**, for clients that do not run an OAuth flow.
+* **Access tokens**, a long-lived bearer token for callers that have no browser at all: the Claude Messages API MCP connector, the OpenAI Responses API, cron jobs, automation platforms and scripts. Created with an optional expiry, shown once, stored only as a digest, and revocable one at a time.
 
 Both MCP protocol revisions are served during the migration window: the stateless `2026-07-28` and the session-based `2025-11-25`. Existing clients keep working and do not need to reconnect.
 
@@ -41,7 +42,17 @@ Either way, WPPilot generates the exact configuration for your client and shows 
 
 = Clients it generates configuration for =
 
-Claude Code, Claude Desktop, Claude on the web, Codex, Cursor, VS Code, GitHub Copilot, Antigravity CLI, Antigravity IDE, Windsurf, Zed, Cline, Roo Code, Kilo Code, Amazon Q and OpenCode.
+**Editors and CLIs:** Claude Code, Claude Desktop, Codex CLI, the Codex desktop app, Cursor, VS Code, GitHub Copilot, Factory Droid, Antigravity CLI, Antigravity IDE, Devin Desktop (formerly Windsurf), Zed, Cline, Roo Code, Kilo Code, Amazon Q, OpenCode, OpenClaw, Kimi Code CLI, Qwen Code, Gemini CLI and ZCode (GLM).
+
+**Web apps**, each with its own walkthrough: Claude on the web, ChatGPT, Perplexity, Mistral Le Chat and Manus. Every one adds this site from its own settings screen, and WPPilot tells you which credential that app accepts — three of the five can take an access token instead of signing in.
+
+**Anything else that speaks HTTP:** the Claude Messages API MCP connector, the OpenAI Responses API, and plain curl.
+
+Every client's snippet is written in the shape that client actually parses. The field names disagree more than they should — VS Code nests servers under "servers", Antigravity and Devin Desktop want "serverUrl", Qwen Code and Gemini CLI want "httpUrl", Cline spells the transport "streamableHttp" where Kilo spells it "streamable-http", Codex uses TOML — and a snippet copied from the wrong client's documentation often parses cleanly and then connects to nothing.
+
+= Or let your AI set it up =
+
+Every connection method also offers its setup as a ready-made prompt for an AI coding agent, carrying the server name, the URL, the exact snippet, the file it belongs in, and the rules that stop an agent inventing a transport that was never mentioned. Paste it into the agent already open next to WordPress.
 
 = See what is connected =
 
@@ -118,7 +129,7 @@ New content is created as a draft unless you ask for publication explicitly, and
 == Screenshots ==
 
 1. Overview: the AI clients connected to your site, how they authenticated, and how much they call.
-2. Connect, generated configuration for your AI client, for OAuth or an application password.
+2. Connect, generated configuration for your AI client, for OAuth, an application password, or an access token.
 3. Settings, every site-wide switch in one place.
 4. Abilities: every ability exposed to agents, grouped by provider, each one switchable.
 5. Diagnostics, checks that probe the connection the way a client does.
@@ -135,6 +146,18 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.4.0 =
+* Added access tokens, a third way to connect. A long-lived bearer token for callers that have no browser: the Claude Messages API MCP connector, the OpenAI Responses API, cron jobs, automation platforms and scripts. OAuth and application passwords are unchanged and existing connections keep working.
+* A token is shown once when you create it and stored only as a digest, so it cannot be read back afterwards. Give it an expiry of 30 days, 90 days, a year, or none, and revoke it on its own at any time. Deleting the WordPress user deletes their tokens.
+* A token has exactly the access of the account that created it, checked on every request. Removing that account's permissions closes the token immediately.
+* The Connect screen now offers all three methods side by side, with ready-made configuration for seventeen AI clients plus the Claude API, the OpenAI API and curl.
+* Creating a token now takes you straight to it, with the three steps that connect a client and a jump to the ready-made configuration. Previously the page reloaded at the top and the token — shown only once — was far below.
+* The Overview shows an Access tokens block with a direct link to create or manage one.
+* Every method now offers its setup as a copy-paste prompt for an AI coding agent, alongside the existing snippets and instructions rather than in place of them.
+* Setup guides for the web chat interfaces are rewritten for their current menus, and Mistral Le Chat, Perplexity and Manus are added alongside ChatGPT and Claude on the web. Each says where the setting actually lives, what plan it needs, and to switch the connector on in the chat afterwards.
+* Claude on the web, Le Chat and Perplexity can also be connected with an access token instead of signing in, with step-by-step instructions for each.
+* Client setup instructions refreshed for August 2026, including the config format changes in Antigravity, Devin Desktop, Cline and Kilo Code, and a note that Roo Code was discontinued in May 2026.
 
 = 1.3.0 =
 * Fixed restoring a revision, which could not run at all on 1.1.0 through 1.2.1. Every call failed with a fatal error before the post was touched. Nothing else was affected, and no other ability shared the fault.
@@ -181,6 +204,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+A large release, all of it about getting connected. Access tokens are a third way in, for callers that cannot sign in through a browser: the Claude Messages API MCP connector, the OpenAI Responses API, cron jobs, automation platforms and scripts. Web apps get their own route, with real walkthroughs for Claude on the web, ChatGPT, Perplexity, Mistral Le Chat and Manus. Seven clients are new — Kimi Code CLI, Qwen Code, Gemini CLI, ZCode (GLM) and the web apps above — and every existing client's instructions were rewritten against its current interface, several of which had moved. Each method now also offers its setup as a copy-paste prompt for an AI coding agent. The Connect screen is reordered so the setup comes before the status panels. OAuth and application passwords are unchanged, existing connections keep working, and there are no new abilities and no permission changes.
 
 = 1.3.0 =
 Fixes restoring a revision, which failed with a fatal error on every call from 1.1.0 onward and, behind that, reported a restore that never happened as successful. Recommended for everyone. Change ledger entries now name the agent that made each write, so a site connected by more than one AI client can tell them apart. No new abilities, no permission changes, and existing connections keep working.

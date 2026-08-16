@@ -1247,15 +1247,21 @@ body[class*='wppilot'] .wppilot-ts-mint-id {
  * includes/admin/connect/page.php.
  */
 
+/* Grid, not wrapped flex: with three methods the flex version gave each card a
+   width from its own text, so the row read as three mismatched boxes and a
+   wrapped card sat alone at a third of the width. Equal tracks, and a min that
+   drops cleanly to one column on a narrow screen. */
 body[class*='wppilot'] .wppilot-method-cards {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	align-items: stretch;
 	gap: 14px;
 	margin: 0 0 18px;
-	flex-wrap: wrap;
 }
 
 body[class*='wppilot'] .wppilot-method-card {
-	flex: 1 1 240px;
+	width: 100%;
+	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -1279,8 +1285,14 @@ body[class*='wppilot'] .wppilot-method-card.is-active {
 	box-shadow: var(--wpp-shadow);
 }
 
+body[class*='wppilot'] .wppilot-method-card .description {
+	margin: 0;
+	min-height: 2.6em;
+}
+
 body[class*='wppilot'] .wppilot-method-title {
 	font-weight: 800;
+	flex-wrap: wrap;
 	font-size: 15px;
 	display: flex;
 	align-items: center;

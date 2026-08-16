@@ -36,18 +36,31 @@ function register_menu(): void
  * request, which is recorded per method; failing that, the presence of MCP Application Passwords
  * or registered OAuth clients. Empty string means "unknown", and the panel then checks both.
  *
- * @return 'oauth'|'password'|''
+ * @return 'oauth'|'token'|'password'|''
  */
 function detect_connection_method(): string
 {
     // @mago-expect analysis:mixed-assignment
     $last = get_option('wppilot_mcp_last_request', default_value: []);
     if (is_array($last)) {
-        $oauth = is_int($last['oauth'] ?? null) ? $last['oauth'] : 0;
-        $password = is_int($last['password'] ?? null) ? $last['password'] : 0;
-        if ($oauth > 0 || $password > 0) {
-            return $oauth >= $password ? 'oauth' : 'password';
+        $seen = [];
+        foreach (['oauth', 'token', 'password'] as $candidate) {
+            $stamp = is_int($last[$candidate] ?? null) ? $last[$candidate] : 0;
+            if ($stamp > 0) {
+                $seen[$candidate] = $stamp;
+            }
         }
+        if ($seen !== []) {
+            // The most recently used method, so a site that has since moved to a
+            // second credential is diagnosed on the one it is actually using.
+            arsort($seen);
+
+            return (string) array_key_first($seen);
+        }
+    }
+
+    if (function_exists('wppilot_tokens_for_user') && \wppilot_tokens_for_user(get_current_user_id()) !== []) {
+        return 'token';
     }
 
     if (function_exists('wppilot_get_mcp_passwords') && \wppilot_get_mcp_passwords() !== []) {
