@@ -49,18 +49,61 @@ function register(): void
 /**
  * Establish a WordPress identity without making any route authorization decision.
  *
+ * Two kinds of credential arrive as `Authorization: Bearer`: an OAuth access
+ * token, and a WPPilot access token. They are told apart by the token's fixed
+ * prefix before either validator runs, never by trying one and falling back to
+ * the other — a failed OAuth validation records an authentication error, which
+ * denies the request outright, so a WPPilot token would never get a second look.
+ *
  * @param mixed $user Existing identity established by WordPress.
- * @return mixed The existing identity, or the OAuth subject ID after successful validation.
+ * @return mixed The existing identity, or the subject ID after successful validation.
  */
 function resolve_bearer_identity(mixed $user): mixed
 {
     $auth = get_authorization_header();
+
+    // function_exists guards the load order rather than the feature: this file is
+    // reachable from the OAuth bootstrap, and a request that arrived before the
+    // token module loaded must fall through to OAuth rather than fatal.
+    if (function_exists('wppilot_token_looks_like') && \wppilot_token_looks_like(bearer_secret($auth))) {
+        return resolve_token_identity($user, $auth);
+    }
 
     return resolve_bearer_identity_using(
         $user,
         $auth,
         static fn(string $authorization): array => validate_bearer_credential($authorization),
     );
+}
+
+/**
+ * Establish an identity from a WPPilot access token.
+ *
+ * Mirrors resolve_bearer_identity_using() rather than reusing it: the OAuth path
+ * reports its failures as OAuth failures, and a user debugging a static token
+ * should not be told their "OAuth access token" is invalid.
+ *
+ * @return mixed The existing identity, or the token's subject ID.
+ */
+function resolve_token_identity(mixed $user, string $auth): mixed
+{
+    reset_request_context();
+
+    if (has_existing_identity($user)) {
+        return $user;
+    }
+
+    $identity = \wppilot_token_authenticate(bearer_secret($auth));
+    if ($identity === null) {
+        record_authentication_error('Invalid, expired, or revoked WPPilot access token.');
+        return $user;
+    }
+
+    wp_set_current_user($identity['user_id']);
+    record_oauth_identity($identity['user_id'], ['mcp'], 'token-' . $identity['id'], via: 'token');
+    \wppilot_token_touch($identity['id']);
+
+    return $identity['user_id'];
 }
 
 /**
@@ -325,12 +368,43 @@ function is_mcp_route(string $route): bool
 }
 
 /**
+ * Whether a route is any of the MCP endpoints this site serves.
+ *
+ * Access tokens are accepted on all of them, the canonical `/mcp/wppilot`
+ * included. That endpoint is the URL every client config on the Connect screen
+ * already points at, and the API-side callers this credential exists for —
+ * Anthropic's MCP connector, OpenAI's `mcp` tool — take one URL and one bearer
+ * token with no way to express "use the other endpoint for this credential".
+ * Sending them to a second URL would be a second thing to get wrong for no
+ * security gain: the endpoints are mirrors of the same server.
+ */
+function is_any_mcp_route(string $route): bool
+{
+    foreach (['/mcp/wppilot-oauth', '/mcp/wppilot', '/mcp/mcp-adapter-default-server'] as $base) {
+        if ($route === $base || str_starts_with($route, $base . '/')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Exact REST routes on which a WPPilot-established identity may survive post-routing checks.
  */
 function oauth_identity_may_use_route(string $route, string $method): bool
 {
     $method = strtoupper($method);
     if (is_mcp_route($route)) {
+        return true;
+    }
+    // Only for an identity already established by an access token. With no
+    // identity this is false, which is what keeps the OAuth challenge off the
+    // Application Password endpoint: an unauthenticated request there must go on
+    // reaching the adapter's own 401 rather than being answered with a
+    // WWW-Authenticate pointing at OAuth.
+    // @mago-expect lint:no-insecure-comparison -- credential kind, not a secret.
+    if (request_identity_via() === 'token' && is_any_mcp_route($route)) {
         return true;
     }
     if ($route === '/wp-abilities/v1/abilities') {
@@ -385,6 +459,23 @@ function normalize_bearer_authorization(string $auth): string
     return 'Bearer ' . $matches[1];
 }
 
+/**
+ * The credential itself, with the scheme and surrounding whitespace removed.
+ *
+ * Returns an empty string for anything that is not a Bearer credential, so a
+ * shape test on the result cannot be fooled by a header of another scheme that
+ * happens to contain the token prefix.
+ */
+function bearer_secret(string $auth): string
+{
+    $matches = [];
+    if (preg_match('/^\s*Bearer\s+(\S+)\s*$/i', $auth, $matches) !== 1) {
+        return '';
+    }
+
+    return $matches[1];
+}
+
 /** @return list<string> */
 function normalize_scopes(mixed $scopes): array
 {
@@ -421,7 +512,7 @@ function has_existing_identity(mixed $user): bool
  * Request-local proof and error storage. PHP normally serves one request per process; reset at the
  * start of determine_current_user also keeps persistent test/worker environments isolated.
  *
- * @return array{identity: array{user_id: int, scopes: list<string>, client_id?: string}|null, error: WP_Error|null}
+ * @return array{identity: array{user_id: int, scopes: list<string>, via?: string, client_id?: string}|null, error: WP_Error|null}
  */
 function &request_context(): array
 {
@@ -436,14 +527,25 @@ function reset_request_context(): void
 }
 
 /** @param list<string> $scopes */
-function record_oauth_identity(int $user_id, array $scopes, string $client_id = ''): void
+function record_oauth_identity(int $user_id, array $scopes, string $client_id = '', string $via = 'oauth'): void
 {
     $context = &request_context();
-    $context['identity'] = ['user_id' => $user_id, 'scopes' => $scopes];
+    $context['identity'] = ['user_id' => $user_id, 'scopes' => $scopes, 'via' => $via];
     if ($client_id !== '') {
         $context['identity']['client_id'] = $client_id;
     }
     $context['error'] = null;
+}
+
+/**
+ * Which credential established the current identity: 'oauth', 'token', or '' when
+ * nothing did.
+ */
+function request_identity_via(): string
+{
+    $identity = request_oauth_identity();
+
+    return is_array($identity) ? (string) ($identity['via'] ?? 'oauth') : '';
 }
 
 function record_authentication_error(string $message, int $status = 401): void
@@ -453,7 +555,7 @@ function record_authentication_error(string $message, int $status = 401): void
     $context['error'] = new WP_Error('rest_oauth_error', $message, ['status' => $status]);
 }
 
-/** @return array{user_id: int, scopes: list<string>, client_id?: string}|null */
+/** @return array{user_id: int, scopes: list<string>, via?: string, client_id?: string}|null */
 function request_oauth_identity(): ?array
 {
     $context = &request_context();

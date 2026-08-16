@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
  * home (one canonical place to debug a connection); $context prefixes the container id in case
  * another host ever needs it.
  *
- * $method scopes checks and symptoms to one connection method ('oauth' or 'password'). Pass ''
+ * $method scopes checks and symptoms to one connection method ('oauth', 'token' or 'password'). Pass ''
  * when the method is chosen at runtime — the Connect page keeps the attribute in sync with its
  * method chooser via window.wppilotTsSetMethod().
  */
@@ -49,6 +49,10 @@ function render_panel(string $context, string $method = '', bool $with_method_pi
             'method' => 'password',
             'label' => __('The Application Password method fails with 401', domain: 'wppilot'),
         ],
+        'token-401' => [
+            'method' => 'token',
+            'label' => __('My access token is rejected with 401', domain: 'wppilot'),
+        ],
     ];
     ?>
     <div
@@ -74,6 +78,10 @@ function render_panel(string $context, string $method = '', bool $with_method_pi
                         ); ?></option>
                         <option value="password" <?php selected($method, current: 'password'); ?>><?php esc_html_e(
                             'Application Password',
+                            domain: 'wppilot',
+                        ); ?></option>
+                        <option value="token" <?php selected($method, current: 'token'); ?>><?php esc_html_e(
+                            'Access token',
                             domain: 'wppilot',
                         ); ?></option>
                     </select>
@@ -164,6 +172,21 @@ function render_panel(string $context, string $method = '', bool $with_method_pi
             <div class="wppilot-ts-branch" data-wppilot-ts-branch="password-401" hidden>
                 <p><?php esc_html_e(
                     'For the Application Password method a 401 means: the password was revoked (check the list at the bottom of the Connect page), Application Passwords are unavailable (see the checks above), the Authorization header is stripped before reaching PHP (the Connect page shows a dedicated warning when it detects that), or a security plugin or firewall in front of the site is blocking or altering the authenticated request (see the Security & edge layers check above).',
+                    domain: 'wppilot',
+                ); ?></p>
+            </div>
+
+            <div class="wppilot-ts-branch" data-wppilot-ts-branch="token-401" hidden>
+                <p><?php esc_html_e(
+                    'For an access token a 401 means one of five things: the token was revoked or has expired (both are visible in the token list on the Connect page — an expired one is labelled), the account that created it can no longer manage WPPilot, the value was truncated or line-wrapped when it was copied, the header is missing its "Bearer " prefix, or the Authorization header is stripped before reaching PHP (the Connect page warns when it detects that).',
+                    domain: 'wppilot',
+                ); ?></p>
+                <p><?php esc_html_e(
+                    'The curl snippet on the Connect page is the fastest way to tell those apart: it removes the client from the question entirely. If curl returns a tool list and your client still fails, the problem is in the client config, not the token.',
+                    domain: 'wppilot',
+                ); ?></p>
+                <p><?php esc_html_e(
+                    'A client that reports the server as "needs authentication" while the tools still work is a different thing and is not a failure: this site advertises OAuth metadata for the OAuth method, and some clients read that as a sign-in requirement even when a header already authenticates every call.',
                     domain: 'wppilot',
                 ); ?></p>
             </div>
@@ -427,7 +450,8 @@ function render_assets_once(): void
         // and symptom list follow the method the user is actually setting up.
         window.wppilotTsSetMethod = function (method) {
             document.querySelectorAll('.wppilot-troubleshoot').forEach(function (panel) {
-                panel.setAttribute('data-wppilot-ts-method', method === 'oauth' || method === 'password' ? method : '');
+                var known = method === 'oauth' || method === 'password' || method === 'token';
+            panel.setAttribute('data-wppilot-ts-method', known ? method : '');
                 applyMethod(panel);
             });
         };

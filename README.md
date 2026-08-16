@@ -30,7 +30,7 @@ A request is served under the modern revision **only** when it carries modern pe
 
 `server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. Subscriptions, the tasks extension and logging are deliberately not advertised, WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented.
 
-For OAuth, **Client ID Metadata Documents are the preferred registration mechanism**; RFC 7591 Dynamic Client Registration remains available as a compatibility fallback. Application Passwords stay an independent fallback for clients that run no OAuth flow.
+For OAuth, **Client ID Metadata Documents are the preferred registration mechanism**; RFC 7591 Dynamic Client Registration remains available as a compatibility fallback. Application Passwords and access tokens stay independent fallbacks for clients that run no OAuth flow.
 
 It is a control layer, not an AI wrapper. **No AI model is bundled**: external MCP clients bring their own model access, and policy is enforced server-side on your install.
 
@@ -84,7 +84,7 @@ Canonical MCP endpoint:
 https://example.com/wp-json/mcp/wppilot
 ```
 
-OAuth-authenticated clients use `/wp-json/mcp/wppilot-oauth`. The older `/wp-json/mcp/mcp-adapter-default-server` route still resolves as a legacy alias, but new configurations should use the canonical path above.
+OAuth-authenticated clients use `/wp-json/mcp/wppilot-oauth`. Application passwords and access tokens both authenticate on the canonical route. The older `/wp-json/mcp/mcp-adapter-default-server` route still resolves as a legacy alias, but new configurations should use the canonical path above.
 
 ## Supported AI clients
 
@@ -94,10 +94,15 @@ Per-client setup guides: <https://wppilot.co/wordpress-mcp>
 
 ## Authentication
 
-- **OAuth 2.1 with PKCE** and dynamic client registration. Access tokens last 1 hour, refresh tokens 14 days, and every authorization is listed under **Connected Apps** in WordPress so it can be revoked individually.
-- **Application Passwords** as a fallback for clients that cannot run a browser flow.
+Three methods, chosen on **WPPilot → Connect**:
 
-Neither is a product licence. WPPilot needs no activation key, entitlement check or subscription service to run.
+- **OAuth 2.1 with PKCE** and dynamic client registration. Access tokens last 1 hour, refresh tokens 14 days, and every authorization is listed under **Connected Apps** in WordPress so it can be revoked individually. Recommended wherever the client can open a browser.
+- **Application Passwords** as a fallback for clients that cannot run a browser flow. Sent as HTTP Basic.
+- **Access tokens** — a long-lived `Authorization: Bearer wpp_…` credential for callers with no browser and no interactive session: the Claude Messages API MCP connector, the OpenAI Responses API `mcp` tool, cron jobs, automation platforms, `curl`. Created with an optional expiry, shown once, stored only as a SHA-256 digest, and revocable per token. It authenticates on the canonical `/wp-json/mcp/wppilot` endpoint, so the URL is the same one every other snippet uses.
+
+An access token borrows the capabilities of the user who created it, and that check is re-run on every request rather than frozen at creation — demoting or deleting the user closes the token in the same moment.
+
+None of the three is a product licence. WPPilot needs no activation key, entitlement check or subscription service to run.
 
 ## Safety model
 

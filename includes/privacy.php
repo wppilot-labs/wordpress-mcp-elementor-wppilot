@@ -35,7 +35,7 @@ function wppilot_add_privacy_policy_content(): void
     $content .=
         '<p>'
         . wp_kses_post(__(
-            'OAuth records include registered client names, redirect addresses, a one-way registration IP hash, user-linked authorization records, expiry times, and revocation status. Site administrators can revoke connected applications. WordPress personal-data export and erase tools include WPPilot records associated with a user email address.',
+            'OAuth records include registered client names, redirect addresses, a one-way registration IP hash, user-linked authorization records, expiry times, and revocation status. Access tokens are stored against the user who created them as a one-way digest with a name, the last four characters, and created, last-used and expiry times; the token itself is never stored and cannot be exported. Site administrators can revoke connected applications and individual access tokens. WordPress personal-data export and erase tools include WPPilot records associated with a user email address.',
             domain: 'wppilot',
         ))
         . '</p>';
@@ -118,6 +118,7 @@ function wppilot_privacy_user_rows(int $user_id, int $offset, int $limit): array
         'wppilot-chat' => ['label' => __('WPPilot Chat sessions', domain: 'wppilot'), 'rows' => []],
         'wppilot-oauth-codes' => ['label' => __('WPPilot OAuth authorizations', domain: 'wppilot'), 'rows' => []],
         'wppilot-oauth-tokens' => ['label' => __('WPPilot OAuth access grants', domain: 'wppilot'), 'rows' => []],
+        'wppilot-access-tokens' => ['label' => __('WPPilot access tokens', domain: 'wppilot'), 'rows' => []],
     ];
 
     $connections = wppilot_connections_table();
@@ -158,6 +159,19 @@ function wppilot_privacy_user_rows(int $user_id, int $offset, int $limit): array
         // @mago-expect analysis:possibly-invalid-argument -- Trusted custom table name; every value is prepared.
         $groups['wppilot-oauth-tokens']['rows'] = wppilot_privacy_results((string) $wpdb->prepare(
             "SELECT client_id, expires_at, scopes, revoked FROM {$tokens} WHERE user_id = %d ORDER BY expires_at ASC LIMIT %d OFFSET %d",
+            $user_id,
+            $limit,
+            $offset,
+        ));
+    }
+
+    $access_tokens = wppilot_tokens_table();
+    if (wppilot_privacy_table_exists($access_tokens)) {
+        // The digest is deliberately not exported: it is the credential's stored
+        // form, and an export is a document that leaves the site.
+        // @mago-expect analysis:possibly-invalid-argument -- Trusted custom table name; every value is prepared.
+        $groups['wppilot-access-tokens']['rows'] = wppilot_privacy_results((string) $wpdb->prepare(
+            "SELECT name, last_four, created, last_used, expires FROM {$access_tokens} WHERE user_id = %d ORDER BY id ASC LIMIT %d OFFSET %d",
             $user_id,
             $limit,
             $offset,
@@ -240,7 +254,7 @@ function wppilot_erase_user_data(int $user_id): bool
     /** @var wpdb $wpdb */
     $removed = false;
 
-    foreach ([wppilot_connections_table(), wppilot_chat_sessions_table()] as $table) {
+    foreach ([wppilot_connections_table(), wppilot_chat_sessions_table(), wppilot_tokens_table()] as $table) {
         if (wppilot_privacy_table_exists($table)) {
             $deleted = $wpdb->delete($table, ['user_id' => $user_id], ['%d']);
             $removed = is_int($deleted) && $deleted > 0 || $removed;

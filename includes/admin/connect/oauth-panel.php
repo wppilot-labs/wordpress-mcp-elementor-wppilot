@@ -87,6 +87,9 @@ function wppilot_render_oauth_config_section(string $rest_url): void
         'claude-desktop' => 'Claude Desktop',
         'claude-ai' => 'Claude.ai',
         'chatgpt' => 'ChatGPT',
+        'mistral-lechat' => 'Mistral Le Chat',
+        'perplexity' => 'Perplexity',
+        'manus' => 'Manus',
         'codex' => 'Codex',
         'antigravity-cli' => 'Antigravity CLI',
         'antigravity-ide' => 'Antigravity IDE',
@@ -115,6 +118,7 @@ function wppilot_render_oauth_config_section(string $rest_url): void
         <button
             type="button"
             class="wppilot-client-tab wppilot-top-client-tab wppilot-oauth-tab"
+            data-client="<?php echo esc_attr($key); ?>"
             onclick="wppilotOauthSetClient('<?php echo esc_js($key); ?>', this)"
         ><?php echo esc_html($label); ?></button>
         <?php endif; ?>
@@ -217,6 +221,8 @@ function wppilot_render_oauth_config_section(string $rest_url): void
                 style="display:none; list-style-type:lower-alpha; margin:0 0 4px; padding-left:22px;"
             ></ol>
         </div>
+
+        <?php wppilot_render_agent_prompt_block('wppilot-oauth', method: 'oauth'); ?>
     </div>
 
     <?php // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Every value emitted in this block goes through wppilot_script_json(), which hex-escapes <, >, & and quotes for <script> context. Plugin Check cannot recognise a project-local escaper. ?>
@@ -237,6 +243,15 @@ function wppilot_render_oauth_config_section(string $rest_url): void
         var clientLabels = <?php
 
         echo wppilot_script_json($clients); ?>;
+        var oauthEndpointUrl = <?php
+
+        echo wppilot_script_json($rest_url); ?>;
+        var oauthAuthLine = <?php
+
+        echo wppilot_script_json(wppilot_agent_prompt_auth_line('oauth')); ?>;
+        var oauthNotes = <?php
+
+        echo wppilot_script_json(wppilot_agent_prompt_oauth_notes()); ?>;
         var manualLabelPrefix = <?php
 
         echo wppilot_script_json(__('Manual configuration for', domain: 'wppilot')); ?>;
@@ -397,6 +412,7 @@ function wppilot_render_oauth_config_section(string $rest_url): void
                 setDisplay('wppilot-oauth-steps', false);
                 setDisplay('wppilot-oauth-manual-btn-wrap', false);
                 setDisplay('wppilot-oauth-manual', false);
+                setDisplay('wppilot-oauth-agent-prompt-wrap', false);
                 return;
             }
 
@@ -437,12 +453,41 @@ function wppilot_render_oauth_config_section(string $rest_url): void
                 renderSteps(buildConfigSteps(cfg));
             }
 
+            setDisplay('wppilot-oauth-agent-prompt-wrap', true);
+            window.wppilotAgentPrompt('wppilot-oauth', {
+                clientLabel: label || client,
+                serverName: mcpName,
+                url: oauthEndpointUrl,
+                authLine: oauthAuthLine,
+                code: hasCode ? cfg.code.split(namePlaceholder).join(mcpName) : '',
+                paths: cfg.paths || {},
+                isShell: !!cfg.isShell,
+                steps: hasSteps ? cfg.steps.map(function (step) {
+                    var body = (step.body || '').replace(/<[^>]+>/g, '');
+                    return step.copy ? body + ' ' + step.copy.split(namePlaceholder).join(mcpName) : body;
+                }) : null,
+                hasSecret: false,
+                notes: oauthNotes
+            });
+
             // The manual guide is a fallback behind a toggle when there is a one-click primary
             // (connector or deeplink); with no primary it is the only way in, so show it directly.
             setDisplay('wppilot-oauth-manual-btn-wrap', hasManual && hasPrimary);
             setDisplay('wppilot-oauth-manual', hasManual && (!hasPrimary || manualOpen));
             document.getElementById('wppilot-oauth-manual-toggle')
                 .setAttribute('aria-expanded', manualOpen ? 'true' : 'false');
+        }
+
+        // Open on the first client instead of an empty panel. Everything under
+        // the step 2 heading — the steps, the hint, the "let your AI coder do it"
+        // prompt — lives inside #wppilot-oauth-content, which stayed display:none
+        // until a tab was clicked. The heading was therefore followed by a row of
+        // tabs and nothing else, which reads as "this method has no instructions".
+        function selectFirstOauthClient() {
+            var first = document.querySelector('.wppilot-oauth-tab');
+            if (first) {
+                window.wppilotOauthSetClient(first.getAttribute('data-client'), first);
+            }
         }
 
         window.wppilotOauthSetClient = function (key, btn) {
@@ -504,6 +549,12 @@ function wppilot_render_oauth_config_section(string $rest_url): void
                 setTimeout(function () { btn.textContent = orig; }, 1500);
             });
         };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', selectFirstOauthClient);
+        } else {
+            selectFirstOauthClient();
+        }
     }());
     </script>
     <?php // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped ?>

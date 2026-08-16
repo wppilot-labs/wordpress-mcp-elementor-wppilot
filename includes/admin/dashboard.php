@@ -194,7 +194,7 @@ function wppilot_dashboard_pro_status(): ?array
  * Recorded by includes/troubleshoot/bootstrap.php, at most once a minute per
  * method, so this is a liveness signal rather than a request counter.
  *
- * @return array{oauth: ?int, password: ?int}
+ * @return array{oauth: ?int, token: ?int, password: ?int}
  */
 function wppilot_dashboard_last_seen(): array
 {
@@ -210,6 +210,7 @@ function wppilot_dashboard_last_seen(): array
 
     return [
         'oauth' => $read($stored['oauth'] ?? null),
+        'token' => $read($stored['token'] ?? null),
         'password' => $read($stored['password'] ?? null),
     ];
 }
@@ -334,6 +335,8 @@ function wppilot_dashboard_connection(): void
                 ?>
             </div>
 
+            <?php wppilot_dashboard_access_tokens(); ?>
+
             <?php wppilot_dashboard_endpoints(); ?>
 
             <p class="wppilot-legend"><?php esc_html_e('Last request seen', domain: 'wppilot'); ?></p>
@@ -357,6 +360,12 @@ function wppilot_dashboard_connection(): void
                             esc_html(wppilot_dashboard_ago($last_seen['oauth']))
                         ; ?></td>
                     </tr>
+                    <tr>
+                        <td><?php esc_html_e('Access token', domain: 'wppilot'); ?></td>
+                        <td class="wppilot-mono"><?php echo
+                            esc_html(wppilot_dashboard_ago($last_seen['token']))
+                        ; ?></td>
+                    </tr>
                 </tbody>
             </table>
             <p class="description"><?php esc_html_e(
@@ -365,6 +374,90 @@ function wppilot_dashboard_connection(): void
             ); ?></p>
         </section>
 
+    <?php
+}
+
+/**
+ * Access tokens: what they are for, what exists, and the way to make one.
+ *
+ * Sits between the connection stats and the endpoint table because that is the
+ * order the questions arrive in — is anything live, how would something
+ * authenticate, and what address does it call. The credential itself is managed
+ * on the Connect screen; this is the pointer to it, because a method that only
+ * appears three screens down the setup flow is a method nobody finds.
+ */
+function wppilot_dashboard_access_tokens(): void
+{
+    $tokens = function_exists('wppilot_tokens_for_user') ? wppilot_tokens_for_user(get_current_user_id()) : [];
+    $connect_url = admin_url('admin.php?page=wppilot-connect#wppilot-token-method');
+    $dt_format = wppilot_get_datetime_format('Y-m-d H:i');
+
+    // Expired rows are still listed on the Connect screen so they can be cleared
+    // deliberately, but counting them here would overstate what actually works.
+    $live = 0;
+    $last_used = null;
+    foreach ($tokens as $token) {
+        $expires = $token['expires'];
+        if ($expires !== '' && (int) strtotime($expires . ' UTC') < time()) {
+            continue;
+        }
+        $live++;
+        $used = $token['last_used'] !== '' ? (int) strtotime($token['last_used'] . ' UTC') : 0;
+        if ($used > 0 && ($last_used === null || $used > $last_used)) {
+            $last_used = $used;
+        }
+    }
+    ?>
+        <p class="wppilot-legend"><?php esc_html_e('Access tokens', domain: 'wppilot'); ?></p>
+
+        <p class="description" style="margin:0 0 10px;">
+            <?php esc_html_e(
+                'A long-lived bearer token, for callers that cannot sign in through a browser: the Claude Messages API MCP connector, the OpenAI Responses API, a cron job, an automation platform, or any client that takes a URL and one header. It authenticates on the same MCP address listed below.',
+                domain: 'wppilot',
+            ); ?>
+        </p>
+
+        <?php if ($live === 0) { ?>
+            <p style="margin:0 0 6px;">
+                <a class="button" href="<?php echo esc_url($connect_url); ?>"><?php esc_html_e(
+                    'Create an access token',
+                    domain: 'wppilot',
+                ); ?></a>
+            </p>
+            <p class="description" style="margin:0;">
+                <?php esc_html_e(
+                    'None exist yet. Creating one shows the value once, then generates the configuration for your client with the token already in it.',
+                    domain: 'wppilot',
+                ); ?>
+            </p>
+        <?php } else { ?>
+            <table class="widefat">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Active tokens', domain: 'wppilot'); ?></th>
+                        <th><?php esc_html_e('Last used', domain: 'wppilot'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><?php echo esc_html((string) $live); ?></td>
+                        <td class="wppilot-mono"><?php echo
+                            esc_html(
+                                $last_used === null
+                                    ? __('Never', domain: 'wppilot')
+                                    : wppilot_dashboard_date($last_used, $dt_format),
+                            )
+                        ; ?></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="description" style="margin:6px 0 0;">
+                <a href="<?php echo esc_url($connect_url); ?>"><?php esc_html_e(
+                    'Create, inspect or revoke tokens, and get the configuration for your client',
+                    domain: 'wppilot',
+                ); ?></a>
+            </p>
+        <?php } ?>
     <?php
 }
 
@@ -672,6 +765,7 @@ function wppilot_dashboard_client_card(array $client): void
     $transports = [
         'password' => __('Application password', domain: 'wppilot'),
         'oauth' => __('OAuth', domain: 'wppilot'),
+        'token' => __('Access token', domain: 'wppilot'),
     ];
     $methods = [];
     foreach ($client['methods'] as $method) {
@@ -850,7 +944,11 @@ function wppilot_dashboard_endpoint_rows(): array
 {
     $rows = [
         [
-            'label' => __('MCP endpoint (application password)', domain: 'wppilot'),
+            // Both credentials that travel in a header authenticate here; only
+            // OAuth gets a route of its own. Naming just one of them is what sent
+            // people looking for a separate access-token address that does not
+            // exist.
+            'label' => __('MCP endpoint (application password or access token)', domain: 'wppilot'),
             'url' => rest_url('mcp/wppilot'),
         ],
     ];

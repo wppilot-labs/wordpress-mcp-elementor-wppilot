@@ -36,7 +36,7 @@ function run_checks(WP_REST_Request $req): WP_REST_Response
 {
     // @mago-expect analysis:mixed-assignment
     $raw = $req->get_json_params()['method'] ?? null;
-    $method = in_array($raw, ['oauth', 'password'], strict: true) ? $raw : null;
+    $method = in_array($raw, ['oauth', 'token', 'password'], strict: true) ? $raw : null;
 
     $checks = \WPPilot\Troubleshoot\Checks\run_all($method);
     // run_all() already probed for security/edge layers; current_security_edge_layers() caches that

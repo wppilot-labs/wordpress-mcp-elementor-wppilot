@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
- * Version: 1.3.0
+ * Version: 1.4.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -241,6 +241,7 @@ require_once __DIR__ . '/includes/rate-limit.php';
 require_once __DIR__ . '/includes/change-log.php';
 require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';
+require_once __DIR__ . '/includes/tokens.php';
 require_once __DIR__ . '/includes/privacy.php';
 require_once __DIR__ . '/includes/rest/transport-hardening.php';
 
@@ -554,6 +555,7 @@ add_action('admin_init', static function () {
     }
     if ($page === 'wppilot-connect') {
         wppilot_handle_revoke_password();
+        wppilot_handle_revoke_token();
         wppilot_handle_dismiss_production_warning();
     }
     if ($page === 'wppilot-abilities') {

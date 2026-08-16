@@ -32,7 +32,7 @@ function record_mcp_request(mixed $result, mixed $server, WP_REST_Request $reque
     if (!is_user_logged_in()) {
         return $result;
     }
-    $method = mcp_route_method($request->get_route());
+    $method = mcp_request_method($request->get_route());
     if ($method === null) {
         return $result;
     }
@@ -72,6 +72,34 @@ function record_mcp_request(mixed $result, mixed $server, WP_REST_Request $reque
  * or the canonical + legacy-alias routes used by Application Password clients. Non-MCP routes
  * return null. Matching mirrors WPPilot\OAuth\Middleware\is_mcp_route (exact slug or slash
  * suffix — `/mcp/wppilot-oauth` must never be treated as a `/mcp/wppilot` prefix match).
+ *
+ * @return 'oauth'|'token'|'password'|null
+ */
+function mcp_request_method(string $route): ?string
+{
+    $route_method = mcp_route_method($route);
+    if ($route_method === null) {
+        return null;
+    }
+
+    // An access token is accepted on every MCP route, so the route alone cannot
+    // name the method: a token used against the canonical endpoint would
+    // otherwise be filed under Application password and the Overview screen
+    // would credit the wrong credential.
+    // @mago-expect lint:no-insecure-comparison -- credential kind, not a secret.
+    if (
+        function_exists('WPPilot\\OAuth\\Middleware\\request_identity_via')
+        && \WPPilot\OAuth\Middleware\request_identity_via() === 'token'
+    ) {
+        return 'token';
+    }
+
+    return $route_method;
+}
+
+/**
+ * Map a REST route to the auth method it implies, ignoring which credential
+ * actually arrived. Callers that need the credential too want mcp_request_method().
  *
  * @return 'oauth'|'password'|null
  */

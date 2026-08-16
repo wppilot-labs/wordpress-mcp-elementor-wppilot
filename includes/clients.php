@@ -28,9 +28,13 @@ declare(strict_types=1);
  *     and speaks stdio to the client. Every client can therefore reach OAuth;
  *     only the route differs.
  *
- *   - Credentials: which connection methods are actually available, so the
- *     Connect screen offers each client the ones that work rather than a generic
- *     list the user has to filter themselves.
+ *   - Credentials: which of the three connection methods — OAuth, application
+ *     password, access token — are actually available, so the Connect screen
+ *     offers each client the ones that work rather than a generic list the user
+ *     has to filter themselves. A client is listed for `token` only where it can
+ *     send a static Authorization header — including three of the hosted web UIs,
+ *     which now store one per connector. ChatGPT, Manus and the Codex desktop app
+ *     have nowhere to put one and stay OAuth-only.
  *
  * The registry is split by that OAuth route rather than listed flat, so no entry
  * has to restate it and no entry can contradict the group it sits in. A client
@@ -55,39 +59,92 @@ function wppilot_clients_native_oauth(): array
         'claude-code' => [
             'label' => 'Claude Code',
             'match' => ['claude-code', 'claude code'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __(
-                'Add the server, then run /mcp inside Claude Code to complete the browser sign-in.',
+                'Add the server, then run /mcp inside Claude Code to complete the browser sign-in. With an access token there is no sign-in step, but /mcp still reports the server as needing authentication — a display bug that does not stop the tools working.',
                 domain: 'wppilot',
             ),
         ],
         'claude-desktop' => [
             'label' => 'Claude Desktop',
             'match' => ['claude-ai', 'claude-desktop', 'claude desktop'],
-            'methods' => ['oauth', 'bundle', 'password'],
+            'methods' => ['oauth', 'bundle', 'token', 'password'],
             'note' => __(
                 'Settings, then Connectors, then Add custom connector. The .mcpb bundle is the no-typing alternative.',
                 domain: 'wppilot',
             ),
         ],
-        // Hosted agents. They connect from their own infrastructure, so the
-        // site must be reachable over public HTTPS — a localhost or LAN URL
-        // cannot work, and no local stdio proxy is available to bridge it.
+    ];
+}
+
+/**
+ * The hosted web UIs.
+ *
+ * Split from the list above because they answer a different question. An editor
+ * is told where its configuration file is; these are told which menu to open,
+ * and they disagree — Customize, Settings, Apps, Connectors — often enough that
+ * the wrong one is the whole reason a setup fails. They also all connect from
+ * their own servers, so none of them can reach a site that is only up on the
+ * operator's machine.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function wppilot_clients_web_ui(): array
+{
+    return [
+        // Not all OAuth-only any more: claude.ai, Le Chat and Perplexity each
+        // store a fixed Authorization header per connector, which is what makes
+        // an access token usable from a browser at all. ChatGPT's developer mode
+        // offers OAuth or no authentication and has no header field, and Manus
+        // and the Codex app take OAuth client credentials rather than a header,
+        // so those three stay OAuth-only.
+        'claude-web' => [
+            'label' => __('Claude (web)', domain: 'wppilot'),
+            'match' => ['claude-web'],
+            'methods' => ['oauth', 'token'],
+            'note' => __(
+                'Customize, then Connectors, then Add custom connector. Requires a public HTTPS site — claude.ai cannot reach localhost.',
+                domain: 'wppilot',
+            ),
+        ],
+        'chatgpt' => [
+            'label' => 'ChatGPT',
+            'match' => ['chatgpt', 'openai-chatgpt'],
+            'methods' => ['oauth'],
+            'note' => __(
+                'Settings, Apps, Advanced settings, Developer mode — then Create app. Web only, and the site must be reachable over public HTTPS.',
+                domain: 'wppilot',
+            ),
+        ],
+        // Le Chat's connector dialog also accepts Basic, so an application
+        // password would work there in principle. It is not listed: the
+        // application-password method generates config files for local clients
+        // and has no walkthrough form, so claiming it here would advertise a tab
+        // that does not exist. Bearer is the shorter route to the same place.
+        'mistral-lechat' => [
+            'label' => 'Mistral Le Chat',
+            'match' => ['mistral', 'le-chat', 'lechat'],
+            'methods' => ['oauth', 'token'],
+            'note' => __(
+                'Connectors, Add Connector, Custom MCP Connector. The name is an identifier, so it takes no spaces.',
+                domain: 'wppilot',
+            ),
+        ],
         'manus' => [
             'label' => 'Manus',
             'match' => ['manus'],
             'methods' => ['oauth'],
             'note' => __(
-                'Add WPPilot as an MCP connector in Manus. Manus connects from its own servers, so this site must be reachable over public HTTPS.',
+                'Settings, Connectors, Add connectors, Custom MCP, Direct configuration. Manus connects from its own servers, so this site must be reachable over public HTTPS.',
                 domain: 'wppilot',
             ),
         ],
-        'claude-web' => [
-            'label' => __('Claude (web)', domain: 'wppilot'),
-            'match' => ['claude-web'],
-            'methods' => ['oauth'],
+        'perplexity' => [
+            'label' => 'Perplexity',
+            'match' => ['perplexity', 'comet'],
+            'methods' => ['oauth', 'token'],
             'note' => __(
-                'Custom connectors require a public HTTPS site — claude.ai cannot reach localhost.',
+                'Settings, then Connectors. Custom remote connectors need Pro, Max or Enterprise, and an HTTPS URL.',
                 domain: 'wppilot',
             ),
         ],
@@ -106,16 +163,27 @@ function wppilot_clients_native_oauth(): array
                 domain: 'wppilot',
             ),
         ],
+    ];
+}
+
+/**
+ * The rest of the natively-authenticating clients.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function wppilot_clients_native_oauth_editors(): array
+{
+    return [
         'codex' => [
             'label' => __('Codex CLI', domain: 'wppilot'),
             'match' => ['codex'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __('After adding the server, run codex mcp login to authorise it.', domain: 'wppilot'),
         ],
         'cursor' => [
             'label' => 'Cursor',
             'match' => ['cursor'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __(
                 'Cursor marks the server "needs login" until you complete the browser sign-in.',
                 domain: 'wppilot',
@@ -124,7 +192,7 @@ function wppilot_clients_native_oauth(): array
         'vscode' => [
             'label' => 'VS Code',
             'match' => ['visual studio code', 'vscode'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __('Requires VS Code 1.101 or later for remote MCP with OAuth.', domain: 'wppilot'),
         ],
         // Factory's Droid CLI discovers the authorization server, registers via
@@ -135,28 +203,57 @@ function wppilot_clients_native_oauth(): array
         'factory-droid' => [
             'label' => 'Factory Droid',
             'match' => ['factory', 'droid', 'factory-droid'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __('Add the server with /mcp inside Droid, or put it in ~/.factory/mcp.json.', domain: 'wppilot'),
+        ],
+        // Kimi Code CLI takes a whole server in one command, like Claude Code,
+        // and stores it in a standard mcpServers file.
+        'kimi-cli' => [
+            'label' => __('Kimi Code CLI', domain: 'wppilot'),
+            'match' => ['kimi', 'kimi-cli', 'kimi code'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __('Servers live in ~/.kimi/mcp.json, or add one with kimi mcp add.', domain: 'wppilot'),
+        ],
+        // Qwen Code and Gemini CLI share a lineage and a quirk: a remote server's
+        // URL goes in `httpUrl`, not `url`. A snippet copied from any other
+        // client's documentation therefore fails silently on both.
+        'qwen-code' => [
+            'label' => __('Qwen Code', domain: 'wppilot'),
+            'match' => ['qwen-code', 'qwen code', 'qwencode'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __('Add to settings.json. Remote servers use "httpUrl", not "url".', domain: 'wppilot'),
+        ],
+        'gemini-cli' => [
+            'label' => __('Gemini CLI', domain: 'wppilot'),
+            'match' => ['gemini-cli', 'gemini cli'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __('Add to settings.json. Remote servers use "httpUrl", not "url".', domain: 'wppilot'),
+        ],
+        'zcode' => [
+            'label' => __('ZCode (GLM)', domain: 'wppilot'),
+            'match' => ['zcode', 'z.ai', 'zai', 'glm'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __(
-                'Add the server with /mcp inside Droid, or put it in ~/.factory/mcp.json.',
+                'Added through ZCode\'s own MCP server manager, which accepts stdio, HTTP and SSE.',
                 domain: 'wppilot',
             ),
         ],
         'github-copilot' => [
             'label' => 'GitHub Copilot',
             'match' => ['github copilot', 'copilot'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __('Uses the VS Code MCP configuration.', domain: 'wppilot'),
         ],
         'antigravity-cli' => [
             'label' => 'Antigravity CLI',
             'match' => ['antigravity-cli', 'antigravity cli'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __('Add the server with /mcp, then complete the browser sign-in.', domain: 'wppilot'),
         ],
         'antigravity-ide' => [
             'label' => 'Antigravity IDE',
             'match' => ['antigravity-ide', 'antigravity ide', 'antigravity'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __(
                 'Open MCP Servers in the IDE, add the server, then complete the browser sign-in.',
                 domain: 'wppilot',
@@ -193,50 +290,64 @@ function wppilot_clients_proxied_oauth(): array
         'windsurf' => [
             'label' => 'Devin Desktop (Windsurf)',
             'match' => ['devin-desktop', 'devin desktop', 'devin', 'windsurf', 'codeium'],
-            'methods' => ['oauth', 'password'],
-            'note' => '',
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'MCP configuration still lives at the Windsurf path, and remote servers use "serverUrl" rather than "url".',
+                domain: 'wppilot',
+            ),
         ],
         'zed' => [
             'label' => 'Zed',
             'match' => ['zed'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => __('Configured as a context server.', domain: 'wppilot'),
         ],
-        'cline' => ['label' => 'Cline', 'match' => ['cline'], 'methods' => ['oauth', 'password'], 'note' => ''],
+        'cline' => [
+            'label' => 'Cline',
+            'match' => ['cline'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => '',
+        ],
         // Self-hosted Node agent with native MCP client support since early
         // 2026. It runs on the operator's own machine or server, so the
         // mcp-remote proxy this group uses is available to it.
         'openclaw' => [
             'label' => 'OpenClaw',
             'match' => ['openclaw', 'open-claw'],
-            'methods' => ['oauth', 'password'],
-            'note' => __(
-                'Add the server to your OpenClaw MCP configuration and restart the agent.',
-                domain: 'wppilot',
-            ),
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __('Add the server to your OpenClaw MCP configuration and restart the agent.', domain: 'wppilot'),
         ],
+        // The extension was discontinued on 15 May 2026 and its repository
+        // archived, with Cline named as the migration target. It stays in the
+        // registry because installs already in the field keep working and keep
+        // identifying themselves — dropping the entry would turn a live
+        // connection into an unlabelled row — but the note says so, since anyone
+        // reading this screen to set up a new client should not start here.
         'roo-code' => [
             'label' => 'Roo Code',
             'match' => ['roo-code', 'roo code', 'roocode'],
-            'methods' => ['oauth', 'password'],
-            'note' => '',
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'Discontinued in May 2026. Existing installs still connect; for a new setup use Cline.',
+                domain: 'wppilot',
+            ),
         ],
         'kilo-code' => [
             'label' => 'Kilo Code',
             'match' => ['kilo-code', 'kilo code', 'kilocode'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => '',
         ],
         'amazon-q' => [
             'label' => 'Amazon Q',
             'match' => ['amazon-q', 'amazon q', 'amazonq'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => '',
         ],
         'opencode' => [
             'label' => 'OpenCode',
             'match' => ['opencode'],
-            'methods' => ['oauth', 'password'],
+            'methods' => ['oauth', 'token', 'password'],
             'note' => '',
         ],
     ];
@@ -303,6 +414,8 @@ function wppilot_clients(): array
 {
     $clients = array_merge(
         wppilot_clients_with_oauth_route(wppilot_clients_native_oauth(), oauth: 'native'),
+        wppilot_clients_with_oauth_route(wppilot_clients_web_ui(), oauth: 'native'),
+        wppilot_clients_with_oauth_route(wppilot_clients_native_oauth_editors(), oauth: 'native'),
         wppilot_clients_with_oauth_route(wppilot_clients_proxied_oauth(), oauth: 'proxy'),
         wppilot_client_proxy_shapes(),
     );

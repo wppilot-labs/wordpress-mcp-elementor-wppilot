@@ -36,17 +36,18 @@ function http_options(): array
  *
  * $method scopes the report to the connection method being troubleshot: 'oauth' drops the
  * Application Passwords check, 'password' drops the OAuth-only checks (and, with them, their
- * outbound probes). Null runs everything. Abilities, transport, permalinks, and anonymous REST
- * apply to both methods.
+ * outbound probes), and 'token' drops both — an access token needs neither an application password
+ * nor OAuth discovery, so either result would be noise in its report. Null runs everything.
+ * Abilities, transport, permalinks, and anonymous REST apply to every method.
  *
  * @return list<array{id: string, status: string, label: string, message: string, remedy: string, action: string, copy: string}>
  */
 function run_all(?string $method = null): array
 {
-    // 'password' here is the connection-method slug, not a credential — nothing sensitive is compared.
+    // These are connection-method slugs, not credentials — nothing sensitive is compared.
+    $include_oauth = $method === null || $method === 'oauth';
     // @mago-expect lint:no-insecure-comparison
-    $include_oauth = $method !== 'password';
-    $include_password = $method !== 'oauth';
+    $include_password = $method === null || $method === 'password';
 
     $results = [];
 

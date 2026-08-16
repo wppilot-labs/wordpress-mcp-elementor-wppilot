@@ -470,3 +470,24 @@ if (!function_exists('esc_url_raw')) {
         return in_array(strtolower($scheme), wp_allowed_protocols(), true) ? $url : '';
     }
 }
+
+if (!function_exists('add_action')) {
+    /**
+     * Hook registration is a no-op here.
+     *
+     * The suite loads modules that register hooks at file scope. It asserts on
+     * what the registered callbacks compute, never on the registration itself, so
+     * recording the callback would be state no test reads.
+     */
+    function add_action(string $hook, mixed $callback, int $priority = 10, int $accepted_args = 1): bool
+    {
+        return true;
+    }
+}
+
+if (!function_exists('add_filter')) {
+    function add_filter(string $hook, mixed $callback, int $priority = 10, int $accepted_args = 1): bool
+    {
+        return true;
+    }
+}

@@ -170,8 +170,14 @@ function wppilot_oauth_code_entry(string $code, string $hint, array $paths, stri
  */
 function wppilot_oauth_add_to(string $file): string
 {
-    /* translators: %s: config file name wrapped in <code> tags */
-    return sprintf(__('Add to %s.', domain: 'wppilot'), '<code>' . $file . '</code>');
+    return sprintf(
+        /* translators: %s: config file name wrapped in <code> tags */
+        __(
+            'Add to %s, then restart the client. It will report the server as needing sign-in — approve it, and a browser window opens. Nothing here contains a secret, so this snippet is safe to commit.',
+            domain: 'wppilot',
+        ),
+        '<code>' . $file . '</code>',
+    );
 }
 
 /**
@@ -224,16 +230,23 @@ function wppilot_oauth_chatgpt_steps(string $mcp_name, string $mcp_url): array
 {
     return [
         [
-            'title' => __('Enable developer mode', domain: 'wppilot'),
+            'title' => __('Turn on developer mode', domain: 'wppilot'),
             'body' => __(
-                'In ChatGPT, open Settings, go to Security and login, and turn on Developer mode. This is the only way to add plugins that OpenAI has not reviewed, and yours will always be one of those: it connects directly to your own site, so it can never be published as a reviewed plugin. The warning ChatGPT shows is expected.',
+                'In ChatGPT on the web, open Settings, choose Apps in the sidebar, open Advanced settings, and turn on Developer mode. It is the only way to add an MCP server OpenAI has not reviewed, and yours will always be one of those — it connects to your own site, so it can never be a listed app. The warning ChatGPT shows is expected. Available on Plus, Pro, Business, Enterprise and Edu, on the web app; the mobile apps cannot add one.',
                 domain: 'wppilot',
             ),
         ],
         [
-            'title' => __('Create a plugin', domain: 'wppilot'),
+            'title' => __('Business, Enterprise or Edu: have an admin allow it first', domain: 'wppilot'),
             'body' => __(
-                'In Settings, open Plugins and press the button in the top right to create a new plugin. Give it this name, or one you’ll recognize with "WPPilot" in it:',
+                'On a workspace plan the toggle above stays off until an admin enables it in Workspace settings, under Permissions & roles, as "Developer mode / Create custom MCP connectors". A personal Plus or Pro account needs nothing here.',
+                domain: 'wppilot',
+            ),
+        ],
+        [
+            'title' => __('Create the app', domain: 'wppilot'),
+            'body' => __(
+                'Back on the Apps screen, press Create app. Give it this name, or one you will recognize with "WPPilot" in it:',
                 domain: 'wppilot',
             ),
             'copy' => $mcp_name,
@@ -241,7 +254,113 @@ function wppilot_oauth_chatgpt_steps(string $mcp_name, string $mcp_url): array
         [
             'title' => __('Enter the server URL', domain: 'wppilot'),
             'body' => __(
-                'Paste the URL below as the Server URL, keep Authentication set to OAuth, tick "I understand and want to continue", and press Create. Then sign in when the browser opens.',
+                'Paste the URL below as the MCP server URL — include the whole path, ChatGPT does not add one. Set Authentication to OAuth, confirm the trust prompt, and create it. Then sign in when the browser opens.',
+                domain: 'wppilot',
+            ),
+            'copy' => $mcp_url,
+        ],
+        [
+            'title' => __('Use it in a chat', domain: 'wppilot'),
+            'body' => __(
+                'A new connector is not on by default. Start a chat, open the + menu, and enable this one for the conversation. ChatGPT connects from OpenAI\'s servers, so the site has to be reachable over public HTTPS — a localhost URL cannot work.',
+                domain: 'wppilot',
+            ),
+        ],
+    ];
+}
+
+/**
+ * Manus: Settings, then Connectors, then the Custom MCP tab.
+ *
+ * @return list<array<string, string>>
+ */
+function wppilot_oauth_manus_steps(string $mcp_name, string $mcp_url): array
+{
+    return [
+        [
+            'title' => __('Open Connectors', domain: 'wppilot'),
+            'body' => __(
+                'In Manus, open Settings from the sidebar and choose Connectors, then press "+ Add connectors".',
+                domain: 'wppilot',
+            ),
+        ],
+        [
+            'title' => __('Add a custom MCP server', domain: 'wppilot'),
+            'body' => __(
+                'Select the Custom MCP tab, press "+ Add custom MCP", and choose Direct configuration. Name it:',
+                domain: 'wppilot',
+            ),
+            'copy' => $mcp_name,
+        ],
+        [
+            'title' => __('Enter the server URL', domain: 'wppilot'),
+            'body' => __(
+                'Leave the transport type as HTTP, paste this as the Server URL, and save. Manus then checks it can reach the server and lists the tools it found. Leave the OAuth client id and secret under Advanced settings empty, and sign in when prompted.',
+                domain: 'wppilot',
+            ),
+            'copy' => $mcp_url,
+        ],
+    ];
+}
+
+/**
+ * Mistral Le Chat: Connectors, then the Custom MCP Connector tab.
+ *
+ * @return list<array<string, string>>
+ */
+function wppilot_oauth_mistral_steps(string $mcp_name, string $mcp_url): array
+{
+    return [
+        [
+            'title' => __('Open Connectors', domain: 'wppilot'),
+            'body' => __(
+                'In Le Chat, open the Connectors page and press "+ Add Connector", then switch to the Custom MCP Connector tab.',
+                domain: 'wppilot',
+            ),
+        ],
+        [
+            'title' => __('Name the connector', domain: 'wppilot'),
+            'body' => __(
+                'Le Chat treats the name as an identifier, so it takes no spaces or punctuation. Use this:',
+                domain: 'wppilot',
+            ),
+            'copy' => $mcp_name,
+        ],
+        [
+            'title' => __('Enter the server URL and connect', domain: 'wppilot'),
+            'body' => __(
+                'Paste this as the server URL and press Connect. Le Chat detects how the server authenticates and runs the sign-in itself. Afterwards the connector appears in the tools dropdown — enable it in the chat you want to use it in.',
+                domain: 'wppilot',
+            ),
+            'copy' => $mcp_url,
+        ],
+    ];
+}
+
+/**
+ * Perplexity: Settings, then Connectors.
+ *
+ * @return list<array<string, string>>
+ */
+function wppilot_oauth_perplexity_steps(string $mcp_name, string $mcp_url): array
+{
+    return [
+        [
+            'title' => __('Open Connectors', domain: 'wppilot'),
+            'body' => __(
+                'Click your profile picture at the bottom left, open Settings, and go to Connectors. Custom remote connectors need Pro, Max or Enterprise.',
+                domain: 'wppilot',
+            ),
+        ],
+        [
+            'title' => __('Add a custom connector', domain: 'wppilot'),
+            'body' => __('Choose to add a custom connector and name it:', domain: 'wppilot'),
+            'copy' => $mcp_name,
+        ],
+        [
+            'title' => __('Enter the server URL', domain: 'wppilot'),
+            'body' => __(
+                'Paste this as the remote MCP server URL and save, then complete the sign-in. Perplexity requires HTTPS and connects from its own servers, so a localhost URL cannot work. On a team plan you can keep the connector private or share it with the organization.',
                 domain: 'wppilot',
             ),
             'copy' => $mcp_url,
@@ -292,22 +411,48 @@ function wppilot_build_oauth_configs(string $mcp_url, string $mcp_name): array
     if (wppilot_host_unreachable_from_cloud()) {
         return (
             wppilot_build_oauth_bridge_configs($mcp_url, $mcp_name, $env)
-            + ['chatgpt' => wppilot_oauth_cloud_only_notice('ChatGPT')]
+            + [
+                'chatgpt' => wppilot_oauth_cloud_only_notice('ChatGPT'),
+                'manus' => wppilot_oauth_cloud_only_notice('Manus'),
+                'mistral-lechat' => wppilot_oauth_cloud_only_notice('Mistral Le Chat'),
+                'perplexity' => wppilot_oauth_cloud_only_notice('Perplexity'),
+            ]
         );
     }
     return (
         wppilot_build_oauth_public_configs($mcp_url, $mcp_name)
-        + [
-            'chatgpt' => [
-                'kind' => 'code',
-                'code' => '',
-                'hint' => '',
-                'paths' => [],
-                'isShell' => false,
-                'steps' => wppilot_oauth_chatgpt_steps($mcp_name, $mcp_url),
-            ],
-        ]
+        + wppilot_build_oauth_web_ui_configs($mcp_url, $mcp_name)
     );
+}
+
+/**
+ * The hosted web UIs, which add an MCP server through their own interface.
+ *
+ * None of them reads a configuration file, so each is a list of steps rather
+ * than a snippet — and each names a different menu for the same action, which is
+ * exactly the thing worth writing down. All of them connect from their own
+ * servers, so they only appear on a publicly reachable site; the local set
+ * replaces them with a notice explaining why.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function wppilot_build_oauth_web_ui_configs(string $mcp_url, string $mcp_name): array
+{
+    $steps_entry = static fn(array $steps): array => [
+        'kind' => 'code',
+        'code' => '',
+        'hint' => '',
+        'paths' => [],
+        'isShell' => false,
+        'steps' => $steps,
+    ];
+
+    return [
+        'chatgpt' => $steps_entry(wppilot_oauth_chatgpt_steps($mcp_name, $mcp_url)),
+        'manus' => $steps_entry(wppilot_oauth_manus_steps($mcp_name, $mcp_url)),
+        'mistral-lechat' => $steps_entry(wppilot_oauth_mistral_steps($mcp_name, $mcp_url)),
+        'perplexity' => $steps_entry(wppilot_oauth_perplexity_steps($mcp_name, $mcp_url)),
+    ];
 }
 
 /**
@@ -341,7 +486,20 @@ function wppilot_oauth_connector_steps(string $app_label, string $mcp_name, stri
         [
             'title' => __('Open Connectors', domain: 'wppilot'),
             /* translators: %s: the client name, e.g. Claude Desktop */
-            'body' => sprintf(__('In %s, open Settings and go to Connectors.', domain: 'wppilot'), $app_label),
+            'body' => sprintf(
+                __(
+                    'In %s, open Customize and go to Connectors. Custom connectors are available on Free, Pro and Max as well as Team and Enterprise.',
+                    domain: 'wppilot',
+                ),
+                $app_label,
+            ),
+        ],
+        [
+            'title' => __('Team or Enterprise: an Owner adds it first', domain: 'wppilot'),
+            'body' => __(
+                'On those plans the member-level screen cannot create a connector. An Owner adds it once under Organization settings, Connectors, Add, Custom — choosing Web if asked for a type — and everyone else then finds it under Customize, Connectors and presses Connect. On Free, Pro or Max, skip this step.',
+                domain: 'wppilot',
+            ),
         ],
         [
             'title' => __('Add a custom connector', domain: 'wppilot'),
@@ -358,6 +516,13 @@ function wppilot_oauth_connector_steps(string $app_label, string $mcp_name, stri
                 domain: 'wppilot',
             ),
             'copy' => $mcp_url,
+        ],
+        [
+            'title' => __('Turn it on in a chat', domain: 'wppilot'),
+            'body' => __(
+                'A connector is not enabled in conversations by default. Use the "+" button in the chat, open Connectors, and switch this one on. The same menu is where you turn it off again.',
+                domain: 'wppilot',
+            ),
         ],
     ];
 }
@@ -423,6 +588,9 @@ function wppilot_build_antigravity_oauth_entry(string $mcp_url, string $mcp_name
  */
 function wppilot_build_oauth_native_configs(string $mcp_url, string $mcp_name): array
 {
+    // The Gemini-lineage clients are appended from their own builder: they are
+    // the only entries here whose URL field disagrees with everyone else's, and
+    // keeping them separate is what stops that difference being "tidied" away.
     $tq = static fn(string $v): string => '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $v) . '"';
     $connector = wppilot_build_connector_install_link(
         $mcp_url,
@@ -619,6 +787,22 @@ function wppilot_build_oauth_bridge_standard(string $mcp_servers_json, string $s
             __('Global', domain: 'wppilot') => '~/.cursor/mcp.json',
             __('Project', domain: 'wppilot') => '.cursor/mcp.json',
         ]),
+        'kimi-cli' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('mcp.json'), [
+            __('Global', domain: 'wppilot') => '~/.kimi/mcp.json',
+        ]),
+        'qwen-code' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('settings.json'), [
+            __('Global', domain: 'wppilot') => '~/.qwen/settings.json',
+            __('Project', domain: 'wppilot') => '.qwen/settings.json',
+        ]),
+        'gemini-cli' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('settings.json'), [
+            __('Global', domain: 'wppilot') => '~/.gemini/settings.json',
+            __('Project', domain: 'wppilot') => '.gemini/settings.json',
+        ]),
+        'zcode' => wppilot_oauth_code_entry(
+            $mcp_servers_json,
+            __('Add through ZCode\'s MCP server manager, choosing the stdio transport.', domain: 'wppilot'),
+            [],
+        ),
         'vscode' => wppilot_oauth_code_entry($servers_json, wppilot_oauth_add_to('mcp.json'), [
             __('Workspace', domain: 'wppilot') => '.vscode/mcp.json',
             __('User', domain: 'wppilot') => __(

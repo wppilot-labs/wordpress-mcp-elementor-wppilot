@@ -42,6 +42,13 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
 
 require_once dirname(__DIR__) . '/includes/oauth/client-id-metadata.php';
 
+// The access-token module and the Bearer middleware. Both touch WordPress only
+// from inside their functions, so the parts under test here — credential shape,
+// digesting, and the route boundary a token identity is allowed to cross — run
+// without a database. Storage itself is integration territory.
+require_once dirname(__DIR__) . '/includes/tokens.php';
+require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
+
 // The change ledger registers nothing at file scope, so it loads here purely for
 // its before-image capture: that code calls WordPress functions taking arguments
 // by reference, and only a real call proves the call sites still satisfy them.
