@@ -40,6 +40,11 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
     require_once dirname(__DIR__) . '/includes/mcp/' . $module . '.php';
 }
 
+// The preview differ is pure — no WordPress state, no options, no registry — so
+// it loads on its own. That is the point of keeping it separate from the
+// projectors, which do read WordPress.
+require_once dirname(__DIR__) . '/includes/preview/diff.php';
+
 require_once dirname(__DIR__) . '/includes/oauth/client-id-metadata.php';
 
 // The access-token module and the Bearer middleware. Both touch WordPress only

@@ -1,0 +1,161 @@
+/*
+ * SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Preview screen. Depends on includes/assets/admin.css for the shell, and only
+ * styles what the diff table adds on top of it.
+ */
+
+.wppilot-preview-meta {
+	border-collapse: collapse;
+	margin-top: 0.5rem;
+}
+
+.wppilot-preview-meta th {
+	text-align: left;
+	padding: 0.35rem 1.25rem 0.35rem 0;
+	font-weight: 600;
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+.wppilot-preview-meta td {
+	padding: 0.35rem 0;
+}
+
+/* A long post_content value must scroll inside the table, never widen the page. */
+.wppilot-diff-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+.wppilot-diff {
+	table-layout: fixed;
+}
+
+.wppilot-diff th:first-child,
+.wppilot-diff td:first-child {
+	width: 22%;
+}
+
+.wppilot-diff-value {
+	margin: 0;
+	padding: 0.5rem;
+	max-height: 16rem;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-size: 12px;
+	line-height: 1.5;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.03);
+}
+
+.wppilot-diff-value--before {
+	border-left: 3px solid #d63638;
+}
+
+.wppilot-diff-value--after {
+	border-left: 3px solid #00a32a;
+}
+
+.wppilot-diff--removed .wppilot-diff-value--after {
+	border-left-color: #8c8f94;
+	opacity: 0.6;
+}
+
+.wppilot-diff--added .wppilot-diff-value--before {
+	border-left-color: #8c8f94;
+	opacity: 0.6;
+}
+
+.wppilot-badge {
+	display: inline-block;
+	margin-left: 0.4rem;
+	padding: 0.05rem 0.4rem;
+	border-radius: 3px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	background: #f0f0f1;
+	color: #50575e;
+}
+
+.wppilot-badge--removed,
+.wppilot-badge--destructive {
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.wppilot-badge--added {
+	background: #edfaef;
+	color: #135e2b;
+}
+
+.wppilot-badge--unknown {
+	background: #fcf9e8;
+	color: #7a5c00;
+}
+
+.wppilot-status {
+	display: inline-block;
+	margin-left: 0.5rem;
+	padding: 0.1rem 0.5rem;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 600;
+	background: #f0f0f1;
+	color: #50575e;
+	vertical-align: middle;
+}
+
+.wppilot-status--pending {
+	background: #fcf9e8;
+	color: #7a5c00;
+}
+
+.wppilot-status--applied {
+	background: #edfaef;
+	color: #135e2b;
+}
+
+.wppilot-status--conflicted,
+.wppilot-status--failed {
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.wppilot-panel--actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.wppilot-inline-form {
+	display: inline-block;
+	margin: 0;
+}
+
+.wppilot-panel--actions .wppilot-muted {
+	flex-basis: 100%;
+	margin: 0;
+}
+
+.wppilot-list {
+	margin: 0.5rem 0 0;
+	padding-left: 1.25rem;
+	list-style: disc;
+}
+
+.wppilot-list li {
+	margin-bottom: 0.35rem;
+}
+
+@media screen and (max-width: 782px) {
+	.wppilot-diff th:first-child,
+	.wppilot-diff td:first-child {
+		width: auto;
+	}
+}

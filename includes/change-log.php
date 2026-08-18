@@ -82,9 +82,32 @@ function wppilot_replace_change(string $id, array $replacement): bool
 /**
  * Capture a before-image for known reversible WordPress operations.
  */
+/**
+ * Meta-abilities that wrap another write and must not record one of their own.
+ *
+ * Each of these ends up executing some other ability, which records itself. A
+ * second entry for the wrapper carries no before-image, so it would be filed as
+ * non-reversible with the reason "No supported before-image" — and with the log
+ * capped at WPPILOT_CHANGE_LOG_MAX entries, that junk evicts real history at
+ * twice the rate it should.
+ *
+ * @var list<string>
+ */
+const WPPILOT_CHANGE_META_ABILITIES = ['wppilot/rollback-change', 'wppilot/apply-preview'];
+
+function wppilot_change_ability_is_meta(string $ability_name): bool
+{
+    foreach (WPPILOT_CHANGE_META_ABILITIES as $meta) {
+        if (str_starts_with($ability_name, $meta)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function wppilot_change_before(string $ability_name, mixed $input): void
 {
-    if (wppilot_change_is_suppressed() || str_starts_with($ability_name, 'wppilot/rollback-change')) {
+    if (wppilot_change_is_suppressed() || wppilot_change_ability_is_meta($ability_name)) {
         return;
     }
     $ability = function_exists('wp_get_ability') ? wp_get_ability($ability_name) : null;
@@ -1212,11 +1235,30 @@ function wppilot_rollback_created_comment(int $comment_id): array|WP_Error
     return ['comment_id' => $comment_id, 'verified' => get_comment($comment_id) === null];
 }
 
+/**
+ * Post columns that move on their own and must never count as a change.
+ *
+ * WordPress rewrites post_modified on every save, guid is derived, and filter is
+ * a runtime marker rather than stored state. The fingerprint below drops them so
+ * an unrelated touch does not read as drift, and includes/preview/diff.php drops
+ * the same list so a preview does not report them as edits.
+ *
+ * The two must stay one list. If the differ ignored a column the fingerprint
+ * hashed, a preview would show "no changes" and then fail its own drift check;
+ * if the fingerprint ignored a column the differ reported, every preview would
+ * carry a phantom entry.
+ *
+ * @var list<string>
+ */
+const WPPILOT_VOLATILE_POST_FIELDS = ['post_modified', 'post_modified_gmt', 'guid', 'filter'];
+
 /** @param array<string, mixed> $snapshot */
 function wppilot_post_snapshot_fingerprint(array $snapshot): string
 {
     $post = is_array($snapshot['post'] ?? null) ? $snapshot['post'] : [];
-    unset($post['post_modified'], $post['post_modified_gmt'], $post['guid'], $post['filter']);
+    foreach (WPPILOT_VOLATILE_POST_FIELDS as $volatile) {
+        unset($post[$volatile]);
+    }
     return wppilot_snapshot_fingerprint([
         'post' => $post,
         'meta' => $snapshot['meta'] ?? [],
