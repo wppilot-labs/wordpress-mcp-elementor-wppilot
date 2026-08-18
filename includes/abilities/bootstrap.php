@@ -9,6 +9,8 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
+require_once __DIR__ . '/schema.php';
+
 // Function definitions only — the module registers nothing until its loader runs.
 require_once __DIR__ . '/wordpress/bootstrap.php';
 
