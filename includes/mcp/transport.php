@@ -310,7 +310,12 @@ function get_prompt(array $params, mixed $id): array
 
         // execute() runs the permission check itself and returns a WP_Error
         // when the caller may not read this prompt.
-        $result = $ability->execute([]);
+        //
+        // null rather than [] when the prompt declares no input schema: core
+        // refuses any non-null input in that case, so passing an empty array
+        // would fail the read rather than perform it. Every prompt ability
+        // currently declares one, which is why this has not bitten yet.
+        $result = $ability->execute($ability->get_input_schema() === [] ? null : []);
         if ($result instanceof WP_Error) {
             return error_response(ERROR_INVALID_PARAMS, $result->get_error_message(), 200, $id);
         }

@@ -118,6 +118,7 @@ register_core_ability('wppilot/get-site-settings', [
         'Returns a curated, non-secret set of WordPress reading, discussion, locale, date, URL, and front-page settings.',
         domain: 'wppilot',
     ),
+    'input_schema' => WPPILOT_NO_INPUT_SCHEMA,
     'category' => 'wordpress',
     'execute_callback' => __NAMESPACE__ . '\\wordpress_get_site_settings',
     'permission_callback' => static fn(): bool => current_user_can('manage_options'),

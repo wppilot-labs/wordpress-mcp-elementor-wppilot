@@ -449,4 +449,37 @@ final class CoreSurfaceTest extends TestCase
 
         self::assertNull($before);
     }
+
+    // ------------------------------------------------- core include integrity
+
+    /**
+     * The media importer requires three WordPress core files before it can run,
+     * and one of them was `wp-admin/includes/wppilot-media.php` — a rebrand
+     * find-and-replace that renamed a core path. Every call to
+     * wppilot/import-media-url therefore died on a require_once before it
+     * reached the download, and the ability was unusable in every shipped build
+     * that carried it.
+     *
+     * A path that does not exist cannot be caught by a type checker or by
+     * `php -l`, so the shape of the mistake is asserted here instead.
+     */
+    public function testNoCoreIncludePathIsPrefixedWithThePluginName(): void
+    {
+        $root = dirname(__DIR__, 2) . '/includes';
+        $pattern = '#ABSPATH\s*\.\s*[\'"](?:wp-admin|wp-includes)/[^\'"]*wppilot-#';
+        $offenders = [];
+
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root));
+        foreach ($files as $file) {
+            if (!$file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+            $body = (string) file_get_contents($file->getPathname());
+            if (preg_match($pattern, $body) === 1) {
+                $offenders[] = str_replace($root, '', $file->getPathname());
+            }
+        }
+
+        self::assertSame([], $offenders, 'A WordPress core include path was prefixed with "wppilot-".');
+    }
 }

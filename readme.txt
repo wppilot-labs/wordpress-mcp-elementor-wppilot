@@ -156,6 +156,8 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Applying re-runs the safety profile check and the ability's own confirmation requirement, so it is not a route around either.
 * New Settings option, off by default: require a reviewed preview before agent writes, over MCP and REST. Abilities that cannot be previewed are exempt rather than blocked.
 * Previews are capped at fifty and expire after a day. Two administrators cannot apply the same one twice.
+* Fixed importing media from a URL, which could never run: the ability required a WordPress core file under a name that does not exist, so every call failed before the download started.
+* Fixed abilities that take no input rejecting a call that sends an empty object — which is what AI clients send rather than omitting the field. Six abilities were affected, including the site settings read and the diagnostics reports.
 
 = 1.4.1 =
 * Fixed the plugin version constant, which still read 1.3.0 in the 1.4.0 release while the plugin header read 1.4.0. That constant is what the update check advertises, what admin assets are cache-busted against, and what WPPilot Pro compares when it decides which features the free plugin owns, so the three disagreed on every 1.4.0 install.
