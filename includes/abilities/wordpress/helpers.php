@@ -99,6 +99,50 @@ const WPPILOT_BUILDER_STORAGE_META_KEYS = [
 ];
 
 /**
+ * The ability that owns each builder's content, keyed by the display name used
+ * in the tables above. Consulted through builder_remedy(), which drops the name
+ * when the ability is not registered on this site.
+ *
+ * @var array<string, string>
+ */
+const WPPILOT_BUILDER_CONTENT_ABILITIES = [
+    'Elementor' => 'wppilot/elementor-set-content',
+    'Bricks' => 'wppilot/bricks-set-content',
+    'Beaver Builder' => 'wppilot/beaver-builder-set-content',
+    'Breakdance' => 'wppilot/breakdance-set-content',
+    'Divi' => 'wppilot/divi-set-content',
+    'Divi 5' => 'wppilot/divi-set-content',
+    'Divi (legacy shortcodes)' => 'wppilot/divi-set-content',
+    'Etch' => 'wppilot/etch-set-content',
+    'WPBakery' => 'wppilot/wpbakery-set-content',
+];
+
+/**
+ * Builders that store their element tree in postmeta and render it INSTEAD of
+ * post_content, mapped to the meta key that marks ownership and the exact value
+ * that key must hold (null means "any non-empty, non-zero value").
+ *
+ * These are invisible to the markup markers above, and that is the whole problem
+ * the gate below solves. The markers can only recognise proprietary syntax in
+ * post_content; a page owned by one of these builders leaves post_content looking
+ * completely ordinary. So a post_content write is accepted, WordPress stores it,
+ * the front end keeps rendering the builder's tree, and the agent is told the edit
+ * landed while nothing visible changed. The builder then overwrites post_content
+ * from its own tree the next time someone saves in its editor.
+ *
+ * Breakdance is deliberately absent: it has its own gate, which asks the builder's
+ * API who owns a post rather than reading meta, and which also fires on create,
+ * before any ownership meta exists.
+ *
+ * @var array<string, array{0: string, 1: string|null}>
+ */
+const WPPILOT_POSTMETA_BUILDER_OWNERS = [
+    'Elementor' => ['_elementor_edit_mode', 'builder'],
+    'Bricks' => ['_bricks_editor_mode', null],
+    'Beaver Builder' => ['_fl_builder_enabled', null],
+];
+
+/**
  * Run both builder guards against a wrapper ability's input (after alias
  * normalization): the `content` field against the markup markers and the
  * `meta` map against the storage-key blocklist. Returns the rejection error,
@@ -234,6 +278,112 @@ function wordpress_breakdance_content_warnings(array $input, ?int $post_id = nul
 }
 
 /**
+ * Name the postmeta-storing builder that owns a post, or null when none does.
+ *
+ * @return array{builder: string, ability: string}|null
+ */
+function wordpress_postmeta_builder_owner(int $post_id): ?array
+{
+    foreach (WPPILOT_POSTMETA_BUILDER_OWNERS as $builder => [$meta_key, $expected]) {
+        /** @var mixed $value */
+        $value = get_post_meta($post_id, $meta_key, single: true);
+        if (!is_scalar($value)) {
+            continue;
+        }
+        $value = (string) $value;
+
+        // A null expectation means the flag is a truthy marker rather than a
+        // named mode: Beaver Builder stores '1', Bricks stores its editor mode.
+        // '0' is excluded because a disabled flag is often stored, not deleted.
+        $owns = $expected === null ? ($value !== '' && $value !== '0') : $value === $expected;
+
+        if ($owns) {
+            return ['builder' => $builder, 'ability' => WPPILOT_BUILDER_CONTENT_ABILITIES[$builder] ?? ''];
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Require explicit user confirmation before a generic wrapper writes non-empty
+ * post_content to a post owned by a postmeta-storing builder.
+ *
+ * Without this the write is a silent no-op with a success response: see the
+ * comment on WPPILOT_POSTMETA_BUILDER_OWNERS. The opt-in is deliberately its own
+ * flag so an agent cannot infer permission from an unrelated confirmation, and
+ * the refusal names the builder's own ability when that ability is installed.
+ *
+ * Update-only. On create there is no post to own yet, and the builder's tree is
+ * attached afterwards — Breakdance's site-wide gate covers that direction.
+ *
+ * @param array<string, mixed> $input Normalized wrapper input.
+ */
+function wordpress_postmeta_builder_content_gate(array $input, int $post_id): ?WP_Error
+{
+    if (!wordpress_has_nonempty_content($input)) {
+        return null;
+    }
+    if (($input['allow_raw_content_on_builder_post'] ?? false) === true) {
+        return null;
+    }
+
+    $owner = wordpress_postmeta_builder_owner($post_id);
+    if ($owner === null) {
+        return null;
+    }
+
+    return new WP_Error(
+        'builder_owned_post_content_needs_confirmation',
+        sprintf(
+            'Post %1$d is built with %2$s, which stores its layout in postmeta and renders that '
+            . 'instead of post_content. Writing post_content here would be saved by WordPress and '
+            . 'change nothing visitors see, and %2$s overwrites it from its own tree the next time '
+            . 'the page is saved in its editor. To change the page, %3$s. Only if the user wants the '
+            . 'underlying post_content itself changed — for feeds, search results, or a future '
+            . 'without %2$s — re-call with allow_raw_content_on_builder_post: true, and only after '
+            . 'they have EXPLICITLY confirmed; do not set that flag on your own.',
+            $post_id,
+            $owner['builder'],
+            builder_remedy($owner['ability'], $owner['builder']),
+        ),
+        ['status' => 422],
+    );
+}
+
+/**
+ * Keep an in-band audit trace after a confirmed raw-content write to a post a
+ * postmeta-storing builder owns.
+ *
+ * @param array<string, mixed> $input Normalized wrapper input.
+ * @return list<string>
+ */
+function wordpress_postmeta_builder_content_warnings(array $input, int $post_id): array
+{
+    if (
+        !wordpress_has_nonempty_content($input)
+        || ($input['allow_raw_content_on_builder_post'] ?? false) !== true
+    ) {
+        return [];
+    }
+
+    $owner = wordpress_postmeta_builder_owner($post_id);
+    if ($owner === null) {
+        return [];
+    }
+
+    return [
+        sprintf(
+            'AUDIT — Raw post_content was written to %1$s-owned post %2$d after explicit confirmation. '
+                . 'It does not change what the page renders, and %1$s will overwrite it from its own tree '
+                . 'on the next save in its editor.',
+            $owner['builder'],
+            $post_id,
+        ),
+    ];
+}
+
+/**
  * Reject post_content that carries a builder's proprietary markup. Returns
  * the rejection error, or null when the content is ordinary (plain HTML and
  * native Gutenberg blocks pass).
@@ -296,10 +446,11 @@ function wordpress_builder_meta_error(array $meta): ?WP_Error
             'builder_meta_rejected',
             sprintf(
                 '"%1$s" is %2$s builder storage. Never hand-write builder storage meta through '
-                . 'this ability: use the %2$s-specific abilities instead, so the data stays '
-                . 'consistent and the page stays editable in the builder.',
+                . 'this ability: %3$s, so the data stays consistent and the page stays editable '
+                . 'in the builder.',
                 $key,
                 $builder,
+                builder_remedy(WPPILOT_BUILDER_CONTENT_ABILITIES[$builder] ?? '', $builder),
             ),
             ['status' => 422],
         );

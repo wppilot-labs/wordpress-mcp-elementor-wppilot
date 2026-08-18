@@ -51,6 +51,15 @@ final class WPPilot_Test_State
     public static array $revisions = [];
 
     /**
+     * Post meta, keyed by post id then meta key. Values are stored as the list
+     * WordPress keeps internally, so the double can serve both the single and
+     * the multi-value reads from one store.
+     *
+     * @var array<int, array<string, list<string>>>
+     */
+    public static array $post_meta = [];
+
+    /**
      * What wp_restore_post_revision() answers. WordPress returns the post id on
      * success, false when the revision carried no restorable fields, and null on
      * error, so the doubles have to be able to produce all three.
@@ -71,7 +80,16 @@ final class WPPilot_Test_State
         self::$plugins = [];
         self::$posts = [];
         self::$revisions = [];
+        self::$post_meta = [];
         self::$restore_result = null;
+    }
+
+    /**
+     * Store one post meta value the way WordPress would.
+     */
+    public static function set_post_meta(int $post_id, string $key, string $value): void
+    {
+        self::$post_meta[$post_id][$key] = [$value];
     }
 
     /**
@@ -265,10 +283,24 @@ if (!function_exists('get_post')) {
 }
 
 if (!function_exists('get_post_meta')) {
-    /** @return array<string, list<string>> */
-    function get_post_meta(int $post_id): array
+    /**
+     * Mirrors WordPress: no key returns every value keyed by meta key; a key
+     * with $single returns the first value or '' when absent; a key without
+     * $single returns the whole list.
+     *
+     * @return array<string, list<string>>|list<string>|string
+     */
+    function get_post_meta(int $post_id, string $key = '', bool $single = false): array|string
     {
-        return [];
+        $meta = WPPilot_Test_State::$post_meta[$post_id] ?? [];
+
+        if ($key === '') {
+            return $meta;
+        }
+
+        $values = $meta[$key] ?? [];
+
+        return $single ? ($values[0] ?? '') : $values;
     }
 }
 
