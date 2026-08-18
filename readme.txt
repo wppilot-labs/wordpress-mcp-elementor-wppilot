@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,12 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.4.1 =
+* Fixed the plugin version constant, which still read 1.3.0 in the 1.4.0 release while the plugin header read 1.4.0. That constant is what the update check advertises, what admin assets are cache-busted against, and what WPPilot Pro compares when it decides which features the free plugin owns, so the three disagreed on every 1.4.0 install.
+* Writing post_content to a page built with Elementor, Bricks or Beaver Builder is now refused instead of silently doing nothing. Those builders keep their layout in postmeta and render that, so the write was stored, reported as successful, and changed nothing a visitor could see — and the builder overwrote it from its own tree at the next save. The refusal names the builder and the ability that does own the page. Passing allow_raw_content_on_builder_post: true still performs the write, for feeds and search, and returns an audit note saying the page itself did not change. Divi, Etch and WPBakery were already covered, because they store markup in post_content where it can be recognised; Breakdance keeps its own separate gate.
+* The refusal for hand-written builder storage meta no longer names an ability that is not installed. On a site without Pro it now says to edit in the builder instead, matching what the post_content refusal has always done.
+* Fixed the WordPress-core abilities being served by an older copy inside WPPilot Pro. Registration order follows plugin load order, which follows activation order rather than the alphabet, so on a site where Pro had been activated first its own copies of 23 core abilities registered ahead of the free plugin's and won. Every fix shipped to those abilities since 1.1.0 was inert on those sites. The free plugin owns them from 1.1.0 onward, and Pro 1.1.2 now stands aside; older Pro builds are unaffected because the free plugin's own duplicate guard still yields to them.
+
 = 1.4.0 =
 * Added access tokens, a third way to connect. A long-lived bearer token for callers that have no browser: the Claude Messages API MCP connector, the OpenAI Responses API, cron jobs, automation platforms and scripts. OAuth and application passwords are unchanged and existing connections keep working.
 * A token is shown once when you create it and stored only as a digest, so it cannot be read back afterwards. Give it an expiry of 30 days, 90 days, a year, or none, and revoke it on its own at any time. Deleting the WordPress user deletes their tokens.
@@ -204,6 +210,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.4.1 =
+Fixes four defects, two of which affect what an agent can silently get wrong. Writing page content to an Elementor, Bricks or Beaver Builder page used to succeed and change nothing visible; it is now refused, with the builder and the right ability named. On sites running WPPilot Pro, 23 core abilities were being served by Pro's older copies whenever Pro had been activated first, so free's fixes since 1.1.0 never applied there — update Pro to 1.1.2 alongside this release to complete that fix. The version constant, which reported 1.3.0 throughout 1.4.0, is corrected. No new abilities and no permission changes; existing connections keep working.
 
 = 1.4.0 =
 A large release, all of it about getting connected. Access tokens are a third way in, for callers that cannot sign in through a browser: the Claude Messages API MCP connector, the OpenAI Responses API, cron jobs, automation platforms and scripts. Web apps get their own route, with real walkthroughs for Claude on the web, ChatGPT, Perplexity, Mistral Le Chat and Manus. Seven clients are new — Kimi Code CLI, Qwen Code, Gemini CLI, ZCode (GLM) and the web apps above — and every existing client's instructions were rewritten against its current interface, several of which had moved. Each method now also offers its setup as a copy-paste prompt for an AI coding agent. The Connect screen is reordered so the setup comes before the status panels. OAuth and application passwords are unchanged, existing connections keep working, and there are no new abilities and no permission changes.
