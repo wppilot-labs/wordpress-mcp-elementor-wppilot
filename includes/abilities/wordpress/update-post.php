@@ -55,12 +55,17 @@ register_core_ability('wppilot/update-post', [
             ],
             'content' => [
                 'type' => 'string',
-                'description' => 'New post_content. A non-empty value on a Breakdance-owned post requires the explicit allow_raw_content_on_breakdance_post handshake. Proprietary builder markup is always rejected.',
+                'description' => 'New post_content. A non-empty value on a Breakdance-owned post requires the explicit allow_raw_content_on_breakdance_post handshake, and on a post owned by Elementor, Bricks or Beaver Builder the allow_raw_content_on_builder_post handshake. Proprietary builder markup is always rejected.',
             ],
             'allow_raw_content_on_breakdance_post' => [
                 'type' => 'boolean',
                 'default' => false,
                 'description' => 'Set true ONLY after the user has explicitly confirmed they want raw post_content on a Breakdance-owned post; never set it on your own initiative.',
+            ],
+            'allow_raw_content_on_builder_post' => [
+                'type' => 'boolean',
+                'default' => false,
+                'description' => 'Set true ONLY after the user has explicitly confirmed they want raw post_content on a post owned by Elementor, Bricks or Beaver Builder — where it changes nothing visitors see. Never set it on your own initiative; use that builder\'s own abilities to change the page.',
             ],
             'excerpt' => [
                 'type' => 'string',
@@ -240,6 +245,13 @@ function wordpress_update_post(array $input): array|WP_Error
     if ($breakdance_gate !== null) {
         return $breakdance_gate;
     }
+    // Elementor, Bricks and Beaver Builder leave post_content looking ordinary,
+    // so the marker guard above cannot see them. Without this the write is
+    // accepted, stored, and invisible on the page.
+    $builder_gate = wordpress_postmeta_builder_content_gate($input, $post_id);
+    if ($builder_gate !== null) {
+        return $builder_gate;
+    }
 
     $updated_fields = [];
 
@@ -254,7 +266,10 @@ function wordpress_update_post(array $input): array|WP_Error
     }
 
     wordpress_update_post_meta_fields($post_id, $input, $updated_fields);
-    $warnings = wordpress_breakdance_content_warnings($input, $post_id);
+    $warnings = [
+        ...wordpress_breakdance_content_warnings($input, $post_id),
+        ...wordpress_postmeta_builder_content_warnings($input, $post_id),
+    ];
 
     return [
         'post_id' => $post_id,

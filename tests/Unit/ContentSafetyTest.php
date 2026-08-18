@@ -14,8 +14,12 @@ use WPPilot_Test_State;
 
 use function WPPilot\Abilities\WordPress\builder_remedy;
 use function WPPilot\Abilities\WordPress\register_core_ability;
+use function WPPilot\Abilities\WordPress\wordpress_builder_meta_error;
 use function WPPilot\Abilities\WordPress\wordpress_create_capability_error;
 use function WPPilot\Abilities\WordPress\wordpress_post_type_is_agent_facing;
+use function WPPilot\Abilities\WordPress\wordpress_postmeta_builder_content_gate;
+use function WPPilot\Abilities\WordPress\wordpress_postmeta_builder_content_warnings;
+use function WPPilot\Abilities\WordPress\wordpress_postmeta_builder_owner;
 use function WPPilot\Abilities\WordPress\wordpress_resolve_create_status;
 
 /**
@@ -323,5 +327,124 @@ final class ContentSafetyTest extends TestCase
 
         self::assertStringNotContainsString('wppilot/divi-set-content', $remedy);
         self::assertStringContainsString('Divi 5', $remedy);
+    }
+
+    /**
+     * The meta rejection has to route through builder_remedy() too, or it sends a
+     * Free-only site after an ability that is not installed there.
+     */
+    public function testBuilderMetaRejectionDoesNotNameAnAbsentAbility(): void
+    {
+        $error = wordpress_builder_meta_error(['_elementor_data' => '[]']);
+
+        self::assertInstanceOf(WP_Error::class, $error);
+        self::assertSame('builder_meta_rejected', $error->get_error_code());
+        self::assertStringNotContainsString('wppilot/elementor-set-content', $error->get_error_message());
+        self::assertStringContainsString('Elementor', $error->get_error_message());
+    }
+
+    public function testBuilderMetaRejectionNamesTheAbilityWhenRegistered(): void
+    {
+        WPPilot_Test_State::$registered_abilities = ['wppilot/elementor-set-content'];
+
+        $error = wordpress_builder_meta_error(['_elementor_data' => '[]']);
+
+        self::assertInstanceOf(WP_Error::class, $error);
+        self::assertStringContainsString('wppilot/elementor-set-content', $error->get_error_message());
+    }
+
+    // ------------------------------------------- postmeta-builder content gate
+
+    /**
+     * @return list<array{0: string, 1: string, 2: string}>
+     */
+    public static function postmetaBuilderOwners(): array
+    {
+        return [
+            ['Elementor', '_elementor_edit_mode', 'builder'],
+            ['Bricks', '_bricks_editor_mode', 'bricks'],
+            ['Beaver Builder', '_fl_builder_enabled', '1'],
+        ];
+    }
+
+    #[DataProvider('postmetaBuilderOwners')]
+    public function testPostmetaBuilderOwnerIsDetected(string $builder, string $key, string $value): void
+    {
+        WPPilot_Test_State::set_post_meta(12, $key, $value);
+
+        self::assertSame($builder, wordpress_postmeta_builder_owner(12)['builder'] ?? null);
+    }
+
+    /**
+     * The whole point of the gate: this write used to be accepted, stored, and
+     * invisible on the page, with a success response handed back to the agent.
+     */
+    #[DataProvider('postmetaBuilderOwners')]
+    public function testContentWriteOnABuilderOwnedPostIsRefused(string $builder, string $key, string $value): void
+    {
+        WPPilot_Test_State::set_post_meta(12, $key, $value);
+
+        $error = wordpress_postmeta_builder_content_gate(['content' => '<h2>New</h2>'], 12);
+
+        self::assertInstanceOf(WP_Error::class, $error);
+        self::assertSame('builder_owned_post_content_needs_confirmation', $error->get_error_code());
+        self::assertStringContainsString($builder, $error->get_error_message());
+        self::assertStringContainsString('allow_raw_content_on_builder_post', $error->get_error_message());
+    }
+
+    public function testOrdinaryPostIsUnaffected(): void
+    {
+        self::assertNull(wordpress_postmeta_builder_owner(12));
+        self::assertNull(wordpress_postmeta_builder_content_gate(['content' => '<h2>New</h2>'], 12));
+    }
+
+    /**
+     * A disabled flag is commonly stored rather than deleted, so '0' must not
+     * read as ownership.
+     */
+    public function testDisabledBuilderFlagIsNotOwnership(): void
+    {
+        WPPilot_Test_State::set_post_meta(12, '_fl_builder_enabled', '0');
+
+        self::assertNull(wordpress_postmeta_builder_owner(12));
+    }
+
+    /**
+     * Elementor's flag is a named mode, not a truthy marker: a post left in
+     * 'editor' mode is not Elementor-owned.
+     */
+    public function testElementorEditorModeIsNotOwnership(): void
+    {
+        WPPilot_Test_State::set_post_meta(12, '_elementor_edit_mode', 'editor');
+
+        self::assertNull(wordpress_postmeta_builder_owner(12));
+    }
+
+    public function testEmptyContentIsNotGated(): void
+    {
+        WPPilot_Test_State::set_post_meta(12, '_elementor_edit_mode', 'builder');
+
+        self::assertNull(wordpress_postmeta_builder_content_gate(['content' => ''], 12));
+        self::assertNull(wordpress_postmeta_builder_content_gate(['title' => 'Renamed'], 12));
+    }
+
+    public function testExplicitHandshakeAllowsTheWriteAndLeavesAnAuditNote(): void
+    {
+        WPPilot_Test_State::set_post_meta(12, '_elementor_edit_mode', 'builder');
+        $input = ['content' => '<h2>New</h2>', 'allow_raw_content_on_builder_post' => true];
+
+        self::assertNull(wordpress_postmeta_builder_content_gate($input, 12));
+
+        $warnings = wordpress_postmeta_builder_content_warnings($input, 12);
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('AUDIT', $warnings[0]);
+        self::assertStringContainsString('Elementor', $warnings[0]);
+    }
+
+    public function testNoAuditNoteWithoutTheHandshake(): void
+    {
+        WPPilot_Test_State::set_post_meta(12, '_elementor_edit_mode', 'builder');
+
+        self::assertSame([], wordpress_postmeta_builder_content_warnings(['content' => '<h2>New</h2>'], 12));
     }
 }
