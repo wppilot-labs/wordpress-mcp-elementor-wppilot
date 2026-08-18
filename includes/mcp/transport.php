@@ -436,6 +436,18 @@ function call_tool(array $params, mixed $id): array
         unset($arguments['confirm']);
     }
 
+    // The require-preview rule, for the same reason the confirmation block above
+    // is reproduced here: this transport exposes no refusable filter, so every
+    // cross-cutting control has to be added to it by hand. That is now true of
+    // the safety profile, the confirmation gate, the rate limiter and this — a
+    // pattern worth remembering before adding a fifth.
+    if (function_exists('WPPilot\\Preview\\Gate\\check')) {
+        $preview_required = \WPPilot\Preview\Gate\check($ability, $arguments);
+        if ($preview_required instanceof WP_Error) {
+            return tool_error($preview_required, $id);
+        }
+    }
+
     if (function_exists('wppilot_rate_pre_ability_execute')) {
         $limited = \wppilot_rate_pre_ability_execute($arguments, $ability, 'mcp');
         if ($limited instanceof WP_Error) {

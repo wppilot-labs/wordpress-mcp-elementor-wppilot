@@ -108,6 +108,14 @@ function wppilot_register_ability_categories(): void
             domain: 'wppilot',
         ),
     ]);
+
+    wp_register_ability_category('preview', [
+        'label' => __('Preview', domain: 'wppilot'),
+        'description' => __(
+            'Compute what a write would change without performing it, then apply the reviewed result.',
+            domain: 'wppilot',
+        ),
+    ]);
 }
 
 /**
@@ -134,6 +142,7 @@ function wppilot_register_builtin_abilities(): void
     require_once $dir . 'agent-context.php';
     require_once $dir . 'change-log.php';
     require_once $dir . 'diagnostics.php';
+    require_once $dir . 'preview.php';
     wppilot_load_wordpress_abilities();
     wppilot_load_gutenberg_abilities();
 }
