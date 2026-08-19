@@ -83,6 +83,9 @@ function wppilot_uninstall_options(): array
         'wppilot_ability_rules',
         // includes/safety.php
         'wppilot_safety_profile',
+        // includes/preview/gate.php + includes/preview/store.php
+        'wppilot_require_preview_before_write',
+        'wppilot_preview_index',
         'wppilot_safety_policy_version',
         // includes/change-log.php
         'wppilot_change_log',
@@ -217,6 +220,9 @@ function wppilot_uninstall_current_site(): void
     // transients and their timeout twins.
     foreach ([
         'wppilot_oauth_pending_',
+        // includes/preview/store.php: one option per pending preview, plus the
+        // compare-and-set lock each apply claims.
+        'wppilot_preview_',
         '_transient_wppilot_',
         '_transient_timeout_wppilot_',
         '_site_transient_wppilot_',

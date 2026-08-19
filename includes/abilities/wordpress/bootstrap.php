@@ -14,12 +14,16 @@ declare(strict_types=1);
  * integrations (page builders, WooCommerce, forms, SEO suites), not for the
  * WordPress operations every site has.
  *
- * Loaded from includes/abilities/bootstrap.php on `wp_abilities_api_init`.
+ * Loaded from includes/abilities/bootstrap.php on `wp_abilities_api_init`, and
+ * directly by the unit-test bootstrap — which is why the shared schema below is
+ * required here rather than relied on from the sibling loader.
  */
 
 if (!defined('ABSPATH')) {
     exit();
 }
+
+require_once __DIR__ . '/../schema.php';
 
 /**
  * Register the category the WordPress-core abilities are grouped under.

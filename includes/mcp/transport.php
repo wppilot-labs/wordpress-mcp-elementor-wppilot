@@ -310,7 +310,12 @@ function get_prompt(array $params, mixed $id): array
 
         // execute() runs the permission check itself and returns a WP_Error
         // when the caller may not read this prompt.
-        $result = $ability->execute([]);
+        //
+        // null rather than [] when the prompt declares no input schema: core
+        // refuses any non-null input in that case, so passing an empty array
+        // would fail the read rather than perform it. Every prompt ability
+        // currently declares one, which is why this has not bitten yet.
+        $result = $ability->execute($ability->get_input_schema() === [] ? null : []);
         if ($result instanceof WP_Error) {
             return error_response(ERROR_INVALID_PARAMS, $result->get_error_message(), 200, $id);
         }
@@ -434,6 +439,18 @@ function call_tool(array $params, mixed $id): array
         && !\wppilot_ability_schema_has_property($ability, 'confirm')
     ) {
         unset($arguments['confirm']);
+    }
+
+    // The require-preview rule, for the same reason the confirmation block above
+    // is reproduced here: this transport exposes no refusable filter, so every
+    // cross-cutting control has to be added to it by hand. That is now true of
+    // the safety profile, the confirmation gate, the rate limiter and this — a
+    // pattern worth remembering before adding a fifth.
+    if (function_exists('WPPilot\\Preview\\Gate\\check')) {
+        $preview_required = \WPPilot\Preview\Gate\check($ability, $arguments);
+        if ($preview_required instanceof WP_Error) {
+            return tool_error($preview_required, $id);
+        }
     }
 
     if (function_exists('wppilot_rate_pre_ability_execute')) {
