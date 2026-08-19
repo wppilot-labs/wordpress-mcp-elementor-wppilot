@@ -523,3 +523,71 @@ if (!function_exists('add_filter')) {
         return true;
     }
 }
+
+if (!class_exists('WP_Ability')) {
+    /**
+     * Stand-in for the Abilities API's ability object.
+     *
+     * WPPilot's risk classification, confirmation gate, and MCP tool listing all
+     * read an ability rather than a plain array, so exercising them without a
+     * WordPress install needs a real object with those accessors. Only the ones
+     * that decision logic reads are modelled — execute() and the permission
+     * callback run WordPress and belong in an integration suite.
+     */
+    class WP_Ability
+    {
+        /**
+         * @param array<string, mixed> $meta
+         * @param array<string, mixed> $input_schema
+         * @param array<string, mixed> $output_schema
+         */
+        public function __construct(
+            private string $name,
+            private array $meta = [],
+            private array $input_schema = [],
+            private string $category = '',
+            private string $label = '',
+            private string $description = '',
+            private array $output_schema = [],
+        ) {
+        }
+
+        public function get_name(): string
+        {
+            return $this->name;
+        }
+
+        public function get_label(): string
+        {
+            return $this->label;
+        }
+
+        public function get_description(): string
+        {
+            return $this->description;
+        }
+
+        public function get_category(): string
+        {
+            return $this->category;
+        }
+
+        /** @return array<string, mixed> */
+        public function get_meta(): array
+        {
+            return $this->meta;
+        }
+
+        /** @return array<string, mixed> */
+        public function get_input_schema(): array
+        {
+            return $this->input_schema;
+        }
+
+        /** @return array<string, mixed> */
+        public function get_output_schema(): array
+        {
+            return $this->output_schema;
+        }
+    }
+}

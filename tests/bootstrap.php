@@ -34,6 +34,12 @@ require_once __DIR__ . '/doubles/wordpress.php';
 require_once dirname(__DIR__) . '/includes/abilities/wordpress/bootstrap.php';
 wppilot_load_wordpress_abilities();
 
+// The safety layer registers nothing at file scope and reaches WordPress only
+// from inside its functions, so it loads here for its risk classification: the
+// MCP transport asks it which tools must be confirmed before it will run them,
+// and that answer decides what the tool list advertises.
+require_once dirname(__DIR__) . '/includes/safety.php';
+
 // The MCP protocol layer is deliberately free of WordPress dependencies beyond
 // the ABSPATH guard, so it loads and is exercised here directly.
 foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $module) {
