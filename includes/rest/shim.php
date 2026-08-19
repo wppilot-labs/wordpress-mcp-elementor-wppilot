@@ -133,8 +133,34 @@ function wppilot_rest_run_ability(WP_REST_Request $request): mixed
     }
 
     // @mago-expect analysis:mixed-assignment
-    $result = $ability->execute($input);
+    $result = $ability->execute(wppilot_normalize_empty_ability_input($ability, $input));
     return $result instanceof WP_Error ? wppilot_rest_classify_ability_error($result) : $result;
+}
+
+/**
+ * Treat "no arguments" and "an empty object" as the same call.
+ *
+ * WP_Ability::execute() refuses any non-null input when the ability declares no
+ * input schema, so `{"input":{}}` — the natural way to say "no arguments", and
+ * what MCP clients send rather than omitting the field — came back as
+ * ability_missing_input_schema with HTTP 400, while omitting `input` entirely
+ * succeeded. The two mean the same thing to a caller.
+ *
+ * WPPilot's own abilities declare WPPILOT_NO_INPUT_SCHEMA instead of omitting
+ * the schema, which fixes them on every transport. This covers the ones WPPilot
+ * does not own — WordPress core's own abilities and the bundled MCP Adapter's —
+ * where the declaration cannot be changed from here.
+ *
+ * @param mixed $input
+ * @return mixed
+ */
+function wppilot_normalize_empty_ability_input(WP_Ability $ability, mixed $input): mixed
+{
+    if (!is_array($input) || $input !== []) {
+        return $input;
+    }
+
+    return $ability->get_input_schema() === [] ? null : $input;
 }
 
 /**

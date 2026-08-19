@@ -15,6 +15,7 @@ wp_register_ability('wppilot/agent-context', [
         'Return transport-neutral WPPilot site guidance, environment, and skill summaries.',
         domain: 'wppilot',
     ),
+    'input_schema' => WPPILOT_NO_INPUT_SCHEMA,
     'category' => 'code-execution',
     'output_schema' => [
         'type' => 'object',

@@ -197,8 +197,12 @@ function wordpress_import_media_url(array $input): array|WP_Error
             domain: 'wppilot',
         ));
     }
+    // These are WordPress core files, not WPPilot's. The middle one was
+    // 'wppilot-media.php' — a rebrand find-and-replace that renamed a core
+    // include path — so every call to this ability died on a require_once
+    // before it reached the download.
     require_once ABSPATH . 'wp-admin/includes/file.php';
-    require_once ABSPATH . 'wp-admin/includes/wppilot-media.php';
+    require_once ABSPATH . 'wp-admin/includes/media.php';
     require_once ABSPATH . 'wp-admin/includes/image.php';
 
     $temporary = download_url($url, timeout: 30);

@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,18 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.5.0 =
+* Added preview before write. An agent can ask what a change would do and get the answer without doing it: `wppilot/preview-ability` returns a before/after diff plus a URL, and `wppilot/apply-preview` performs the write once a person has agreed to it. Nothing is written until then.
+* The diff is computed rather than performed, so the site is never touched to produce one — not in a transaction, not on a copy.
+* A preview never invents a diff. An ability with no projector is refused by name with a reason, and a call that would be rejected is reported as such instead of being shown as a change that would never have landed.
+* New Preview screen under Agent, listing what is waiting for review, with the AI client and the WordPress user named on each entry.
+* Applying re-checks that the target has not moved, scoped to the fields in the diff. A change elsewhere is reported as a warning; a change to what you reviewed refuses and writes nothing.
+* Applying re-runs the safety profile check and the ability's own confirmation requirement, so it is not a route around either.
+* New Settings option, off by default: require a reviewed preview before agent writes, over MCP and REST. Abilities that cannot be previewed are exempt rather than blocked.
+* Previews are capped at fifty and expire after a day. Two administrators cannot apply the same one twice.
+* Fixed importing media from a URL, which could never run: the ability required a WordPress core file under a name that does not exist, so every call failed before the download started.
+* Fixed abilities that take no input rejecting a call that sends an empty object — which is what AI clients send rather than omitting the field. Six abilities were affected, including the site settings read and the diagnostics reports.
+
 = 1.4.1 =
 * Fixed the plugin version constant, which still read 1.3.0 in the 1.4.0 release while the plugin header read 1.4.0. That constant is what the update check advertises, what admin assets are cache-busted against, and what WPPilot Pro compares when it decides which features the free plugin owns, so the three disagreed on every 1.4.0 install.
 * Writing post_content to a page built with Elementor, Bricks or Beaver Builder is now refused instead of silently doing nothing. Those builders keep their layout in postmeta and render that, so the write was stored, reported as successful, and changed nothing a visitor could see — and the builder overwrote it from its own tree at the next save. The refusal names the builder and the ability that does own the page. Passing allow_raw_content_on_builder_post: true still performs the write, for feeds and search, and returns an audit note saying the page itself did not change. Divi, Etch and WPBakery were already covered, because they store markup in post_content where it can be recognised; Breakdance keeps its own separate gate.
@@ -210,6 +222,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.5.0 =
+Adds preview before write: an agent can show you exactly what a change would do, as a field-by-field diff, before anything is written — and you apply it from a screen in wp-admin. WPPilot could already undo a change; this is the first release where it can show you one first. Nothing about how existing calls behave changes unless you switch on the new Settings option, which is off by default. No permission changes, and existing connections keep working.
 
 = 1.4.1 =
 Fixes four defects, two of which affect what an agent can silently get wrong. Writing page content to an Elementor, Bricks or Beaver Builder page used to succeed and change nothing visible; it is now refused, with the builder and the right ability named. On sites running WPPilot Pro, 23 core abilities were being served by Pro's older copies whenever Pro had been activated first, so free's fixes since 1.1.0 never applied there — update Pro to 1.1.2 alongside this release to complete that fix. The version constant, which reported 1.3.0 throughout 1.4.0, is corrected. No new abilities and no permission changes; existing connections keep working.
