@@ -222,7 +222,7 @@ function list_tools(): array
             'name' => tool_name($ability->get_name()),
             'title' => (string) $ability->get_label(),
             'description' => (string) $ability->get_description(),
-            'inputSchema' => normalize_schema($ability->get_input_schema()),
+            'inputSchema' => normalize_schema(advertise_confirmation($ability, $ability->get_input_schema())),
             'outputSchema' => normalize_schema($ability->get_output_schema()),
         ];
     }
@@ -379,6 +379,114 @@ function normalize_schema(mixed $schema): array
         return ['type' => 'object'];
     }
 
+    return force_schema_objects($schema);
+}
+
+/**
+ * Declare the `confirm` field on the tools that refuse to run without it.
+ *
+ * call_tool() rejects a destructive or critical ability unless the arguments
+ * carry `confirm: true`, but `confirm` is a control field of this transport
+ * rather than ability input, so it appears in no ability's schema. Abilities
+ * also overwhelmingly declare `additionalProperties: false`, and a client that
+ * validates arguments against the advertised schema — Claude among them — drops
+ * an undeclared field rather than sending it. The confirmation then never
+ * arrives, and the tool answers the same refusal however many times the model
+ * retries, with no way to comply:
+ *
+ *     Ability "wppilot/elementor-build-page" is destructive or critical.
+ *     Obtain explicit user approval, then retry with confirm=true.
+ *
+ * Advertising the field is what makes that instruction followable. It is added
+ * to `required` as well, because a call omitting it cannot succeed.
+ *
+ * The injection is on the advertised copy only. Abilities declaring their own
+ * `confirm` keep theirs untouched, and call_tool() still strips the field
+ * before execute() for the rest, asking the ability's real schema rather than
+ * this one.
+ *
+ * @param array<string, mixed> $schema
+ * @return array<string, mixed>
+ */
+function advertise_confirmation(WP_Ability $ability, array $schema): array
+{
+    if (!function_exists('wppilot_ability_requires_confirmation')) {
+        return $schema;
+    }
+    if (!\wppilot_ability_requires_confirmation($ability)) {
+        return $schema;
+    }
+    if (is_array($schema['properties'] ?? null) && array_key_exists('confirm', $schema['properties'])) {
+        return $schema;
+    }
+
+    $schema['type'] = 'object';
+    $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
+    $properties['confirm'] = [
+        'type' => 'boolean',
+        'description' => 'Must be true. This operation is destructive or critical, and WPPilot refuses it '
+            . 'without an explicit confirmation that the user approved this specific call.',
+    ];
+    $schema['properties'] = $properties;
+
+    $required = is_array($schema['required'] ?? null) ? $schema['required'] : [];
+    if (!in_array('confirm', $required, strict: true)) {
+        $required[] = 'confirm';
+    }
+    $schema['required'] = $required;
+
+    return $schema;
+}
+
+/**
+ * Replace empty schema maps with objects before the schema is encoded.
+ *
+ * `json_encode()` renders an empty PHP array as `[]`, so an ability declaring
+ * `'properties' => []` — which every no-input ability does, through
+ * WPPILOT_NO_INPUT_SCHEMA — reaches the client as a JSON array where JSON
+ * Schema requires an object. Anthropic's API rejects the whole tools payload
+ * for it, naming only the index:
+ *
+ *     tools.41.custom.input_schema.properties: Input should be an object
+ *
+ * One such ability therefore breaks every tool call on the connection, not its
+ * own. The keyword maps are coerced recursively because a nested object
+ * property can declare an empty `properties` of its own.
+ *
+ * The same trap is already handled for capabilities in discover.php; this is
+ * the schema path it never reached.
+ *
+ * @param array<string, mixed> $schema
+ * @return array<string, mixed>
+ */
+function force_schema_objects(array $schema): array
+{
+    foreach (['properties', 'patternProperties', 'definitions', '$defs'] as $keyword) {
+        $map = $schema[$keyword] ?? null;
+        if ($map === []) {
+            $schema[$keyword] = new \stdClass();
+            continue;
+        }
+        if (!is_array($map)) {
+            continue;
+        }
+        foreach ($map as $name => $child) {
+            if (is_array($child)) {
+                $map[$name] = force_schema_objects($child);
+            }
+        }
+        $schema[$keyword] = $map;
+    }
+
+    // `items` and `additionalProperties` hold a schema rather than a map of
+    // them, so they are descended into but never replaced: an
+    // `additionalProperties` of `false` is a meaningful value, not an empty map.
+    foreach (['items', 'additionalProperties'] as $keyword) {
+        if (is_array($schema[$keyword] ?? null)) {
+            $schema[$keyword] = force_schema_objects($schema[$keyword]);
+        }
+    }
+
     return $schema;
 }
 
@@ -468,10 +576,9 @@ function call_tool(array $params, mixed $id): array
     // ledger's before/after hooks, and validates the output. Duplicating the
     // permission check here would run it twice and, worse, would drift from
     // core's contract the moment core changed it.
-    // An ability that declares no input schema rejects any input, including an
-    // empty array, so a no-argument call must pass null rather than []. Core
-    // then skips validation and applies its own defaults.
-    $result = $ability->execute($arguments === [] ? null : $arguments);
+    // What a no-argument call must pass depends on the ability, so it cannot be
+    // decided here without asking it. See empty_input_for().
+    $result = $ability->execute($arguments === [] ? empty_input_for($ability) : $arguments);
     if ($result instanceof WP_Error) {
         return tool_error($result, $id);
     }
@@ -481,6 +588,34 @@ function call_tool(array $params, mixed $id): array
         'structuredContent' => $result,
         'isError' => false,
     ], $id, 'tools/call');
+}
+
+/**
+ * The input a no-argument tool call must pass to a given ability.
+ *
+ * Two incompatible contracts meet here. An ability that declares no input
+ * schema at all rejects any input, including `[]`, so it has to be called with
+ * null. An ability that declares WPPILOT_NO_INPUT_SCHEMA — an object schema
+ * with no properties, which is what every no-input WPPilot ability declares —
+ * validates its input with rest_is_object(), and `rest_is_object(null)` is
+ * false, so null comes back as:
+ *
+ *     Ability "wppilot/system-status" has invalid input.
+ *     Reason: input is not of type object.
+ *
+ * Passing one answer for both therefore breaks half the no-argument tools
+ * whichever answer is chosen. The REST shim already resolved this by asking the
+ * ability; this reuses that decision so the two transports cannot drift, and
+ * falls back to the same rule when the shim is not loaded — it is required only
+ * on WordPress versions that support Abilities.
+ */
+function empty_input_for(WP_Ability $ability): mixed
+{
+    if (function_exists('wppilot_normalize_empty_ability_input')) {
+        return \wppilot_normalize_empty_ability_input($ability, []);
+    }
+
+    return $ability->get_input_schema() === [] ? null : [];
 }
 
 /**
@@ -521,9 +656,63 @@ function tool_error(WP_Error $error, mixed $id): array
 }
 
 /**
+ * Repair the legacy adapter's tool schemas on the way out.
+ *
+ * A request without modern `_meta` is answered by the bundled adapter, which
+ * passes each ability's schema through as authored — so the empty
+ * `'properties' => []` that `normalize_schema()` now fixes on the modern path
+ * still reaches a legacy client as a JSON array, and Anthropic still rejects
+ * the whole payload for it. The adapter is a pinned composer package, so the
+ * correction belongs in the response rather than in its source, where the next
+ * `composer update` would undo it.
+ *
+ * @return mixed The response, with tool schemas corrected where they applied.
+ */
+function repair_legacy_tool_schemas(mixed $response, WP_REST_Server $server, WP_REST_Request $request): mixed
+{
+    if (!$response instanceof WP_REST_Response || !is_mcp_route($request->get_route())) {
+        return $response;
+    }
+
+    $body = $response->get_data();
+    if (!is_array($body)) {
+        return $response;
+    }
+
+    $result = $body['result'] ?? null;
+    if (!is_array($result) || !is_array($result['tools'] ?? null)) {
+        return $response;
+    }
+
+    $changed = false;
+    foreach ($result['tools'] as $index => $tool) {
+        if (!is_array($tool)) {
+            continue;
+        }
+        foreach (['inputSchema', 'outputSchema'] as $keyword) {
+            if (is_array($tool[$keyword] ?? null)) {
+                $result['tools'][$index][$keyword] = force_schema_objects($tool[$keyword]);
+                $changed = true;
+            }
+        }
+    }
+
+    if (!$changed) {
+        return $response;
+    }
+
+    $body['result'] = $result;
+    $response->set_data($body);
+
+    return $response;
+}
+
+/**
  * Register the dispatcher.
  */
 function register_modern_transport(): void
 {
     add_filter('rest_pre_dispatch', __NAMESPACE__ . '\\pre_dispatch', DISPATCH_PRIORITY, 3);
+    // Priority 30 so the connection recorder at 20 still sees the response it expects.
+    add_filter('rest_post_dispatch', __NAMESPACE__ . '\\repair_legacy_tool_schemas', 30, 3);
 }
