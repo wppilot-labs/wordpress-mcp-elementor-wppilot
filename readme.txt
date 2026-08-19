@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,12 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.5.1 =
+* Fixed the tool list being rejected outright by AI clients that validate it. An ability declaring no input reached the client with `properties` encoded as a JSON array where a JSON object is required, and one such ability fails the whole tool payload — every tool on the connection, not just that one.
+* Fixed abilities that take no input refusing every call with "input is not of type object". 1.5.0 fixed the client sending an empty object; this fixes the server sending nothing at all, which those abilities reject just as firmly.
+* Fixed destructive tools demanding a confirmation they never advertised. WPPilot refuses them without `confirm`, but the field appeared in no schema and abilities forbid undeclared fields, so a validating client dropped it and the refusal repeated with no way to comply. It is now declared, and required, on the 44 tools that are gated.
+* No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
+
 = 1.5.0 =
 * Added preview before write. An agent can ask what a change would do and get the answer without doing it: `wppilot/preview-ability` returns a before/after diff plus a URL, and `wppilot/apply-preview` performs the write once a person has agreed to it. Nothing is written until then.
 * The diff is computed rather than performed, so the site is never touched to produce one — not in a transaction, not on a copy.
@@ -222,6 +228,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.5.1 =
+Fixes three defects that together made WPPilot unusable from any AI client that checks its calls against the schemas the server hands it — Claude among them. The tool list itself was rejected, abilities that take no input refused every call, and destructive tools asked for a confirmation the client had no way to send, so the same refusal repeated forever. A more forgiving client saw none of this. No new abilities and no permission changes; existing connections keep working.
 
 = 1.5.0 =
 Adds preview before write: an agent can show you exactly what a change would do, as a field-by-field diff, before anything is written — and you apply it from a screen in wp-admin. WPPilot could already undo a change; this is the first release where it can show you one first. Nothing about how existing calls behave changes unless you switch on the new Settings option, which is off by default. No permission changes, and existing connections keep working.
