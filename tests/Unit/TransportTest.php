@@ -9,8 +9,12 @@ namespace WPPilot\Tests\Unit;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use stdClass;
+use WP_Ability;
 
 use function WPPilot\Mcp\ability_for_tool;
+use function WPPilot\Mcp\advertise_confirmation;
+use function WPPilot\Mcp\empty_input_for;
 use function WPPilot\Mcp\is_mcp_route;
 use function WPPilot\Mcp\normalize_schema;
 use function WPPilot\Mcp\tool_name;
@@ -123,5 +127,168 @@ final class TransportTest extends TestCase
         ];
 
         self::assertSame($schema, normalize_schema($schema));
+    }
+
+    /**
+     * `json_encode()` renders an empty PHP array as `[]`, so the
+     * `'properties' => []` that every no-input ability declares reached clients
+     * as a JSON array. Anthropic rejects the entire tools payload for it —
+     * "tools.41.custom.input_schema.properties: Input should be an object" —
+     * which fails every call on the connection, not the one ability at fault.
+     */
+    public function testEmptyPropertiesEncodeAsAnObject(): void
+    {
+        $schema = normalize_schema([
+            'type' => 'object',
+            'properties' => [],
+            'additionalProperties' => false,
+        ]);
+
+        self::assertInstanceOf(stdClass::class, $schema['properties']);
+        self::assertStringContainsString('"properties":{}', (string) json_encode($schema));
+        self::assertStringNotContainsString('"properties":[]', (string) json_encode($schema));
+    }
+
+    /**
+     * An object property may declare an empty `properties` of its own, and it
+     * fails validation exactly the same way as one at the root.
+     */
+    public function testNestedEmptyPropertiesEncodeAsAnObject(): void
+    {
+        $schema = normalize_schema([
+            'type' => 'object',
+            'properties' => [
+                'options' => ['type' => 'object', 'properties' => []],
+                'items' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => []]],
+            ],
+        ]);
+
+        self::assertStringNotContainsString('"properties":[]', (string) json_encode($schema));
+        self::assertInstanceOf(stdClass::class, $schema['properties']['options']['properties']);
+        self::assertInstanceOf(stdClass::class, $schema['properties']['items']['items']['properties']);
+    }
+
+    /**
+     * `additionalProperties` holds a schema, not a map of them, so a `false`
+     * there is a meaningful constraint and must survive the coercion that fixes
+     * the sibling keyword.
+     */
+    public function testFalseAdditionalPropertiesIsNotCoerced(): void
+    {
+        $schema = normalize_schema([
+            'type' => 'object',
+            'properties' => [],
+            'additionalProperties' => false,
+            'required' => [],
+        ]);
+
+        self::assertFalse($schema['additionalProperties']);
+        self::assertSame([], $schema['required']);
+    }
+
+    /**
+     * A no-argument call has to send something, and which "nothing" is correct
+     * differs by ability. One declaring WPPILOT_NO_INPUT_SCHEMA validates its
+     * input with rest_is_object(), which rejects null, so passing null there
+     * refused every no-argument tool with "input is not of type object".
+     */
+    public function testNoInputSchemaAbilityIsCalledWithAnEmptyObject(): void
+    {
+        $ability = new WP_Ability(
+            'wppilot/system-status',
+            [],
+            [
+                'type' => 'object',
+                'properties' => [],
+                'additionalProperties' => false,
+            ],
+        );
+
+        self::assertSame([], empty_input_for($ability));
+    }
+
+    /**
+     * The mirror case: an ability declaring no schema at all rejects any input,
+     * including an empty array, so it is the one that must be passed null.
+     */
+    public function testAbilityWithoutAnInputSchemaIsCalledWithNull(): void
+    {
+        self::assertNull(empty_input_for(new WP_Ability('core/example')));
+    }
+
+    /**
+     * call_tool() refuses a destructive ability without `confirm: true`, but
+     * `confirm` belongs to the transport rather than to any ability's schema.
+     * Abilities also declare `additionalProperties: false`, so a client that
+     * validates arguments against the advertised schema drops the field and the
+     * refusal repeats forever. Advertising it is what makes it sendable.
+     */
+    public function testDestructiveToolAdvertisesConfirm(): void
+    {
+        $schema = advertise_confirmation($this->destructiveAbility(), [
+            'type' => 'object',
+            'properties' => ['post_id' => ['type' => 'integer']],
+            'required' => ['post_id'],
+            'additionalProperties' => false,
+        ]);
+
+        self::assertSame('boolean', $schema['properties']['confirm']['type']);
+        self::assertSame(['post_id', 'confirm'], $schema['required']);
+        self::assertFalse($schema['additionalProperties']);
+    }
+
+    /**
+     * An ability that is not gated gains nothing: advertising `confirm` there
+     * would invite a field call_tool() strips again before execute().
+     */
+    public function testReadOnlyToolDoesNotAdvertiseConfirm(): void
+    {
+        $ability = new WP_Ability('wppilot/list-content', [
+            'annotations' => ['readonly' => true],
+        ]);
+        $schema = ['type' => 'object', 'properties' => []];
+
+        self::assertSame($schema, advertise_confirmation($ability, $schema));
+    }
+
+    /**
+     * An ability declaring its own `confirm` keeps its own description and
+     * requirement: the transport reads that same property, so overwriting it
+     * would replace a deliberate contract with a generic one.
+     */
+    public function testAbilityDeclaringItsOwnConfirmIsLeftAlone(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => ['confirm' => ['type' => 'boolean', 'description' => 'Own wording.']],
+            'required' => [],
+        ];
+
+        self::assertSame($schema, advertise_confirmation($this->destructiveAbility(), $schema));
+    }
+
+    /**
+     * The advertised copy is the only thing that changes. call_tool() strips
+     * `confirm` by asking the ability's real schema, so injecting it here must
+     * not make the field look declared to that check.
+     */
+    public function testAdvertisedConfirmDoesNotReachTheAbilitySchema(): void
+    {
+        $ability = $this->destructiveAbility();
+        advertise_confirmation($ability, $ability->get_input_schema());
+
+        self::assertArrayNotHasKey('confirm', $ability->get_input_schema()['properties']);
+    }
+
+    private function destructiveAbility(): WP_Ability
+    {
+        return new WP_Ability(
+            'wppilot/delete-post',
+            [],
+            [
+                'type' => 'object',
+                'properties' => ['post_id' => ['type' => 'integer']],
+            ],
+        );
     }
 }
