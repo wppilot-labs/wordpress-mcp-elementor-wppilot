@@ -2,7 +2,7 @@
 
 **Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build, pages, block layouts, menus, taxonomies, media, SEO metadata, through typed abilities your permissions still govern.**
 
-[![Version](https://img.shields.io/badge/version-1.3.0-142017)](https://github.com/wppilot-labs/wppilot/releases)
+[![Version](https://img.shields.io/github/v/release/wppilot-labs/wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
@@ -166,7 +166,10 @@ A page builder does not store a page as HTML. It stores an element tree, referen
 
 Pro gives the agent that builder's own vocabulary: `bricks-patch-elements`, `elementor-create-atomic-widget`, `divi-apply-global-preset`, `etch-get-query-preview`, so it can read a schema before it proposes a change.
 
-### Page-builder guides
+### Page builder MCP servers
+
+One endpoint covers every builder below. The agent gets that builder's own
+vocabulary rather than being handed raw HTML to guess at.
 
 | Builder | Abilities | Guide |
 | --- | --- | --- |
@@ -179,6 +182,35 @@ Pro gives the agent that builder's own vocabulary: `bricks-patch-elements`, `ele
 | Breakdance | 33 | [MCP for Breakdance](https://wppilot.co/mcp-for-breakdance) |
 | Beaver Builder | 21 | [MCP for Beaver Builder](https://wppilot.co/mcp-for-beaver-builder) |
 | WPBakery | 18 | [MCP for WPBakery](https://wppilot.co/mcp-for-wpbakery) |
+
+#### Elementor MCP
+
+Reads and writes the Elementor element tree, global classes, design tokens and
+dynamic tags. Writing generated markup into `post_content` does not change an
+Elementor page — the layout lives in postmeta, and the free plugin refuses that
+write by name rather than reporting a success that changes nothing.
+
+#### Bricks MCP
+
+Patches the Bricks element tree in place with `bricks-patch-elements`, so a
+change to one section does not rewrite the page around it.
+
+#### Divi MCP
+
+Works with Divi modules and global presets through `divi-apply-global-preset`,
+rather than flattening a layout into shortcodes.
+
+#### Beaver Builder MCP, Oxygen MCP and WPBakery MCP
+
+Each stores its layout somewhere different — Beaver Builder and Oxygen in
+postmeta, WPBakery in shortcodes inside `post_content`. Pro reads the right
+store for the builder actually installed, and the free plugin refuses a raw
+content write to a page it cannot safely change.
+
+#### WooCommerce MCP
+
+Products, variations, orders and stock as typed abilities, capability-checked
+against the connected WordPress user like everything else.
 
 ### Beyond integrations
 
