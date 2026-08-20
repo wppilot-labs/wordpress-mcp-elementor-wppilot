@@ -255,11 +255,14 @@ rollback, the same as every other write.
 
 ## FAQ
 
-**Is this a WordPress MCP server or an MCP client?**
+**What is a WordPress MCP server, and is this one a server or a client?**
 A server. Your site exposes typed WordPress abilities over MCP at `https://example.com/wp-json/mcp/wppilot`, and the AI client you already use connects to it. No model is bundled and no key is stored here; the client brings its own model access.
 
-**Does it work with Elementor, Bricks, Divi, Beaver Builder, Oxygen, Breakdance, WPBakery, Etch or Mosaic?**
+**Is there an Elementor MCP server? What about Bricks, Divi, Beaver Builder, Oxygen, Breakdance, WPBakery, Etch and Mosaic?**
 Yes, through [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware abilities on the same endpoint. A page builder stores an element tree, shared classes, design tokens and dynamic bindings rather than HTML, so Pro gives the agent that builder's own vocabulary instead of writing markup into a store that will not open in its editor.
+
+**Is there a WooCommerce MCP server?**
+Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user — an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
 No. The free plugin in this repository is a complete WordPress MCP server with 103 abilities, and it needs no licence, activation key or entitlement service. Pro is additive.
@@ -267,13 +270,13 @@ No. The free plugin in this repository is a complete WordPress MCP server with 1
 **How does it relate to the WordPress Abilities API and the official MCP Adapter?**
 It is built on both. The Abilities API is where abilities are registered, and the MCP Adapter is bundled to serve the legacy protocol revision. WPPilot adds the parts an adapter does not: authentication, safety profiles, confirmation gates, rate limiting, a change ledger with rollback, and the abilities themselves.
 
-**Which AI clients can connect?**
+**How do I connect WordPress to Claude, Cursor or Codex?**
 Claude Code, Claude Desktop, Claude on the web, Codex CLI and desktop, Cursor, VS Code, GitHub Copilot, Devin Desktop, Factory Droid, Antigravity CLI and IDE, Zed, Cline, Roo Code, Kilo Code, Amazon Q, OpenCode, OpenClaw and Manus. Setup guides: <https://wppilot.co/wordpress-mcp>.
 
 **Is it safe to point an agent at a production site?**
 That is what the safety model is for. Read Only blocks every write, Production Safe blocks raw PHP, WP-CLI, filesystem, database and extension installation, destructive calls require an explicit confirmation flag, WordPress capabilities still apply on top, and supported changes are recorded in a ledger you can roll back. Start on Read Only and verify one call before enabling any write.
 
-**Can an agent write native Gutenberg blocks?**
+**Is there a Gutenberg MCP server — can an agent write native blocks?**
 Partly, and the plugin says so rather than failing silently. Core blocks are validated and serialised by the block editor's own JavaScript, so writes are staged as a pending batch and finalised through a browser session.
 
 **Is it on WordPress.org?**
