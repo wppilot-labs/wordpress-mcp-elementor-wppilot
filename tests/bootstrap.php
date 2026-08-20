@@ -34,6 +34,14 @@ require_once __DIR__ . '/doubles/wordpress.php';
 require_once dirname(__DIR__) . '/includes/abilities/wordpress/bootstrap.php';
 wppilot_load_wordpress_abilities();
 
+// Anonymous usage reporting, plus the lifecycle file that schedules it. Loaded
+// for TelemetryConsentTest: consent has to be right on a path nobody clicks
+// twice, and the option semantics it depends on are a WordPress quirk rather
+// than anything visible in this plugin's own code.
+require_once dirname(__DIR__) . '/includes/telemetry/settings.php';
+require_once dirname(__DIR__) . '/includes/telemetry/send.php';
+require_once dirname(__DIR__) . '/includes/lifecycle.php';
+
 // The safety layer registers nothing at file scope and reaches WordPress only
 // from inside its functions, so it loads here for its risk classification: the
 // MCP transport asks it which tools must be confirmed before it will run them,

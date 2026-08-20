@@ -139,7 +139,11 @@ function wppilot_fetch_update_info()
  */
 function wppilot_request_update_info()
 {
-    // Version-only lookup: never transmit the site URL, host, users, license data, or credentials.
+    // Version-only lookup: this request transmits no site URL, host, user,
+    // licence data or credential. Scope note: that is a statement about the
+    // update check, not about the plugin as a whole. Anonymous usage
+    // reporting in includes/telemetry/ does send the site URL, on its own
+    // schedule, with its own switch — see readme.txt, External services.
     // add_query_arg() is variadic; named arguments become associative keys in
     // its internal argument array and break WordPress core's numeric indexing.
     // @mago-expect lint:literal-named-argument -- Variadic WordPress helpers require positional arguments.

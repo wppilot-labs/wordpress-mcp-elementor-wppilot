@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
- * Version: 1.5.1
+ * Version: 1.6.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -268,6 +268,13 @@ require_once __DIR__ . '/includes/abilities/bootstrap.php';
 // file for the .org build, and this guard is what makes that safe.
 if (file_exists(__DIR__ . '/includes/updater.php')) {
     require_once __DIR__ . '/includes/updater.php';
+}
+// Anonymous usage reporting. Guarded for the same reason as the updater above:
+// scripts/package.sh deletes includes/telemetry/ from the .org build, so the
+// directory's opt-in rule is satisfied by that build being incapable of
+// reporting rather than by a flag someone could get wrong at runtime.
+if (file_exists(__DIR__ . '/includes/telemetry/bootstrap.php')) {
+    require_once __DIR__ . '/includes/telemetry/bootstrap.php';
 }
 require_once __DIR__ . '/includes/admin/abilities-hub.php';
 require_once __DIR__ . '/includes/admin/connect/connect.php';
