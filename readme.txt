@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.5.1
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,7 +74,9 @@ WPPilot Chat is different: when you use Chat, WordPress sends the conversation h
 
 When you use OAuth, the client you are connecting registers itself with your site. That traffic is between your site and your own AI client, and no WPPilot server is involved.
 
-Builds downloaded from wppilot.co check that site for plugin updates. The copy distributed through the WordPress.org directory does not: it is updated by WordPress.org like any other plugin.
+Builds downloaded from wppilot.co check that site for plugin updates. The update check sends the plugin version and nothing else. The copy distributed through the WordPress.org directory does not check at all: it is updated by WordPress.org like any other plugin.
+
+Builds downloaded from wppilot.co also send anonymous usage data to wppilot.co once a day, and show a notice saying so the first time you open wp-admin. This is switched on by default and can be turned off under **WPPilot > Settings > Anonymous usage reporting**, which also asks us to delete what was already collected. It sends this site's URL, the WPPilot, WordPress and PHP versions, your locale, whether Pro is active, your safety profile, and how many connections exist. It never sends usernames, email addresses, page or post content, or any record of what an agent did. Reports are kept in detail for 90 days and then reduced to daily totals; an install that stops reporting for 400 days is deleted. The copy distributed through the WordPress.org directory contains none of this code and cannot report anything.
 
 == Installation ==
 
@@ -146,6 +148,14 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.6.0 =
+* Added anonymous usage reporting, so we can see which WordPress and PHP versions are actually in use and stop guessing what is safe to drop. It sends this site's URL, a random installation identifier, the WPPilot, WordPress and PHP versions, the locale, whether Pro is active, the safety profile, and the number of recorded connections — once a day.
+* It never sends usernames, email addresses, page or post content, or any record of what an agent did.
+* It is on by default and says so: the first time an administrator opens wp-admin, a notice explains what is sent, with buttons to keep it on or turn it off. The first report is delayed by one to seven hours, so an administrator who reads that notice and switches reporting off is never counted at all.
+* Turning it off sends one final message asking us to delete what was already collected. Reports are kept in detail for 90 days and then reduced to daily totals; an installation that stops reporting for 400 days is deleted.
+* The copy distributed through the WordPress.org directory does not contain this code at all. The packaging script removes it and refuses to build if any trace remains, so that build cannot report even if a setting says otherwise.
+* No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
 
 = 1.5.1 =
 * Fixed the tool list being rejected outright by AI clients that validate it. An ability declaring no input reached the client with `properties` encoded as a JSON array where a JSON object is required, and one such ability fails the whole tool payload — every tool on the connection, not just that one.
@@ -228,6 +238,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.6.0 =
+Adds anonymous usage reporting so we can see which WordPress and PHP versions are actually in use. It is on by default and sends this site's URL once a day, along with version, locale, safety profile and connection counts — never usernames, email addresses, content, or any record of what an agent did. The first time you open wp-admin after updating, a notice tells you this and offers a one-click switch off; the first report is delayed by one to seven hours, so switching it off then means nothing is ever sent. Turning it off also asks us to delete what was already collected. The WordPress.org build does not contain this code at all. No new abilities, no permission changes, and existing connections keep working.
 
 = 1.5.1 =
 Fixes three defects that together made WPPilot unusable from any AI client that checks its calls against the schemas the server hands it — Claude among them. The tool list itself was rejected, abilities that take no input refused every call, and destructive tools asked for a confirmation the client had no way to send, so the same refusal repeated forever. A more forgiving client saw none of this. No new abilities and no permission changes; existing connections keep working.
