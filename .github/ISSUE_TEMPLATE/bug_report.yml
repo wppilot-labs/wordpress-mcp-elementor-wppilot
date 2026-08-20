@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the WordPress MCP server does not behave as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run **WPPilot → Diagnostics** first — it runs the same checks an AI client
+        does and often names the problem outright.
+
+        **Never paste a password, application password, API key or licence key
+        here.** Issues are public and permanent.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        Called wppilot/update-post on an Elementor page.
+        Expected the page to change; the call reported success and nothing changed.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Exact error text
+      description: The literal message, redacted. It is almost always more useful than a description of it.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: "WPPilot 1.6.0, WordPress 6.9, PHP 8.3, Pro 1.1.2 (or none)"
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Safety profile
+      options: ["Read Only", "Production Safe", "Developer Full Access"]
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: AI client
+      placeholder: "Claude Code, Cursor, Codex CLI, Copilot…"

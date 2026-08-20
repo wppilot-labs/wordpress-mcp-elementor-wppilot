@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an ability or capability for the free WordPress MCP server
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The task, not the implementation. What an agent should be able to accomplish.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How do you do it today
+      description: Manually, with another plugin, or not at all.
+  - type: markdown
+    attributes:
+      value: |
+        Page-builder and plugin-aware integrations (Elementor, Bricks, Divi,
+        WooCommerce, ACF and the rest) live in WPPilot Pro rather than here.
+        Suggest those at <https://wppilot.co/support/contact>.
