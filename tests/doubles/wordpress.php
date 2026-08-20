@@ -44,6 +44,41 @@ final class WPPilot_Test_State
     /** @var array<string, array<string, string>> */
     public static array $plugins = [];
 
+    /**
+     * The options table, as WordPress's in-request cache holds it: PHP values
+     * exactly as they were written.
+     *
+     * @var array<string, mixed>
+     */
+    public static array $options = [];
+
+    /** @var array<string, int> hook => next timestamp */
+    public static array $cron = [];
+
+    /** @var list<array{url: string, body: mixed}> */
+    public static array $http_posts = [];
+
+    /**
+     * Simulate a request boundary.
+     *
+     * WordPress caches the PHP value you wrote for the rest of the request, but
+     * the options table stores a string. So `true` comes back as `true` in the
+     * request that wrote it and as `'1'` in every request after, and `false`
+     * comes back as `''`. Code that reads an option it just wrote and code that
+     * reads it a minute later are therefore reading different types — which is
+     * the single most common source of "works once, then stops" option bugs.
+     */
+    public static function next_request(): void
+    {
+        foreach (self::$options as $name => $value) {
+            if (is_bool($value)) {
+                self::$options[$name] = $value ? '1' : '';
+            } elseif (is_int($value) || is_float($value)) {
+                self::$options[$name] = (string) $value;
+            }
+        }
+    }
+
     /** @var array<int, WP_Post> */
     public static array $posts = [];
 
@@ -589,5 +624,141 @@ if (!class_exists('WP_Ability')) {
         {
             return $this->output_schema;
         }
+    }
+}
+
+
+if (!function_exists('get_option')) {
+    /** @return mixed */
+    function get_option(string $option, mixed $default_value = false): mixed
+    {
+        return array_key_exists($option, WPPilot_Test_State::$options)
+            ? WPPilot_Test_State::$options[$option]
+            : $default_value;
+    }
+}
+
+if (!function_exists('add_option')) {
+    function add_option(string $option, mixed $value = '', string $deprecated = '', mixed $autoload = null): bool
+    {
+        if (array_key_exists($option, WPPilot_Test_State::$options)) {
+            return false;
+        }
+
+        WPPilot_Test_State::$options[$option] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('update_option')) {
+    /**
+     * Reproduces the early return in WordPress core, quirk included.
+     *
+     * `get_option()` answers false for an option that does not exist, and the
+     * equality check below runs BEFORE the "does not exist" branch. So writing
+     * boolean false to an option nobody has ever set compares equal, returns
+     * early, and never reaches add_option() — nothing is stored at all.
+     *
+     * A double that simply assigned would hide that, and hiding it is how the
+     * bug this models shipped in the first place.
+     */
+    function update_option(string $option, mixed $value, mixed $autoload = null): bool
+    {
+        $old_value = get_option($option);
+
+        if ($value === $old_value || serialize($value) === serialize($old_value)) {
+            return false;
+        }
+
+        if ($old_value === false && !array_key_exists($option, WPPilot_Test_State::$options)) {
+            return add_option($option, $value, '', $autoload);
+        }
+
+        WPPilot_Test_State::$options[$option] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('wp_generate_uuid4')) {
+    function wp_generate_uuid4(): string
+    {
+        return sprintf(
+            '%04x%04x-%04x-4%03x-%04x-%04x%04x%04x',
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+            random_int(0, 0x0fff),
+            random_int(0, 0x3fff) | 0x8000,
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+            random_int(0, 0xffff),
+        );
+    }
+}
+
+if (!function_exists('wp_next_scheduled')) {
+    /** @return int|false */
+    function wp_next_scheduled(string $hook, array $args = [])
+    {
+        return WPPilot_Test_State::$cron[$hook] ?? false;
+    }
+}
+
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event(int $timestamp, string $recurrence, string $hook, array $args = []): bool
+    {
+        WPPilot_Test_State::$cron[$hook] = $timestamp;
+
+        return true;
+    }
+}
+
+if (!function_exists('wp_clear_scheduled_hook')) {
+    function wp_clear_scheduled_hook(string $hook, array $args = []): int
+    {
+        $existed = isset(WPPilot_Test_State::$cron[$hook]);
+        unset(WPPilot_Test_State::$cron[$hook]);
+
+        return $existed ? 1 : 0;
+    }
+}
+
+if (!function_exists('wp_remote_post')) {
+    /** @param array<string, mixed> $args */
+    function wp_remote_post(string $url, array $args = []): array
+    {
+        WPPilot_Test_State::$http_posts[] = ['url' => $url, 'body' => $args['body'] ?? null];
+
+        return ['response' => ['code' => 204], 'body' => ''];
+    }
+}
+
+if (!function_exists('home_url')) {
+    function home_url(string $path = ''): string
+    {
+        return 'https://example.test' . $path;
+    }
+}
+
+if (!function_exists('get_bloginfo')) {
+    function get_bloginfo(string $show = ''): string
+    {
+        return $show === 'version' ? '7.0' : '';
+    }
+}
+
+if (!function_exists('get_locale')) {
+    function get_locale(): string
+    {
+        return 'en_US';
+    }
+}
+
+if (!function_exists('sanitize_key')) {
+    function sanitize_key(string $key): string
+    {
+        return preg_replace('/[^a-z0-9_\-]/', '', strtolower($key)) ?? '';
     }
 }
