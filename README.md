@@ -1,13 +1,15 @@
-# WPPilot, WordPress MCP Server
+# WPPilot — WordPress MCP Server, Elementor MCP and WooCommerce MCP
 
 **Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build, pages, block layouts, menus, taxonomies, media, SEO metadata, through typed abilities your permissions still govern.**
 
-[![Version](https://img.shields.io/github/v/release/wppilot-labs/wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wppilot/releases)
+[![Version](https://img.shields.io/github/v/release/wppilot-labs/wordpress-mcp-elementor-wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
 
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
+
+The free plugin is the **WordPress MCP server**. [WPPilot Pro](https://wppilot.co/pro) turns that same endpoint into an **Elementor MCP server**, a **WooCommerce MCP server**, and a Bricks, Divi, Oxygen or WPBakery MCP server — one connection, whichever stack the site actually runs.
 
 ### Looking for an Elementor, Divi or Beaver Builder MCP server?
 
@@ -72,7 +74,7 @@ WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom
 
 ## Quick start
 
-1. Download the latest `wppilot.zip` from [Releases](https://github.com/wppilot-labs/wppilot/releases) and install it as `wp-content/plugins/wppilot`.
+1. Download the latest `wppilot.zip` from [Releases](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases) and install it as `wp-content/plugins/wppilot`.
    *A GitHub “Source code (zip)” download is **not** installable, it lacks `vendor/` and uses the wrong folder name.*
 2. Activate WPPilot.
 3. Open **WPPilot → Configuration** and leave **Production Safe** selected.
@@ -200,17 +202,45 @@ change to one section does not rewrite the page around it.
 Works with Divi modules and global presets through `divi-apply-global-preset`,
 rather than flattening a layout into shortcodes.
 
-#### Beaver Builder MCP, Oxygen MCP and WPBakery MCP
+#### Beaver Builder MCP
 
-Each stores its layout somewhere different — Beaver Builder and Oxygen in
-postmeta, WPBakery in shortcodes inside `post_content`. Pro reads the right
-store for the builder actually installed, and the free plugin refuses a raw
-content write to a page it cannot safely change.
+Beaver Builder keeps its layout in postmeta under `_fl_builder_data`, so writing
+HTML into `post_content` changes nothing a visitor sees. Pro reads and writes
+that store; the free plugin recognises the builder and refuses the write rather
+than reporting a success that does nothing.
+
+#### Oxygen MCP
+
+Oxygen stores a JSON element tree in postmeta and renders from it, ignoring
+`post_content` entirely. Pro's 37 abilities work against that tree.
+
+#### WPBakery MCP
+
+WPBakery is the exception that keeps its layout in `post_content`, as nested
+shortcodes. Pro parses and edits those shortcodes instead of replacing the
+markup around them.
+
+#### Breakdance, Etch and Mosaic MCP
+
+Breakdance (33 abilities), Etch (60) and Mosaic (36) each expose their own
+element model. Etch has the largest surface of any builder in Pro.
+
+#### Gutenberg MCP
+
+Block editing is in the **free** plugin, not Pro: parse, insert, move and
+replace blocks in the core block tree, with reusable blocks and patterns.
 
 #### WooCommerce MCP
 
-Products, variations, orders and stock as typed abilities, capability-checked
-against the connected WordPress user like everything else.
+Products, variations, orders, coupons and stock as typed abilities rather than
+raw REST calls. An agent can query the catalogue, create a variable product with
+its attributes and variations, adjust stock, read orders and add order notes —
+each one capability-checked against the connected WordPress user, so an agent
+connected as a shop manager cannot do what that account could not do by hand.
+
+Order status changes and anything touching money are classed destructive, so
+they require explicit confirmation and are recorded in the change ledger with
+rollback, the same as every other write.
 
 ### Beyond integrations
 
@@ -247,7 +277,7 @@ That is what the safety model is for. Read Only blocks every write, Production S
 Partly, and the plugin says so rather than failing silently. Core blocks are validated and serialised by the block editor's own JavaScript, so writes are staged as a pending batch and finalised through a browser session.
 
 **Is it on WordPress.org?**
-No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. Install `wppilot-<version>.zip` from [Releases](https://github.com/wppilot-labs/wppilot/releases); the GitHub "Source code" archive is not installable.
+No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. Install `wppilot-<version>.zip` from [Releases](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases); the GitHub "Source code" archive is not installable.
 
 ## Requirements
 
