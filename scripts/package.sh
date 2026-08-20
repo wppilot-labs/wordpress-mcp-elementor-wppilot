@@ -132,6 +132,28 @@ if [ -f "$ORG/wppilot/includes/updater.php" ]; then
   exit 1
 fi
 
+# Remove anonymous usage reporting.
+#
+# The directory requires reporting to be opt-in. Deleting the code is a stronger
+# guarantee than shipping it switched off: the .org build cannot report even if
+# a future default changes or an option is set by hand. wppilot.php wraps the
+# require in file_exists() so the removal is safe, the same as the updater.
+rm -rf "$ORG/wppilot/includes/telemetry"
+
+if [ -d "$ORG/wppilot/includes/telemetry" ]; then
+  echo "includes/telemetry still present in the .org build" >&2
+  exit 1
+fi
+
+# Belt and braces: grep the whole tree for the endpoint. This catches a future
+# change that references it from a file outside includes/telemetry, which the
+# directory delete above would not remove.
+if grep -rq "api/wppilot/telemetry" "$ORG/wppilot"; then
+  echo "telemetry endpoint still referenced in the .org build" >&2
+  grep -rn "api/wppilot/telemetry" "$ORG/wppilot" >&2
+  exit 1
+fi
+
 verify_tree "$ORG/wppilot" ".org build"
 make_zip "$ROOT/build/wppilot-$VERSION-org.zip" "$ORG" wppilot
 echo "  build/wppilot-$VERSION-org.zip"

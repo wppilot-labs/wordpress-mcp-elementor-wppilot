@@ -88,6 +88,28 @@ function wppilot_activate_current_site(): void
     wppilot_safety_maybe_install();
     wppilot_enable_ai_abilities_on_activate();
     wppilot_pro_upsell_on_activate();
+    wppilot_telemetry_on_activate();
+}
+
+/**
+ * Put the daily usage report on the schedule.
+ *
+ * Guarded on the function existing: includes/telemetry/ is deleted from the
+ * wordpress.org build, and activation still has to work there.
+ *
+ * Never re-enables a site that turned reporting off — schedule() is only
+ * reached when enabled() is true, and a stored '0' is a decision that survives
+ * every reactivation, exactly like the AI abilities toggle above.
+ */
+function wppilot_telemetry_on_activate(): void
+{
+    if (!function_exists('WPPilot\Telemetry\enabled')) {
+        return;
+    }
+
+    if (\WPPilot\Telemetry\enabled()) {
+        \WPPilot\Telemetry\schedule();
+    }
 }
 
 /**
@@ -148,6 +170,14 @@ function wppilot_deactivate_current_site(): void
     \WPPilot\Abilities\Gutenberg\unschedule_cleanup();
 
     wp_clear_scheduled_hook('wppilot_oauth_gc');
+
+    // Report the deactivation before dropping the schedule, then drop it.
+    // Without the report an abandoned install reads as active until it falls
+    // out of the 45-day window, turning a real churn signal into a slow fade.
+    if (function_exists('WPPilot\Telemetry\send_deactivation')) {
+        \WPPilot\Telemetry\send_deactivation();
+        \WPPilot\Telemetry\unschedule();
+    }
 }
 
 /**

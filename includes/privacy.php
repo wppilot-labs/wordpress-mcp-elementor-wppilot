@@ -40,6 +40,19 @@ function wppilot_add_privacy_policy_content(): void
         ))
         . '</p>';
 
+    // Only builds from wppilot.co carry the telemetry code; the wordpress.org
+    // build has the directory removed by scripts/package.sh. Suggesting text
+    // about reporting that cannot happen would be its own kind of inaccuracy.
+    if (function_exists('WPPilot\Telemetry\enabled')) {
+        $content .=
+            '<p>'
+            . wp_kses_post(__(
+                'Unless it has been switched off, WPPilot sends an anonymous daily usage report to wppilot.co containing this site’s address, a random installation identifier, the WPPilot, WordPress and PHP versions, the site locale, whether WPPilot Pro is active, the active safety profile, and the number of recorded AI-client connections. It contains no usernames, no email addresses, no page or post content, and no record of what an AI client did. It can be turned off under WPPilot → Settings, which also sends a request to delete the reports already collected. Detailed reports are kept for 90 days and then reduced to daily totals, and an installation that stops reporting for 400 days is deleted.',
+                domain: 'wppilot',
+            ))
+            . '</p>';
+    }
+
     wp_add_privacy_policy_content(__('WPPilot', domain: 'wppilot'), wpautop($content, br: false));
 }
 
