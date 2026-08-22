@@ -97,9 +97,11 @@ function wppilot_activate_current_site(): void
  * Guarded on the function existing: includes/telemetry/ is deleted from the
  * wordpress.org build, and activation still has to work there.
  *
- * Never re-enables a site that turned reporting off — schedule() is only
- * reached when enabled() is true, and a stored '0' is a decision that survives
- * every reactivation, exactly like the AI abilities toggle above.
+ * Reporting is opt-in, so on a fresh install this does nothing at all:
+ * enabled() is false until somebody stores a decision. It exists for the site
+ * that already switched reporting on and is reactivating or joining a network,
+ * where the stored '1' has to survive — and, in the other direction, a stored
+ * '0' is never overridden, exactly like the AI abilities toggle above.
  */
 function wppilot_telemetry_on_activate(): void
 {

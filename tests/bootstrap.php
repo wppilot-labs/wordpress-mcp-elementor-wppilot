@@ -35,9 +35,10 @@ require_once dirname(__DIR__) . '/includes/abilities/wordpress/bootstrap.php';
 wppilot_load_wordpress_abilities();
 
 // Anonymous usage reporting, plus the lifecycle file that schedules it. Loaded
-// for TelemetryConsentTest: consent has to be right on a path nobody clicks
-// twice, and the option semantics it depends on are a WordPress quirk rather
-// than anything visible in this plugin's own code.
+// for TelemetryConsentTest: reporting is opt-in, so the assertion that carries
+// the promise is that an untouched install sends nothing, and the option
+// semantics it depends on are a WordPress quirk rather than anything visible in
+// this plugin's own code.
 require_once dirname(__DIR__) . '/includes/telemetry/settings.php';
 require_once dirname(__DIR__) . '/includes/telemetry/send.php';
 require_once dirname(__DIR__) . '/includes/lifecycle.php';
