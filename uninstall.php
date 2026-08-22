@@ -100,6 +100,14 @@ function wppilot_uninstall_options(): array
         'wppilot_mcp_last_request',
         // includes/abilities/gutenberg/bootstrap.php
         'wppilot_gb_finalizer_poll_token',
+        // includes/telemetry/settings.php. Absent from the wordpress.org build,
+        // which never writes them; deleting an option that does not exist is a
+        // no-op, so the list does not need to know which build this is.
+        'wppilot_telemetry_enabled',
+        'wppilot_install_id',
+        // Written only by the first-run notice that 1.6.0 shipped and 1.6.1
+        // removed. Listed so an install that saw it does not keep the row.
+        'wppilot_telemetry_notice_acknowledged',
     ];
 }
 
@@ -141,6 +149,8 @@ function wppilot_uninstall_cron_hooks(): array
     return [
         'wppilot_oauth_gc',
         'wppilot_gutenberg_cleanup',
+        // includes/telemetry/settings.php
+        'wppilot_telemetry_ping',
     ];
 }
 

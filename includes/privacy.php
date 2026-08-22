@@ -47,7 +47,7 @@ function wppilot_add_privacy_policy_content(): void
         $content .=
             '<p>'
             . wp_kses_post(__(
-                'Unless it has been switched off, WPPilot sends an anonymous daily usage report to wppilot.co containing this site’s address, a random installation identifier, the WPPilot, WordPress and PHP versions, the site locale, whether WPPilot Pro is active, the active safety profile, and the number of recorded AI-client connections. It contains no usernames, no email addresses, no page or post content, and no record of what an AI client did. It can be turned off under WPPilot → Settings, which also sends a request to delete the reports already collected. Detailed reports are kept for 90 days and then reduced to daily totals, and an installation that stops reporting for 400 days is deleted.',
+                'If anonymous usage reporting has been switched on under WPPilot → Settings, WPPilot sends a daily report to wppilot.co containing this site’s address, a random installation identifier, the WPPilot, WordPress and PHP versions, the site locale, whether WPPilot Pro is active, the active safety profile, and the number of recorded AI-client connections. It is off unless somebody switches it on, and it contains no usernames, no email addresses, no page or post content, and no record of what an AI client did. Switching it back off also sends a request to delete the reports already collected. Detailed reports are kept for 90 days and then reduced to daily totals, and an installation that stops reporting for 400 days is deleted.',
                 domain: 'wppilot',
             ))
             . '</p>';

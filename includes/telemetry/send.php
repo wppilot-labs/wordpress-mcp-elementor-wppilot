@@ -87,8 +87,8 @@ function send(string $event = 'ping'): void
  * Put the daily report on the schedule, jittered by one to seven hours.
  *
  * The jitter spreads load across the day instead of stacking every install that
- * updated in the same hour onto the same minute. It also means an administrator
- * who activates the plugin, reads the notice and switches reporting off in that
+ * switched reporting on in the same hour onto the same minute. It also means an
+ * administrator who turns it on, reconsiders and turns it off again in that
  * first session is never counted at all — the first report has not fired yet.
  */
 function schedule(): void

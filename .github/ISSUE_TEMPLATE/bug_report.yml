@@ -30,7 +30,7 @@ body:
     id: versions
     attributes:
       label: Versions
-      placeholder: "WPPilot 1.6.0, WordPress 6.9, PHP 8.3, Pro 1.1.2 (or none)"
+      placeholder: "WPPilot 1.6.1, WordPress 6.9, PHP 8.3, Pro 1.1.2 (or none)"
     validations:
       required: true
   - type: dropdown

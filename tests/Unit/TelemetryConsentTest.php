@@ -21,14 +21,15 @@ use const WPPilot\Telemetry\CRON_HOOK;
 /**
  * Consent for anonymous usage reporting.
  *
- * Reporting is on by default, so "off" has to be reliable in a way that "on"
- * does not: a default that fails open is a nuisance, a switch-off that fails
- * open is a broken promise made in an admin notice.
+ * Reporting is opt-in, and there is no notice asking for it: a site reports
+ * only because somebody went to Settings and switched it on. So the assertion
+ * that carries the promise is the boring one — an untouched install sends
+ * nothing — and it has to hold on the activation path too, which runs again on
+ * every reactivation and on every new site added to a network.
  *
- * The case that matters most is the one that looks least interesting — turning
- * it off on a site that has never touched the setting. That is the first-run
- * notice path, and it is the exact combination WordPress's update_option()
- * silently refuses to write.
+ * "Off" still has to be reliable once chosen. Writing it on a site that has
+ * never touched the setting is the exact combination WordPress's
+ * update_option() silently refuses to write.
  */
 final class TelemetryConsentTest extends TestCase
 {
@@ -46,10 +47,18 @@ final class TelemetryConsentTest extends TestCase
         WPPilot_Test_State::$http_posts = [];
     }
 
-    public function test_reporting_is_on_before_anyone_chooses(): void
+    public function test_reporting_is_off_before_anyone_chooses(): void
     {
-        self::assertTrue(enabled(), 'Reporting should be on by default.');
+        self::assertFalse(enabled(), 'Reporting must be opt-in.');
         self::assertFalse(decided(), 'An untouched option is not a decision.');
+    }
+
+    /** The promise, stated as an assertion: an untouched install sends nothing. */
+    public function test_a_site_that_never_chose_sends_nothing(): void
+    {
+        \WPPilot\Telemetry\send('ping');
+
+        self::assertSame([], WPPilot_Test_State::$http_posts);
     }
 
     /**
@@ -58,8 +67,10 @@ final class TelemetryConsentTest extends TestCase
      * update_option() reads the current value with get_option(), which answers
      * false for an option that does not exist, then returns early when the new
      * value equals the old one. Writing boolean false to a never-set option
-     * therefore stores nothing at all, and enabled() keeps answering true from
-     * its default — the notice says "turned off" and the site keeps reporting.
+     * therefore stores nothing at all, and decided() keeps answering false — an
+     * operator who deliberately confirmed "off" would be indistinguishable from
+     * one who never opened the screen, and a later change to the default would
+     * silently overrule them.
      */
     public function test_turning_it_off_sticks_when_nobody_has_ever_chosen(): void
     {
@@ -111,8 +122,26 @@ final class TelemetryConsentTest extends TestCase
         );
     }
 
+    /**
+     * Activation is not consent.
+     *
+     * Nothing about installing or reactivating the plugin may put a report on
+     * the schedule; only the Settings toggle can.
+     */
+    public function test_activation_does_not_schedule_for_a_site_that_never_chose(): void
+    {
+        \wppilot_telemetry_on_activate();
+
+        self::assertFalse(enabled());
+        self::assertFalse(\wp_next_scheduled(CRON_HOOK));
+    }
+
     public function test_activation_schedules_within_the_jitter_window(): void
     {
+        set_enabled(true);
+        \wp_clear_scheduled_hook(CRON_HOOK);
+        WPPilot_Test_State::next_request();
+
         \wppilot_telemetry_on_activate();
 
         $next = \wp_next_scheduled(CRON_HOOK);
@@ -131,6 +160,10 @@ final class TelemetryConsentTest extends TestCase
      */
     public function test_opting_out_sends_one_final_deletion_request(): void
     {
+        set_enabled(true);
+        WPPilot_Test_State::next_request();
+        WPPilot_Test_State::$http_posts = [];
+
         set_enabled(false);
 
         self::assertCount(1, WPPilot_Test_State::$http_posts);
@@ -142,10 +175,26 @@ final class TelemetryConsentTest extends TestCase
     /** Opting out twice must not send twice; there is nothing left to delete. */
     public function test_opting_out_again_sends_nothing(): void
     {
+        set_enabled(true);
+        WPPilot_Test_State::next_request();
         set_enabled(false);
         WPPilot_Test_State::next_request();
         WPPilot_Test_State::$http_posts = [];
 
+        set_enabled(false);
+
+        self::assertSame([], WPPilot_Test_State::$http_posts);
+    }
+
+    /**
+     * Confirming "off" on a site that never reported must not contact us.
+     *
+     * The deletion request exists because data was collected. A site that never
+     * sent anything has nothing to delete, and a request would be the one
+     * outbound call an operator who declined would least expect.
+     */
+    public function test_confirming_off_without_ever_opting_in_sends_nothing(): void
+    {
         set_enabled(false);
 
         self::assertSame([], WPPilot_Test_State::$http_posts);
