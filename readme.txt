@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.6.1
+Stable tag: 1.6.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -149,6 +149,13 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.6.2 =
+* Fixed blocks from libraries that fill in part of their own settings from the editor — Spectra among them — saving without those settings. An agent-built page could reach the database with the block's style id missing, render unstyled, and still be reported as finished. Blocks now go through the hidden block editor before they are saved.
+* Fixed the Block Editor Queue getting stuck on a batch when a request arrived without a readable body. The endpoint ended in a fatal error part-way through an item, and nothing was left running to finish it or hand it back. It now refuses the request and says what to send.
+* Fixed revoking a connection not freeing its connection slot. The slot stayed in use until that connection expired on its own, so a site could report itself full immediately after an administrator made room.
+* Fixed a recursive directory listing coming back empty because of a single folder it could not read. Unreadable entries are skipped and the rest of the listing is returned.
+* No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
+
 = 1.6.1 =
 * Anonymous usage reporting is now off until you switch it on, and the notice that appeared on your dashboard in 1.6.0 is gone. A feature that only runs when asked for has nothing to disclose on activation, so there is nothing left to dismiss.
 * Sites that already turned reporting off in 1.6.0 stay off. Sites that pressed **Keep it on** stay on — that was a recorded choice and this release does not overrule it. Every other site stops reporting on update, whether or not it ever saw the notice.
@@ -239,6 +246,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.6.2 =
+Four fixes, no new abilities. Blocks from libraries such as Spectra keep the settings their editor assigns, so an agent-built page stops rendering unstyled while the queue says it worked. The Block Editor Queue no longer strands a batch when a request arrives without a readable body, revoking a connection frees its slot straight away, and a recursive directory listing survives a folder it cannot read. Existing connections keep working.
 
 = 1.6.1 =
 Makes anonymous usage reporting opt-in and removes the dashboard notice that 1.6.0 introduced. Sites that made a choice in 1.6.0 keep it; every other site stops reporting on update. No new abilities, no permission changes, and existing connections keep working.

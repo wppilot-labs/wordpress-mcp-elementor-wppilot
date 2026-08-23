@@ -112,6 +112,10 @@ function revoke_client_access(string $client_id, int $user_id): void
 
     // Revoke all access tokens for this client and user.
     $wpdb->update($t, ['revoked' => 1], ['client_id' => $client_id, 'user_id' => $user_id]);
+
+    // Hand the connection slot back now. Slot accounting reads the client's last use, so without
+    // this a revoked connection went on occupying one until its grant expired on its own.
+    \WPPilot\OAuth\ClientValidation\release_client_slot_if_unused($client_id);
 }
 
 // @mago-expect lint:halstead

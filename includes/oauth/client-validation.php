@@ -359,6 +359,64 @@ function client_count_for_ip(string $client_ip): int
 }
 
 /**
+ * Release the connection slot a client holds once its last live grant is gone.
+ *
+ * A slot is counted from `last_used_at`, so revoking a connection's tokens left the slot occupied
+ * until the refresh-token lifetime ran out on its own — an administrator who revoked a connection
+ * to make room for another was told the site was still full, for up to two weeks, with nothing on
+ * screen explaining why. Called after a revocation, this frees the slot in the same request.
+ *
+ * A client granted by several accounts is only released once none of them has a live token left,
+ * because the others are still connected through it. An admin-created client ID is kept and merely
+ * returned to its unused state: it exists so somebody can connect with it again, and an unused one
+ * occupies no slot.
+ */
+// @mago-expect lint:no-global
+// WordPress core requires global $wpdb for database access.
+function release_client_slot_if_unused(string $client_id): void
+{
+    if (!client_table_exists()) {
+        return;
+    }
+
+    global $wpdb;
+    /** @var \wpdb $wpdb */
+    $tokens = $wpdb->prefix . 'wppilot_oauth_access_tokens';
+    $refresh = $wpdb->prefix . 'wppilot_oauth_refresh_tokens';
+    $now = gmdate('Y-m-d H:i:s');
+    // A live refresh token counts as a live grant on its own: access tokens last an hour, so a
+    // connection that is merely idle has none, and reading only that table would release a slot
+    // another account is still connected through.
+    // @mago-expect analysis:possibly-invalid-argument
+    $sql = $wpdb->prepare(
+        "SELECT COUNT(*) FROM `{$tokens}` at
+         LEFT JOIN `{$refresh}` rt ON rt.access_token_hash = at.identifier_hash
+         WHERE at.client_id = %s
+           AND ((at.revoked = 0 AND at.expires_at > %s) OR (rt.revoked = 0 AND rt.expires_at > %s))",
+        $client_id,
+        $now,
+        $now,
+    );
+    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Values are bound by $wpdb->prepare() above; Plugin Check cannot follow the prepared statement through the variable. The only interpolation is the table name, which prepare() has no placeholder for. Not cached: this reads live per-request state.
+    $live = is_string($sql) ? (int) $wpdb->get_var($sql) : 0;
+    if ($live > 0) {
+        return;
+    }
+
+    $clients = $wpdb->prefix . 'wppilot_oauth_clients';
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table; values are escaped by $wpdb.
+    $wpdb->delete($clients, ['client_id' => $client_id, 'admin_created' => 0], ['%s', '%d']);
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table; values are escaped by $wpdb.
+    $wpdb->update(
+        $clients,
+        ['last_used_at' => null],
+        ['client_id' => $client_id, 'admin_created' => 1],
+        ['%s'],
+        ['%s', '%d'],
+    );
+}
+
+/**
  * Delete clients that no longer hold a live grant so they stop occupying connection slots: pending
  * registrations that never completed a token exchange (older than STALE_UNUSED_CLIENT_TTL, except
  * admin-created client IDs, which stay until used or deleted from Connected Apps), and clients not

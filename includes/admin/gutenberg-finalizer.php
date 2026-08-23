@@ -17,6 +17,7 @@ function boot_gutenberg_finalizer_admin(): void
 {
     add_action('admin_menu', __NAMESPACE__ . '\\register_gutenberg_finalizer_menu', priority: 60);
     add_action('admin_enqueue_scripts', __NAMESPACE__ . '\\enqueue_gutenberg_finalizer_assets');
+    add_filter('block_editor_settings_all', __NAMESPACE__ . '\\quiet_autosave_in_hidden_editor');
 }
 
 function gutenberg_finalizer_page_slug(): string
@@ -105,6 +106,31 @@ function enqueue_gutenberg_finalizer_runtime_assets(): void
     wp_enqueue_script(handle: 'wppilot-gutenberg-finalizer');
 }
 
+/**
+ * Stop the hidden editor autosaving what the queue puts in it.
+ *
+ * The queue loads the target post's editor in an offscreen frame and resets its blocks so each
+ * block's own editor code can fill in the attributes it assigns on mount. That leaves the editor
+ * dirty, and an editor left dirty long enough autosaves — which would store a draft of content
+ * nobody has approved yet and offer the author a backup of a post they never edited. Only the
+ * frame the queue opens is affected: every other editor screen keeps its usual interval, because
+ * the marker is the query argument the queue puts on its own iframe URL.
+ *
+ * @param array<string, mixed> $settings
+ * @return array<string, mixed>
+ */
+function quiet_autosave_in_hidden_editor(array $settings): array
+{
+    if (($_GET['wppilot_gb_finalizer'] ?? '') !== '1') {
+        return $settings;
+    }
+
+    $settings['autosaveInterval'] = DAY_IN_SECONDS;
+    $settings['localAutosaveInterval'] = DAY_IN_SECONDS;
+
+    return $settings;
+}
+
 function is_gutenberg_finalizer_request(): bool
 {
     return ($_GET['page'] ?? '') === gutenberg_finalizer_page_slug();
@@ -189,6 +215,7 @@ function gutenberg_finalizer_script(): string
             let editorFrame = document.getElementById( 'wppilot-gb-editor-frame' );
             const editorLoadTimeoutMs = Number( config.editorLoadTimeoutMs || 30000 );
             const blockRegistrationTimeoutMs = Number( config.blockRegistrationTimeoutMs || 30000 );
+            const blockMountTimeoutMs = Number( config.blockMountTimeoutMs || 8000 );
             let leaseOwner = '';
             let isRunning = false;
             let dashboardPollRunning = false;
@@ -196,6 +223,8 @@ function gutenberg_finalizer_script(): string
             let editorFrameLoadPromise = Promise.resolve();
             let frameAccessError = null;
             let fallbackWarning = '';
+            let mountWarning = '';
+            let usingFallbackRuntime = false;
 
             const path = ( suffix ) => `/wppilot/v1${ suffix }`;
 
@@ -483,6 +512,7 @@ function gutenberg_finalizer_script(): string
             const loadEditorBlocksApi = async ( editorUrl, blocks ) => {
                 const refs = collectBlockRefs( blocks );
                 let frameError = null;
+                usingFallbackRuntime = false;
 
                 try {
                     await navigateEditorFrame( editorUrl );
@@ -507,6 +537,7 @@ function gutenberg_finalizer_script(): string
                         : missingRegistrationError( missingRefs );
                 }
 
+                usingFallbackRuntime = true;
                 fallbackWarning = 'The hidden block editor iframe could not be used, so blocks were serialized with the '
                     + 'block runtime of this page. Only blocks registered on this page are supported. Reason: '
                     + ( frameError && frameError.message ? frameError.message : 'unknown.' );
@@ -547,11 +578,131 @@ function gutenberg_finalizer_script(): string
                 return validations;
             };
 
+            const editorDataApi = () => {
+                try {
+                    const frameWindow = iframeWindow();
+                    const dataApi = frameWindow && frameWindow.wp ? frameWindow.wp.data : null;
+
+                    return dataApi
+                        && typeof dataApi.select === 'function'
+                        && typeof dataApi.dispatch === 'function'
+                        ? dataApi
+                        : null;
+                } catch ( error ) {
+                    return null;
+                }
+            };
+
+            // Several block libraries assign part of a block's attributes from the editor itself —
+            // the per-block style id and layout markers they generate when the block mounts — and
+            // createBlock() alone never triggers that, because nothing has rendered the block's
+            // edit component. Serializing straight from createBlock() therefore saved markup that
+            // rendered unstyled, or with a row's columns stacked, while the queue reported success.
+            // Put the blocks through the frame's own block-editor store first and serialize what
+            // the editor made of them instead.
+            const mountBlocksInEditor = async ( created ) => {
+                const dataApi = editorDataApi();
+                if ( ! dataApi ) {
+                    return null;
+                }
+
+                const readBlocks = () => {
+                    try {
+                        const selector = dataApi.select( 'core/block-editor' );
+
+                        return selector && typeof selector.getBlocks === 'function' ? selector.getBlocks() : null;
+                    } catch ( error ) {
+                        return null;
+                    }
+                };
+
+                // Wait for the editor to have loaded the post first. Resetting blocks into a store
+                // that is still initialising is worse than not resetting at all: the editor loads
+                // the post's own content on top, and serializing that would replace the agent's
+                // blocks with whatever the page already had.
+                const postLoaded = () => {
+                    try {
+                        const editorSelector = dataApi.select( 'core/editor' );
+
+                        return !! editorSelector
+                            && typeof editorSelector.getCurrentPostId === 'function'
+                            && Number( editorSelector.getCurrentPostId() ) > 0;
+                    } catch ( error ) {
+                        return false;
+                    }
+                };
+
+                const readyBy = Date.now() + blockMountTimeoutMs;
+                while ( ! postLoaded() && Date.now() < readyBy ) {
+                    await sleep( 100 );
+                }
+
+                if ( ! postLoaded() ) {
+                    return null;
+                }
+
+                try {
+                    const editorStore = dataApi.dispatch( 'core/block-editor' );
+                    if ( ! editorStore || typeof editorStore.resetBlocks !== 'function' || ! readBlocks() ) {
+                        return null;
+                    }
+
+                    editorStore.resetBlocks( created );
+                } catch ( error ) {
+                    return null;
+                }
+
+                // What comes back out has to still be the blocks that went in. Anything else means
+                // the editor replaced them — it finished loading the post late, or a plugin reset
+                // the store — and serializing that would write the wrong content while reporting
+                // success, which is the failure this whole step exists to end.
+                const isStillOurs = ( blocks ) => Array.isArray( blocks )
+                    && blocks.length === created.length
+                    && blocks.every( ( block, index ) => blockName( block ) === blockName( created[ index ] ) );
+
+                // Editor-assigned attributes arrive a render at a time, so wait for two identical
+                // reads rather than a fixed delay: blocks that assign nothing settle on the first
+                // pair, and a deep tree that assigns an id at every level still gets every level.
+                let previous = null;
+                const deadline = Date.now() + blockMountTimeoutMs;
+                while ( Date.now() < deadline ) {
+                    await sleep( 150 );
+                    const blocks = readBlocks();
+                    if ( ! blocks ) {
+                        return null;
+                    }
+
+                    if ( ! isStillOurs( blocks ) ) {
+                        return null;
+                    }
+
+                    const signature = JSON.stringify( blocks );
+                    if ( previous !== null && signature === previous ) {
+                        return blocks;
+                    }
+                    previous = signature;
+                }
+
+                const settled = readBlocks();
+                if ( ! isStillOurs( settled ) ) {
+                    return null;
+                }
+
+                mountWarning = 'The hidden block editor was still changing the blocks after '
+                    + `${ Math.round( blockMountTimeoutMs / 1000 ) } seconds, so they were serialized as it last had them. `
+                    + 'Blocks that assign their own style ids on mount may be incomplete.';
+
+                return settled;
+            };
+
             const serializeJob = async ( job ) => {
                 const blocks = job.blocks || [];
                 const blocksApi = await loadEditorBlocksApi( job.editor_url || '', blocks );
                 const created = blocks.map( ( spec ) => toBlock( blocksApi, spec ) );
-                const content = blocksApi.serialize( created );
+                // The fallback runtime is this page's own wp.blocks, not the frame's, so its blocks
+                // must not be handed to the frame's store.
+                const mounted = usingFallbackRuntime ? null : await mountBlocksInEditor( created );
+                const content = blocksApi.serialize( mounted || created );
                 const parsed = blocksApi.parse( content );
                 const validations = validateBlocks( blocksApi, parsed );
                 const errors = [];
@@ -582,8 +733,9 @@ function gutenberg_finalizer_script(): string
 
             const finalNotice = ( batch ) => {
                 if ( batch && batch.status === 'finalized' ) {
-                    if ( fallbackWarning ) {
-                        setNotice( 'warning', fallbackWarning );
+                    const warnings = [ fallbackWarning, mountWarning ].filter( Boolean );
+                    if ( warnings.length ) {
+                        setNotice( 'warning', warnings.join( ' ' ) );
                     } else {
                         clearNotice();
                     }
@@ -606,6 +758,7 @@ function gutenberg_finalizer_script(): string
 
                 isRunning = true;
                 fallbackWarning = '';
+                mountWarning = '';
                 try {
                     clearNotice();
                     setProgress( 'Working on queued Gutenberg changes...' );
