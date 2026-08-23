@@ -167,7 +167,15 @@ function wppilot_collect_recursive_entries($resolved, $pattern, $include_hidden,
 {
     $entries = [];
     $iterator = new RecursiveDirectoryIterator($resolved, RecursiveDirectoryIterator::SKIP_DOTS);
-    $iterator = new RecursiveIteratorIterator($iterator, RecursiveIteratorIterator::SELF_FIRST);
+    // CATCH_GET_CHILD: descending into a subdirectory the process cannot open — one without read
+    // permission, or a symlink whose target has gone — throws UnexpectedValueException from
+    // getChildren(). Without this flag that exception escapes the whole listing, so a single
+    // unreadable entry anywhere in the tree returned nothing at all instead of everything else.
+    $iterator = new RecursiveIteratorIterator(
+        $iterator,
+        RecursiveIteratorIterator::SELF_FIRST,
+        RecursiveIteratorIterator::CATCH_GET_CHILD,
+    );
     $iterator->setMaxDepth($max_depth - 1); // setMaxDepth is 0-indexed.
 
     foreach ($iterator as $item) {

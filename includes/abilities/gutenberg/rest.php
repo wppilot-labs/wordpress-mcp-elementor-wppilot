@@ -417,6 +417,10 @@ function rest_claim_next_batch(): WP_REST_Response|WP_Error
 function rest_claim_next_item(WP_REST_Request $request): WP_REST_Response|WP_Error
 {
     $params = rest_json_params($request);
+    if (is_wp_error($params)) {
+        return $params;
+    }
+
     $lease_owner = is_scalar($params['lease_owner'] ?? null) ? (string) $params['lease_owner'] : '';
 
     return rest_response(claim_next_item(rest_int_param($request, name: 'batch_id'), $lease_owner));
@@ -486,6 +490,10 @@ function rest_item_editor_url(WP_Post $item): string|WP_Error
 function rest_complete_item(WP_REST_Request $request): WP_REST_Response|WP_Error
 {
     $params = rest_json_params($request);
+    if (is_wp_error($params)) {
+        return $params;
+    }
+
     $lease_owner = is_scalar($params['lease_owner'] ?? null) ? (string) $params['lease_owner'] : '';
     $content = is_scalar($params['content'] ?? null) ? (string) $params['content'] : '';
 
@@ -501,6 +509,10 @@ function rest_complete_item(WP_REST_Request $request): WP_REST_Response|WP_Error
 function rest_fail_item(WP_REST_Request $request): WP_REST_Response|WP_Error
 {
     $params = rest_json_params($request);
+    if (is_wp_error($params)) {
+        return $params;
+    }
+
     $lease_owner = is_scalar($params['lease_owner'] ?? null) ? (string) $params['lease_owner'] : '';
     $message = is_scalar($params['message'] ?? null) ? (string) $params['message'] : '';
 
@@ -519,11 +531,31 @@ function rest_cancel_batch(WP_REST_Request $request): WP_REST_Response|WP_Error
 }
 
 /**
- * @return array<string, mixed>
+ * Read the JSON object body of a queue request.
+ *
+ * get_json_params() answers null both for a request that carried no body and for one whose body
+ * did not parse, and neither is distinguishable from the other by the time it reaches here. Both
+ * are reported as the same 400 rather than allowed through: an item is already leased by the time
+ * these endpoints run, so a fatal here left the batch in the running state with a lease nobody
+ * could complete or release.
+ *
+ * @return array<string, mixed>|WP_Error
  */
-function rest_json_params(WP_REST_Request $request): array
+function rest_json_params(WP_REST_Request $request): array|WP_Error
 {
     $raw_params = $request->get_json_params();
+    // The stub types this as an array, which is what makes the check look redundant. WordPress
+    // returns null from it for every request described above, so the check is the whole point.
+    // @mago-expect analysis:impossible-condition
+    // @mago-expect analysis:redundant-type-comparison
+    if (!is_array($raw_params)) {
+        return new WP_Error(
+            'gutenberg_invalid_body',
+            'Send a JSON object body with this request, and a Content-Type of application/json.',
+            ['status' => 400],
+        );
+    }
+
     $params = array_filter(
         $raw_params,
         static fn(mixed $value, mixed $key): bool => is_string($key),

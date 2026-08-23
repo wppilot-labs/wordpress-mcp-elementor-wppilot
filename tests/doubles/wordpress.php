@@ -281,6 +281,57 @@ if (!class_exists('WP_Error')) {
     }
 }
 
+if (!function_exists('is_wp_error')) {
+    function is_wp_error(mixed $thing): bool
+    {
+        return $thing instanceof WP_Error;
+    }
+}
+
+if (!class_exists('WP_REST_Request')) {
+    /**
+     * Minimal stand-in for a REST request.
+     *
+     * Only the JSON body matters here, and only because WordPress hands back null for it far more
+     * often than the name suggests: no body, a body that did not parse, and a body sent without the
+     * JSON content type all arrive the same way.
+     */
+    class WP_REST_Request
+    {
+        /** @param array<array-key, mixed> $params */
+        public function __construct(
+            private mixed $json_params = null,
+            private array $params = [],
+        ) {
+        }
+
+        public function get_json_params(): mixed
+        {
+            return $this->json_params;
+        }
+
+        /** @return array<array-key, mixed> */
+        public function get_params(): array
+        {
+            return $this->params;
+        }
+    }
+}
+
+if (!class_exists('WP_REST_Response')) {
+    /**
+     * Minimal stand-in for a REST response.
+     */
+    class WP_REST_Response
+    {
+        public function __construct(
+            public mixed $data = null,
+            public int $status = 200,
+        ) {
+        }
+    }
+}
+
 if (!function_exists('get_post_type_object')) {
     function get_post_type_object(string $post_type): ?WP_Post_Type
     {
