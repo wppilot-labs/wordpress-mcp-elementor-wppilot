@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.6.2
+Stable tag: 1.6.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -149,6 +149,10 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.6.3 =
+* Fixed a Block Editor Queue batch getting stuck with nobody working it. If the tab that picked up a batch was closed, navigated away from, or left in the background long enough for the browser to throttle it, the batch stayed marked as running and no other tab would take it — an administrator had to cancel and queue it again. It is picked up and retried automatically now. A batch another tab is actively working is still left alone.
+* No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
+
 = 1.6.2 =
 * Fixed blocks from libraries that fill in part of their own settings from the editor — Spectra among them — saving without those settings. An agent-built page could reach the database with the block's style id missing, render unstyled, and still be reported as finished. Blocks now go through the hidden block editor before they are saved.
 * Fixed the Block Editor Queue getting stuck on a batch when a request arrived without a readable body. The endpoint ended in a fatal error part-way through an item, and nothing was left running to finish it or hand it back. It now refuses the request and says what to send.
@@ -246,6 +250,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.6.3 =
+Fixes a Block Editor Queue batch getting stuck when the tab working it goes away — closed, navigated off, or throttled in the background. The batch is retried automatically instead of needing an administrator to cancel and re-queue it. One more fix, no new abilities, and existing connections keep working.
 
 = 1.6.2 =
 Four fixes, no new abilities. Blocks from libraries such as Spectra keep the settings their editor assigns, so an agent-built page stops rendering unstyled while the queue says it worked. The Block Editor Queue no longer strands a batch when a request arrives without a readable body, revoking a connection frees its slot straight away, and a recursive directory listing survives a folder it cannot read. Existing connections keep working.
