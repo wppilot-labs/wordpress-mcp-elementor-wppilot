@@ -385,7 +385,14 @@ function rest_claim_next_batch(): WP_REST_Response|WP_Error
 {
     mark_stale_drafts();
 
-    foreach (get_batches([STATUS_READY, STATUS_FAILED], posts_per_page: 50) as $batch) {
+    // Running batches are scanned too, because a batch can be left in that state with nobody
+    // working it: the tab that claimed it was closed, navigated away from, or throttled by the
+    // browser past the lease. release_expired_leases_for_batch() already knows how to recover one —
+    // it fails the batch with a message naming the abandoned tab, which makes it claimable again —
+    // but it was only ever reached through this scan, and this scan could not see the batches that
+    // needed it. A running batch whose lease is still valid refreshes to running, and claim_batch()
+    // refuses it as not claimable, which this loop already skips over.
+    foreach (get_batches([STATUS_READY, STATUS_FAILED, STATUS_RUNNING], posts_per_page: 50) as $batch) {
         $batch = refresh_batch_runtime_state($batch);
         if (!current_user_can_finalize_batch($batch)) {
             continue;
