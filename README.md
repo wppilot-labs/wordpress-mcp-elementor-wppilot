@@ -280,7 +280,7 @@ That is what the safety model is for. Read Only blocks every write, Production S
 Partly, and the plugin says so rather than failing silently. Core blocks are validated and serialised by the block editor's own JavaScript, so writes are staged as a pending batch and finalised through a browser session.
 
 **Is it on WordPress.org?**
-No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. Install `wppilot-<version>.zip` from [Releases](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases); the GitHub "Source code" archive is not installable.
+No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. Install `wppilot.zip` from [Releases](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases); the GitHub "Source code" archive is not installable.
 
 ## Requirements
 

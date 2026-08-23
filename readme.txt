@@ -74,9 +74,9 @@ WPPilot Chat is different: when you use Chat, WordPress sends the conversation h
 
 When you use OAuth, the client you are connecting registers itself with your site. That traffic is between your site and your own AI client, and no WPPilot server is involved.
 
-Builds downloaded from wppilot.co check that site for plugin updates. The update check sends the plugin version and nothing else. The copy distributed through the WordPress.org directory does not check at all: it is updated by WordPress.org like any other plugin.
+WPPilot is distributed from wppilot.co and GitHub releases, not the WordPress.org directory, so it checks wppilot.co for plugin updates rather than the directory API. The update check sends the plugin version and nothing else.
 
-Builds downloaded from wppilot.co can send anonymous usage data to wppilot.co once a day, but only if you switch it on under **WPPilot > Settings > Anonymous usage reporting**. It is off until then: nothing is sent, and there is no notice asking. Switching it back off also asks us to delete what was already collected. When on, it sends this site's URL, the WPPilot, WordPress and PHP versions, your locale, whether Pro is active, your safety profile, and how many connections exist. It never sends usernames, email addresses, page or post content, or any record of what an agent did. Reports are kept in detail for 90 days and then reduced to daily totals; an install that stops reporting for 400 days is deleted. The copy distributed through the WordPress.org directory contains none of this code and cannot report anything.
+Builds downloaded from wppilot.co can send anonymous usage data to wppilot.co once a day, but only if you switch it on under **WPPilot > Settings > Anonymous usage reporting**. It is off until then: nothing is sent, and there is no notice asking. Switching it back off also asks us to delete what was already collected. When on, it sends this site's URL, the WPPilot, WordPress and PHP versions, your locale, whether Pro is active, your safety profile, and how many connections exist. It never sends usernames, email addresses, page or post content, or any record of what an agent did. Reports are kept in detail for 90 days and then reduced to daily totals; an install that stops reporting for 400 days is deleted.
 
 == Installation ==
 
