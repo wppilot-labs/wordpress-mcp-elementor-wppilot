@@ -98,8 +98,14 @@ function wppilot_system_status(): array
         ],
         'wppilot' => [
             'version' => defined('WPPILOT_VERSION') ? WPPILOT_VERSION : null,
-            'enabled' => function_exists('wppilot_mcp_is_enabled') && wppilot_mcp_is_enabled(),
-            'safety_profile' => function_exists('wppilot_safety_profile') ? wppilot_safety_profile() : 'unknown',
+            // The real function names. The previous probes named functions
+            // that have never existed anywhere in this plugin, and the
+            // function_exists guards meant nobody noticed: every site reported
+            // enabled=false and profile=unknown while everything worked.
+            'enabled' => function_exists('wppilot_is_enabled') && wppilot_is_enabled(),
+            'safety_profile' => function_exists('wppilot_get_safety_profile')
+                ? wppilot_get_safety_profile()
+                : 'unknown',
             'change_records' => function_exists('wppilot_get_change_log') ? count(wppilot_get_change_log()) : 0,
         ],
     ];
@@ -199,7 +205,7 @@ function wppilot_security_audit(): array
     $home_uses_https = str_starts_with(home_url('/'), 'https://');
     $file_editor_disabled = defined('DISALLOW_FILE_EDIT') && DISALLOW_FILE_EDIT === true;
     $debug_display = defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY === true;
-    $safety_profile = function_exists('wppilot_safety_profile') ? (string) wppilot_safety_profile() : 'unknown';
+    $safety_profile = function_exists('wppilot_get_safety_profile') ? wppilot_get_safety_profile() : 'unknown';
     /** @var list<array<string, mixed>> $checks */
     $checks = [
         wppilot_diagnostic_check(
