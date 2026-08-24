@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.6.3
+Stable tag: 1.6.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -149,6 +149,14 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
+= 1.6.4 =
+* Preview inputs are encrypted at rest and malformed, tampered, legacy or oversized payloads fail closed. A stale apply can recover safely, while discard now refuses a preview another request is applying instead of racing it.
+* Menu item partial updates preserve fields the request did not change. Moving an item through the wrong menu, or assigning a parent from another menu, is refused.
+* The Block Editor Queue can claim an eligible batch beyond the first fifty records instead of reporting that no work exists.
+* Front-page site settings reject invalid page combinations before writing anything, and their preview shows the settings that will change.
+* Approval hooks now cover abilities added through the modern MCP transport, so Pro extensions receive the same preview and live safety checks as built-in abilities.
+* No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
+
 = 1.6.3 =
 * Fixed a Block Editor Queue batch getting stuck with nobody working it. If the tab that picked up a batch was closed, navigated away from, or left in the background long enough for the browser to throttle it, the batch stayed marked as running and no other tab would take it — an administrator had to cancel and queue it again. It is picked up and retried automatically now. A batch another tab is actively working is still left alone.
 * No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
@@ -250,6 +258,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.6.4 =
+Fixes preview confidentiality and lifecycle races, menu partial updates and ownership checks, queue discovery beyond the first fifty records, front-page settings validation, and approval enforcement for Pro abilities on the modern MCP transport. No new abilities or permission changes.
 
 = 1.6.3 =
 Fixes a Block Editor Queue batch getting stuck when the tab working it goes away — closed, navigated off, or throttled in the background. The batch is retried automatically instead of needing an administrator to cancel and re-queue it. One more fix, no new abilities, and existing connections keep working.

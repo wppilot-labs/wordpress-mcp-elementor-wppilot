@@ -295,6 +295,13 @@ function project_update_settings(array $before, array $input): array|WP_Error
         return new WP_Error('wppilot_preview_unsupported_target', 'The target is not a settings record.');
     }
 
+    if (function_exists('WPPilot\\Abilities\\WordPress\\wordpress_validate_site_settings')) {
+        $invalid = \WPPilot\Abilities\WordPress\wordpress_validate_site_settings($input);
+        if ($invalid instanceof WP_Error) {
+            return $invalid;
+        }
+    }
+
     /** @var array<string, mixed> $values */
     $values = is_array($before['values'] ?? null) ? $before['values'] : [];
     /** @var mixed $value */

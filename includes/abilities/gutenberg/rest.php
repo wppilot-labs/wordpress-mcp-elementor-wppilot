@@ -392,7 +392,7 @@ function rest_claim_next_batch(): WP_REST_Response|WP_Error
     // but it was only ever reached through this scan, and this scan could not see the batches that
     // needed it. A running batch whose lease is still valid refreshes to running, and claim_batch()
     // refuses it as not claimable, which this loop already skips over.
-    foreach (get_batches([STATUS_READY, STATUS_FAILED, STATUS_RUNNING], posts_per_page: 50) as $batch) {
+    foreach (get_batches([STATUS_READY, STATUS_FAILED, STATUS_RUNNING], posts_per_page: -1) as $batch) {
         $batch = refresh_batch_runtime_state($batch);
         if (!current_user_can_finalize_batch($batch)) {
             continue;

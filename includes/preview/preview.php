@@ -144,10 +144,18 @@ function build(string $ability_name, array $input): array|WP_Error
         $warnings[] = 'This call would not change anything. The values it sends already match what is stored.';
     }
 
+    $input_payload = Store\encode_input($input);
+    if (is_wp_error($input_payload)) {
+        return $input_payload;
+    }
+
     $now = time();
     $record = [
         'ability' => $ability_name,
+        // This copy is safe for logs and diagnostics only. Apply always uses
+        // the authenticated encrypted payload, never the lossy redaction.
         'input' => \wppilot_redact_for_log($input),
+        'input_payload' => $input_payload,
         'risk' => \wppilot_ability_risk($ability),
         'supported' => true,
         'would_fail' => false,
@@ -164,6 +172,9 @@ function build(string $ability_name, array $input): array|WP_Error
     ];
 
     $id = Store\create($record);
+    if (is_wp_error($id)) {
+        return $id;
+    }
     $record = Store\get($id) ?? $record;
     $record['preview_url'] = preview_url($id);
     $record['apply_ability'] = 'wppilot/apply-preview';
@@ -219,6 +230,21 @@ function apply(string $preview_id, bool $confirm): array|WP_Error
     }
 
     try {
+        // The status checked before claim_lock() may have changed while this
+        // request was waiting. Re-read it under the shared apply/discard lock.
+        $record = Store\get($preview_id);
+        if ($record === null) {
+            return new WP_Error('wppilot_preview_not_found', 'No such preview.', ['status' => 404]);
+        }
+        $status = (string) ($record['status'] ?? '');
+        if ($status !== Store\STATUS_PENDING) {
+            return new WP_Error(
+                'wppilot_preview_not_pending',
+                sprintf('This preview is %s and cannot be applied.', $status),
+                ['status' => 409, 'preview_id' => $preview_id, 'preview_status' => $status],
+            );
+        }
+
         $ability_name = (string) ($record['ability'] ?? '');
         $ability = resolve_ability($ability_name);
         if (!$ability instanceof WP_Ability) {
@@ -238,8 +264,38 @@ function apply(string $preview_id, bool $confirm): array|WP_Error
             return \wppilot_confirmation_required_error($ability);
         }
 
+        $payload = is_string($record['input_payload'] ?? null) ? $record['input_payload'] : '';
+        if ($payload === '') {
+            Store\update($preview_id, ['status' => Store\STATUS_FAILED]);
+            return new WP_Error(
+                'wppilot_preview_legacy_payload',
+                'This preview predates secure exact-input storage and cannot be applied. Create a new preview.',
+                ['status' => 409, 'preview_id' => $preview_id],
+            );
+        }
+
+        /** @var mixed $decoded_input */
+        $decoded_input = Store\decode_input($payload);
+        if (is_wp_error($decoded_input)) {
+            Store\update($preview_id, [
+                'status' => Store\STATUS_FAILED,
+                'error' => [
+                    'code' => $decoded_input->get_error_code(),
+                    'message' => $decoded_input->get_error_message(),
+                ],
+            ]);
+            return $decoded_input;
+        }
+        if (!is_array($decoded_input)) {
+            Store\update($preview_id, ['status' => Store\STATUS_FAILED]);
+            return new WP_Error(
+                'wppilot_preview_payload_invalid',
+                'The stored preview input is not an object.',
+                ['status' => 409, 'preview_id' => $preview_id],
+            );
+        }
         /** @var array<string, mixed> $input */
-        $input = is_array($record['input'] ?? null) ? $record['input'] : [];
+        $input = $decoded_input;
 
         // Re-read through the ledger's own capture, so a preview and the ledger
         // can never disagree about what the target is.
@@ -287,7 +343,7 @@ function apply(string $preview_id, bool $confirm): array|WP_Error
 
         // Fail closed: a crash between here and the result leaves the record
         // non-reapplyable rather than pending.
-        Store\update($preview_id, ['status' => Store\STATUS_APPLYING]);
+        Store\update($preview_id, ['status' => Store\STATUS_APPLYING, 'applying_at' => gmdate('c')]);
 
         apply_in_progress(true);
         try {
@@ -328,8 +384,33 @@ function discard(string $preview_id): array|WP_Error
     if ($record === null) {
         return new WP_Error('wppilot_preview_not_found', 'No such preview.', ['status' => 404]);
     }
-    Store\update($preview_id, ['status' => Store\STATUS_DISCARDED]);
-    return ['preview_id' => $preview_id, 'discarded' => true];
+    if (!Store\claim_lock($preview_id)) {
+        return new WP_Error(
+            'wppilot_preview_discard_raced',
+            'Another request is applying or discarding this preview.',
+            ['status' => 409, 'preview_id' => $preview_id],
+        );
+    }
+
+    try {
+        $record = Store\get($preview_id);
+        if ($record === null) {
+            return new WP_Error('wppilot_preview_not_found', 'No such preview.', ['status' => 404]);
+        }
+        $status = (string) ($record['status'] ?? '');
+        if ($status !== Store\STATUS_PENDING) {
+            return new WP_Error(
+                'wppilot_preview_not_pending',
+                sprintf('This preview is %s and cannot be discarded.', $status),
+                ['status' => 409, 'preview_id' => $preview_id, 'preview_status' => $status],
+            );
+        }
+
+        Store\update($preview_id, ['status' => Store\STATUS_DISCARDED, 'discarded_at' => gmdate('c')]);
+        return ['preview_id' => $preview_id, 'discarded' => true];
+    } finally {
+        Store\release_lock($preview_id);
+    }
 }
 
 /**

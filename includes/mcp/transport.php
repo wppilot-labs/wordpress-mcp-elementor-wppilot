@@ -571,6 +571,19 @@ function call_tool(array $params, mixed $id): array
         }
     }
 
+    // Extension point for controls supplied by companion plugins. It runs only
+    // after Free's safety, confirmation, preview and rate gates, and exactly
+    // once on the modern transport (which does not traverse the legacy adapter
+    // or direct Ability REST filters).
+    /** @var mixed $gated */
+    $gated = apply_filters('wppilot_modern_mcp_pre_ability_execute', $arguments, $ability, 'mcp');
+    if ($gated instanceof WP_Error) {
+        return tool_error($gated, $id);
+    }
+    if (is_array($gated)) {
+        $arguments = $gated;
+    }
+
     // No separate permission call: WP_Ability::execute() normalizes the input,
     // validates it against the schema, runs check_permissions(), fires the
     // ledger's before/after hooks, and validates the output. Duplicating the

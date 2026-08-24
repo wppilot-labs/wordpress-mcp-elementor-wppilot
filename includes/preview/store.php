@@ -41,6 +41,11 @@ const MAX_LIVE = 50;
 /** A single stored record. Beyond this the diff was already truncated. */
 const MAX_RECORD_BYTES = 262_144;
 
+/** A crashed request may leave an applying record or lock behind. */
+const APPLY_STALE_SECONDS = 3_600;
+
+const PAYLOAD_AAD = 'wppilot-preview-v1';
+
 const STATUS_PENDING = 'pending';
 const STATUS_APPLYING = 'applying';
 const STATUS_APPLIED = 'applied';
@@ -86,7 +91,7 @@ function write_index(array $ids): void
  *
  * @param array<string, mixed> $record
  */
-function create(array $record): string
+function create(array $record): string|\WP_Error
 {
     $id = wp_generate_uuid4();
     $record['preview_id'] = $id;
@@ -95,11 +100,20 @@ function create(array $record): string
     $encoded = wp_json_encode($record);
     if (is_string($encoded) && strlen($encoded) > MAX_RECORD_BYTES) {
         // The diff is the only unbounded part, and it is already capped. If a
-        // record still exceeds the budget, drop the entries rather than refuse
-        // the preview: the caller keeps the counts and the fingerprints.
+        // record still exceeds the budget, drop the entries before deciding
+        // whether the complete, encrypted input itself is too large to retain.
         $record['diff']['entries'] = [];
         $record['diff']['truncated'] = true;
         $record['diff']['dropped_for_size'] = true;
+
+        $encoded = wp_json_encode($record);
+        if (!is_string($encoded) || strlen($encoded) > MAX_RECORD_BYTES) {
+            return new \WP_Error(
+                'wppilot_preview_too_large',
+                'This preview is too large to store safely. Reduce the input and create a new preview.',
+                ['status' => 413],
+            );
+        }
     }
 
     update_option(option_name($id), $record, autoload: false);
@@ -130,6 +144,17 @@ function get(string $id): ?array
         update_option(option_name($id), $record, autoload: false);
     }
 
+    if (($record['status'] ?? '') === STATUS_APPLYING && applying_is_stale($record)) {
+        $record['status'] = STATUS_FAILED;
+        $record['error'] = [
+            'code' => 'wppilot_preview_apply_interrupted',
+            'message' => 'The apply request did not finish. Its result is unknown; review the site before retrying.',
+        ];
+        $record['failed_at'] = gmdate('c');
+        update_option(option_name($id), $record, autoload: false);
+        release_lock($id);
+    }
+
     return $record;
 }
 
@@ -141,6 +166,14 @@ function is_expired(array $record): bool
         return false;
     }
     return strtotime($expires) < time();
+}
+
+/** @param array<string, mixed> $record */
+function applying_is_stale(array $record): bool
+{
+    $started = (string) ($record['applying_at'] ?? $record['created_at'] ?? '');
+    $timestamp = $started !== '' ? strtotime($started) : false;
+    return $timestamp !== false && $timestamp <= time() - APPLY_STALE_SECONDS;
 }
 
 /**
@@ -181,6 +214,7 @@ function delete(string $id): void
         return;
     }
     delete_option(option_name($id));
+    delete_option(LOCK_PREFIX . $id);
     write_index(array_values(array_filter(index(), static fn(string $known): bool => $known !== $id)));
 }
 
@@ -201,6 +235,7 @@ function prune(): void
         }
         if (is_expired($record) && ($record['status'] ?? '') !== STATUS_APPLIED) {
             delete_option(option_name($id));
+            delete_option(LOCK_PREFIX . $id);
             continue;
         }
         $kept[] = $id;
@@ -209,6 +244,7 @@ function prune(): void
     if (count($kept) > MAX_LIVE) {
         foreach (array_slice($kept, offset: MAX_LIVE) as $id) {
             delete_option(option_name($id));
+            delete_option(LOCK_PREFIX . $id);
         }
         $kept = array_slice($kept, offset: 0, length: MAX_LIVE);
     }
@@ -229,7 +265,18 @@ function claim_lock(string $id): bool
     if (!is_valid_id($id)) {
         return false;
     }
-    return add_option(LOCK_PREFIX . $id, (string) time(), deprecated: '', autoload: 'no');
+    $name = LOCK_PREFIX . $id;
+    if (add_option($name, (string) time(), deprecated: '', autoload: 'no')) {
+        return true;
+    }
+
+    $claimed_at = (int) get_option($name, default_value: 0);
+    if ($claimed_at > time() - APPLY_STALE_SECONDS) {
+        return false;
+    }
+
+    delete_option($name);
+    return add_option($name, (string) time(), deprecated: '', autoload: 'no');
 }
 
 function release_lock(string $id): void
@@ -245,4 +292,98 @@ function release_lock(string $id): void
 function is_valid_id(string $id): bool
 {
     return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) === 1;
+}
+
+/**
+ * Encrypt the exact ability input retained for a later apply.
+ */
+function encode_input(mixed $input): string|\WP_Error
+{
+    if (!function_exists('openssl_encrypt')) {
+        return new \WP_Error(
+            'wppilot_preview_crypto_unavailable',
+            'This server cannot encrypt preview inputs, so the preview was not stored.',
+            ['status' => 500],
+        );
+    }
+
+    $json = wp_json_encode($input, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($json)) {
+        return new \WP_Error('wppilot_preview_encode_failed', 'The preview input could not be encoded.', ['status' => 500]);
+    }
+
+    try {
+        $iv = random_bytes(12);
+    } catch (\Throwable) {
+        return new \WP_Error('wppilot_preview_crypto_failed', 'The preview input could not be encrypted.', ['status' => 500]);
+    }
+
+    $tag = '';
+    $ciphertext = openssl_encrypt(
+        $json,
+        'aes-256-gcm',
+        hash('sha256', wp_salt('auth'), binary: true),
+        OPENSSL_RAW_DATA,
+        $iv,
+        $tag,
+        PAYLOAD_AAD,
+        16,
+    );
+    if (!is_string($ciphertext) || strlen($tag) !== 16) {
+        return new \WP_Error('wppilot_preview_crypto_failed', 'The preview input could not be encrypted.', ['status' => 500]);
+    }
+
+    $envelope = wp_json_encode([
+        'v' => 1,
+        'alg' => 'A256GCM',
+        'iv' => base64_encode($iv),
+        'tag' => base64_encode($tag),
+        'ciphertext' => base64_encode($ciphertext),
+    ], JSON_UNESCAPED_SLASHES);
+
+    return is_string($envelope)
+        ? $envelope
+        : new \WP_Error('wppilot_preview_encode_failed', 'The encrypted preview input could not be encoded.', ['status' => 500]);
+}
+
+/**
+ * Decode and authenticate an exact ability input.
+ */
+function decode_input(string $payload): mixed
+{
+    if (!function_exists('openssl_decrypt')) {
+        return new \WP_Error('wppilot_preview_crypto_unavailable', 'This server cannot decrypt the preview input.', ['status' => 500]);
+    }
+
+    /** @var mixed $envelope */
+    $envelope = json_decode($payload, associative: true);
+    if (!is_array($envelope) || ($envelope['v'] ?? null) !== 1 || ($envelope['alg'] ?? '') !== 'A256GCM') {
+        return new \WP_Error('wppilot_preview_payload_invalid', 'The stored preview input is invalid.', ['status' => 409]);
+    }
+
+    $iv = base64_decode((string) ($envelope['iv'] ?? ''), strict: true);
+    $tag = base64_decode((string) ($envelope['tag'] ?? ''), strict: true);
+    $ciphertext = base64_decode((string) ($envelope['ciphertext'] ?? ''), strict: true);
+    if (!is_string($iv) || strlen($iv) !== 12 || !is_string($tag) || strlen($tag) !== 16 || !is_string($ciphertext)) {
+        return new \WP_Error('wppilot_preview_payload_invalid', 'The stored preview input is invalid.', ['status' => 409]);
+    }
+
+    $json = openssl_decrypt(
+        $ciphertext,
+        'aes-256-gcm',
+        hash('sha256', wp_salt('auth'), binary: true),
+        OPENSSL_RAW_DATA,
+        $iv,
+        $tag,
+        PAYLOAD_AAD,
+    );
+    if (!is_string($json)) {
+        return new \WP_Error('wppilot_preview_payload_tampered', 'The stored preview input failed authentication.', ['status' => 409]);
+    }
+
+    /** @var mixed $decoded */
+    $decoded = json_decode($json, associative: true);
+    return json_last_error() === JSON_ERROR_NONE
+        ? $decoded
+        : new \WP_Error('wppilot_preview_payload_invalid', 'The stored preview input is invalid.', ['status' => 409]);
 }

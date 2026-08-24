@@ -225,7 +225,7 @@ register_core_ability('wppilot/upsert-menu-item', [
             'position' => ['type' => 'integer', 'minimum' => 0],
             'target' => ['type' => 'string'],
             'classes' => ['type' => 'array', 'items' => ['type' => 'string']],
-            'status' => ['type' => 'string', 'enum' => ['publish', 'draft'], 'default' => 'publish'],
+            'status' => ['type' => 'string', 'enum' => ['publish', 'draft']],
         ],
         'required' => ['menu_id'],
         'additionalProperties' => false,
@@ -429,9 +429,14 @@ function wordpress_get_site_settings(): array
     return $result;
 }
 
-/** @param array<string, mixed> $input @return array<string, mixed> */
-function wordpress_update_site_settings(array $input): array
+/** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
+function wordpress_update_site_settings(array $input): array|WP_Error
 {
+    $invalid = wordpress_validate_site_settings($input);
+    if ($invalid instanceof WP_Error) {
+        return $invalid;
+    }
+
     $sanitizers = wordpress_setting_sanitizers();
     $updated = [];
     foreach ($input as $key => $value) {
@@ -443,6 +448,49 @@ function wordpress_update_site_settings(array $input): array
         $updated[$key] = get_option($key);
     }
     return ['updated' => $updated, 'settings' => wordpress_get_site_settings()];
+}
+
+/** @param array<string, mixed> $input */
+function wordpress_validate_site_settings(array $input): ?WP_Error
+{
+    $sanitizers = wordpress_setting_sanitizers();
+    $effective = [];
+    foreach (['show_on_front', 'page_on_front', 'page_for_posts'] as $key) {
+        $value = array_key_exists($key, $input) ? $input[$key] : get_option($key);
+        $effective[$key] = $sanitizers[$key]($value);
+    }
+
+    foreach (['page_on_front', 'page_for_posts'] as $key) {
+        $post_id = (int) $effective[$key];
+        if ($post_id === 0) {
+            continue;
+        }
+        $post = get_post($post_id);
+        if (!$post instanceof WP_Post || $post->post_type !== 'page' || $post->post_status !== 'publish') {
+            return new WP_Error(
+                'wppilot_invalid_reading_page',
+                sprintf('%s must identify an existing published page.', $key),
+                ['status' => 422, 'setting' => $key, 'post_id' => $post_id],
+            );
+        }
+    }
+
+    if ($effective['show_on_front'] === 'page' && (int) $effective['page_on_front'] === 0) {
+        return new WP_Error(
+            'wppilot_front_page_required',
+            'page_on_front must identify a published page when show_on_front is page.',
+            ['status' => 422],
+        );
+    }
+    if ((int) $effective['page_on_front'] > 0 && $effective['page_on_front'] === $effective['page_for_posts']) {
+        return new WP_Error(
+            'wppilot_reading_pages_conflict',
+            'page_on_front and page_for_posts must be different pages.',
+            ['status' => 422],
+        );
+    }
+
+    return null;
 }
 
 /** @return array<string, callable(mixed): mixed> */
@@ -549,6 +597,29 @@ function wordpress_upsert_menu_item(array $input): array|WP_Error
     }
 
     $args = [];
+    if ($item_id > 0) {
+        $item = get_post($item_id);
+        if (!$item instanceof WP_Post || $item->post_type !== 'nav_menu_item') {
+            return new WP_Error(
+                'wppilot_menu_item_not_found',
+                __('Navigation menu item not found.', domain: 'wppilot'),
+                ['status' => 404],
+            );
+        }
+        $membership = is_object_in_term($item_id, 'nav_menu', $menu_id);
+        if (is_wp_error($membership)) {
+            return $membership;
+        }
+        if ($membership !== true) {
+            return new WP_Error(
+                'wppilot_menu_item_wrong_menu',
+                __('The navigation menu item does not belong to the requested menu.', domain: 'wppilot'),
+                ['status' => 409, 'item_id' => $item_id, 'menu_id' => $menu_id],
+            );
+        }
+        $args = wordpress_existing_menu_item_args($item);
+    }
+
     foreach ([
         'title' => 'menu-item-title',
         'url' => 'menu-item-url',
@@ -561,7 +632,8 @@ function wordpress_upsert_menu_item(array $input): array|WP_Error
             continue;
         }
 
-        $args[$target] = (string) $input[$source];
+        $value = (string) $input[$source];
+        $args[$target] = $source === 'title' ? wp_slash($value) : $value;
     }
     foreach ([
         'object_id' => 'menu-item-object-id',
@@ -575,15 +647,69 @@ function wordpress_upsert_menu_item(array $input): array|WP_Error
         $args[$target] = (int) $input[$source];
     }
     if (array_key_exists('classes', $input)) {
-        $args['menu-item-classes'] = array_map('sanitize_html_class', (array) $input['classes']);
+        $args['menu-item-classes'] = implode(' ', array_filter(array_map(
+            static fn(mixed $class): string => sanitize_html_class((string) $class),
+            (array) $input['classes'],
+        )));
     }
-    $args['menu-item-status'] ??= 'publish';
+
+    $parent_id = (int) ($args['menu-item-parent-id'] ?? 0);
+    if ($parent_id > 0) {
+        if ($parent_id === $item_id) {
+            return new WP_Error(
+                'wppilot_menu_item_parent_invalid',
+                __('A navigation menu item cannot be its own parent.', domain: 'wppilot'),
+                ['status' => 422],
+            );
+        }
+        $parent = get_post($parent_id);
+        $parent_membership = $parent instanceof WP_Post && $parent->post_type === 'nav_menu_item'
+            ? is_object_in_term($parent_id, 'nav_menu', $menu_id)
+            : false;
+        if (is_wp_error($parent_membership)) {
+            return $parent_membership;
+        }
+        if ($parent_membership !== true) {
+            return new WP_Error(
+                'wppilot_menu_item_parent_wrong_menu',
+                __('The parent navigation item does not belong to the requested menu.', domain: 'wppilot'),
+                ['status' => 422, 'parent_id' => $parent_id, 'menu_id' => $menu_id],
+            );
+        }
+    }
+    if ($item_id === 0) {
+        $args['menu-item-status'] ??= 'publish';
+    }
     $updated = wp_update_nav_menu_item($menu_id, $item_id, $args);
     if (is_wp_error($updated)) {
         return $updated;
     }
     $item = get_post((int) $updated);
     return $item instanceof WP_Post ? wordpress_menu_item_summary($item) : ['id' => (int) $updated];
+}
+
+/** @return array<string, mixed> */
+function wordpress_existing_menu_item_args(WP_Post $item): array
+{
+    $classes = get_post_meta($item->ID, '_menu_item_classes', single: true);
+    return [
+        'menu-item-object-id' => (int) get_post_meta($item->ID, '_menu_item_object_id', single: true),
+        'menu-item-object' => (string) get_post_meta($item->ID, '_menu_item_object', single: true),
+        'menu-item-parent-id' => (int) get_post_meta($item->ID, '_menu_item_menu_item_parent', single: true),
+        'menu-item-position' => (int) $item->menu_order,
+        'menu-item-type' => (string) get_post_meta($item->ID, '_menu_item_type', single: true),
+        'menu-item-title' => wp_slash($item->post_title),
+        'menu-item-url' => (string) get_post_meta($item->ID, '_menu_item_url', single: true),
+        'menu-item-description' => wp_slash($item->post_content),
+        'menu-item-attr-title' => wp_slash($item->post_excerpt),
+        'menu-item-target' => (string) get_post_meta($item->ID, '_menu_item_target', single: true),
+        'menu-item-classes' => implode(' ', array_filter(array_map(
+            static fn(mixed $class): string => sanitize_html_class((string) $class),
+            is_array($classes) ? $classes : (preg_split('/\s+/', (string) $classes) ?: []),
+        ))),
+        'menu-item-xfn' => (string) get_post_meta($item->ID, '_menu_item_xfn', single: true),
+        'menu-item-status' => $item->post_status,
+    ];
 }
 
 /** @param array<string, mixed> $input @return array<string, mixed>|WP_Error */
