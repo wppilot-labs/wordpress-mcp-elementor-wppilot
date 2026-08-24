@@ -1,3 +1,11 @@
+v1.6.4 - 2026/08/24
+* Preview inputs are now encrypted at rest with authenticated encryption. A malformed, tampered, legacy or oversized stored payload is refused rather than passed to an ability. Applying can recover a stale applying claim, while discard now shares the same lock and refuses a preview another request is applying instead of racing it.
+* Fixed partial menu item updates clearing fields the request did not send, including CSS classes. An item cannot be updated through a menu it does not belong to, and its parent must belong to the same menu.
+* Fixed the Block Editor Queue considering only the first fifty batches when looking for claimable work. It now scans through later pages until it finds an eligible batch or exhausts the queue.
+* Fixed front-page site settings accepting invalid page IDs or combinations and partially writing earlier settings before a later validation failed. Validation now completes before any write, and the preview projector shows the affected settings.
+* The modern MCP transport now exposes the same extension hook as the legacy transport, so Pro abilities receive preview approval and a live safety re-check immediately before execution.
+* No new abilities and no permission changes. Existing connections keep working and do not need re-authorising.
+
 v1.6.3 - 2026/08/23
 * Fixed a Block Editor Queue batch stranding in the running state with nobody working it. A tab that claimed a batch and then went away — closed, navigated off, or throttled by the browser past the five-minute lease — left the batch running and its item leased to a runtime that no longer existed. The recovery for exactly that case was already written: release_expired_leases_for_batch() fails the batch with a message naming the abandoned tab, which makes it claimable again. Nothing reached it, because the scan that calls it looked only at ready and failed batches, and a stranded batch is neither. The scan now includes running batches. One whose lease is still valid is refused as not claimable and skipped, exactly as before, so a batch another tab is actively working cannot be taken from it.
 * 1.6.2 stopped WPPilot producing that state from a malformed request. This is the other half: recovering a batch that reached it some other way, without an administrator having to cancel and re-queue.

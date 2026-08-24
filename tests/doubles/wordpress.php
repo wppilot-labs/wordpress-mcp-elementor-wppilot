@@ -94,6 +94,15 @@ final class WPPilot_Test_State
      */
     public static array $post_meta = [];
 
+    /** @var list<int> */
+    public static array $nav_menus = [];
+
+    /** @var array<int, list<int>> Menu item id to menu ids. */
+    public static array $nav_menu_memberships = [];
+
+    /** @var list<array{menu_id: int, item_id: int, args: array<string, mixed>}> */
+    public static array $nav_menu_updates = [];
+
     /**
      * What wp_restore_post_revision() answers. WordPress returns the post id on
      * success, false when the revision carried no restorable fields, and null on
@@ -116,6 +125,9 @@ final class WPPilot_Test_State
         self::$posts = [];
         self::$revisions = [];
         self::$post_meta = [];
+        self::$nav_menus = [];
+        self::$nav_menu_memberships = [];
+        self::$nav_menu_updates = [];
         self::$restore_result = null;
     }
 
@@ -246,6 +258,25 @@ if (!class_exists('WP_Post')) {
         public string $post_modified_gmt = '';
 
         public int $post_author = 0;
+
+        public int $menu_order = 0;
+
+        public string $title = '';
+
+        public string $url = '';
+
+        public string $type = '';
+
+        public string $object = '';
+
+        public int $object_id = 0;
+
+        public int $menu_item_parent = 0;
+
+        public string $target = '';
+
+        /** @var list<string> */
+        public array $classes = [];
     }
 }
 
@@ -374,9 +405,9 @@ if (!function_exists('get_post_meta')) {
      * with $single returns the first value or '' when absent; a key without
      * $single returns the whole list.
      *
-     * @return array<string, list<string>>|list<string>|string
+     * @return mixed
      */
-    function get_post_meta(int $post_id, string $key = '', bool $single = false): array|string
+    function get_post_meta(int $post_id, string $key = '', bool $single = false): mixed
     {
         $meta = WPPilot_Test_State::$post_meta[$post_id] ?? [];
 
@@ -410,9 +441,9 @@ if (!function_exists('wp_get_object_terms')) {
 }
 
 if (!function_exists('wp_json_encode')) {
-    function wp_json_encode(mixed $value): string|false
+    function wp_json_encode(mixed $value, int $flags = 0, int $depth = 512): string|false
     {
-        return json_encode($value);
+        return json_encode($value, $flags, $depth);
     }
 }
 
@@ -746,6 +777,80 @@ if (!function_exists('wp_generate_uuid4')) {
             random_int(0, 0xffff),
             random_int(0, 0xffff),
         );
+    }
+}
+
+if (!function_exists('delete_option')) {
+    function delete_option(string $option): bool
+    {
+        if (!array_key_exists($option, WPPilot_Test_State::$options)) {
+            return false;
+        }
+        unset(WPPilot_Test_State::$options[$option]);
+        return true;
+    }
+}
+
+if (!function_exists('wp_salt')) {
+    function wp_salt(string $scheme = 'auth'): string
+    {
+        return 'wppilot-test-salt-' . $scheme;
+    }
+}
+
+if (!function_exists('wp_slash')) {
+    function wp_slash(mixed $value): mixed
+    {
+        return is_string($value) ? addslashes($value) : $value;
+    }
+}
+
+if (!function_exists('sanitize_html_class')) {
+    function sanitize_html_class(string $class): string
+    {
+        return preg_replace('/[^A-Za-z0-9_-]/', '', $class) ?? '';
+    }
+}
+
+if (!function_exists('wp_get_nav_menu_object')) {
+    function wp_get_nav_menu_object(int $menu_id): object|false
+    {
+        return in_array($menu_id, WPPilot_Test_State::$nav_menus, true)
+            ? (object) ['term_id' => $menu_id, 'name' => 'Menu ' . $menu_id]
+            : false;
+    }
+}
+
+if (!function_exists('is_object_in_term')) {
+    function is_object_in_term(int $object_id, string $taxonomy, int $term_id): bool|WP_Error
+    {
+        return $taxonomy === 'nav_menu'
+            && in_array($term_id, WPPilot_Test_State::$nav_menu_memberships[$object_id] ?? [], true);
+    }
+}
+
+if (!function_exists('wp_update_nav_menu_item')) {
+    /** @param array<string, mixed> $args */
+    function wp_update_nav_menu_item(int $menu_id, int $item_id, array $args): int|WP_Error
+    {
+        WPPilot_Test_State::$nav_menu_updates[] = compact('menu_id', 'item_id', 'args');
+        return $item_id > 0 ? $item_id : 999;
+    }
+}
+
+if (!function_exists('wp_setup_nav_menu_item')) {
+    function wp_setup_nav_menu_item(WP_Post $item): object
+    {
+        $item->title = $item->post_title;
+        $item->url = (string) get_post_meta($item->ID, '_menu_item_url', true);
+        $item->type = (string) get_post_meta($item->ID, '_menu_item_type', true);
+        $item->object = (string) get_post_meta($item->ID, '_menu_item_object', true);
+        $item->object_id = (int) get_post_meta($item->ID, '_menu_item_object_id', true);
+        $item->menu_item_parent = (int) get_post_meta($item->ID, '_menu_item_menu_item_parent', true);
+        $item->target = (string) get_post_meta($item->ID, '_menu_item_target', true);
+        $classes = get_post_meta($item->ID, '_menu_item_classes', true);
+        $item->classes = is_array($classes) ? $classes : [];
+        return $item;
     }
 }
 

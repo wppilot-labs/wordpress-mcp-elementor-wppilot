@@ -129,7 +129,12 @@ function handle_discard(): void
     $id = read_id();
     require_capability_and_nonce('wppilot_preview_discard_' . $id);
 
-    Preview\discard($id);
+    $result = Preview\discard($id);
+    if (is_wp_error($result)) {
+        redirect_with_notice('error', $result->get_error_message(), ['preview' => $id]);
+        return;
+    }
+
     redirect_with_notice('success', __('The preview was discarded. Nothing was written.', domain: 'wppilot'));
 }
 
