@@ -1,3 +1,8 @@
+v1.7.0 - 2026/08/25
+* New ability: wppilot/search-images, stock-image search over Openverse — WordPress.org's own openly-licensed media search. No API key, no account, and every result carries the licence, the creator, and a ready-made attribution string. The ability description instructs the agent to import a chosen result with wppilot/import-media-url and to carry the attribution into the caption, because attribution is a licence obligation for every CC licence except CC0 and the public domain mark, not a courtesy.
+* The per-page cap matches what Openverse actually grants an anonymous caller (20), rather than promising a page size the API silently clamps. A rate-limited response is reported as exactly that, with an instruction to wait rather than retry. The endpoint is queried only when the ability is called, and receives the search terms and filters, nothing else.
+* One new read-only ability gated on the upload_files capability. No permission changes to anything existing; connections keep working and do not need re-authorising.
+
 v1.6.4 - 2026/08/24
 * Preview inputs are now encrypted at rest with authenticated encryption. A malformed, tampered, legacy or oversized stored payload is refused rather than passed to an ability. Applying can recover a stale applying claim, while discard now shares the same lock and refuses a preview another request is applying instead of racing it.
 * Fixed partial menu item updates clearing fields the request did not send, including CSS classes. An item cannot be updated through a menu it does not belong to, and its parent must belong to the same menu.

@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.6.4
+Stable tag: 1.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,6 +71,8 @@ The Overview screen names the AI clients actually talking to your site, identifi
 The MCP endpoint runs on your own site, and your AI client connects to it directly without a WPPilot-hosted content relay.
 
 WPPilot Chat is different: when you use Chat, WordPress sends the conversation history, selected attachments, site instructions, tool definitions and relevant tool results to the AI provider and model you selected through the WordPress AI Client. That provider is an external service and its own terms and privacy policy apply. WPPilot adds suggested text to WordPress's Privacy Policy Guide and integrates with the personal-data export and erase tools.
+
+The stock-image search ability queries Openverse (api.openverse.org), WordPress.org's openly-licensed media search, and only when an agent calls it. The search terms and filters are sent to Openverse; nothing about your site, your users, or your content goes with them, and no account or API key is involved. Openverse is operated by the WordPress.org project and its own terms apply. Importing a chosen image then downloads that file from wherever its source hosts it, exactly as pasting the URL into the media importer would.
 
 When you use OAuth, the client you are connecting registers itself with your site. That traffic is between your site and your own AI client, and no WPPilot server is involved.
 
@@ -148,6 +150,11 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.7.0 =
+* New ability: wppilot/search-images. Searches Openverse — WordPress.org's openly-licensed media search — for CC-licensed and public-domain images, with licence, licence-type, orientation, extension and source filters. No API key and no account. Every result carries a ready-made attribution string, and the ability's own description tells the agent to carry it into the caption when importing, because attribution is a licence obligation for every CC licence except CC0 and the public domain mark.
+* Search and import stay separate abilities on purpose: search is read-only and costs nothing, and a failed import should not look like a failed search. Import a chosen result with the existing wppilot/import-media-url.
+* See External services above for exactly what the search sends: the query and filters, and nothing else.
 
 = 1.6.4 =
 * Preview inputs are encrypted at rest and malformed, tampered, legacy or oversized payloads fail closed. A stale apply can recover safely, while discard now refuses a preview another request is applying instead of racing it.
