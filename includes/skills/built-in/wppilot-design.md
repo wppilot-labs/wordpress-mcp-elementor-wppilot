@@ -61,7 +61,17 @@ brief (purpose, audience, tone, existing brand or reference), then propose **2-3
 distinct, bespoke** directions — exact fonts, a specific palette, a scale, a
 compositional posture (see dials). Make each feel deliberate, never a generic
 template. The user picks; you write the full DESIGN.md and call
-`wppilot/save-design` (`activate: true`). Confirm that the response says both
+`wppilot/save-design` (`activate: true`).
+
+`wppilot/list-design-examples` holds seven worked directions — light and dark,
+serif and sans, dense and airy, quiet and loud. They are **reference, not a
+menu**: nothing applies one, and copying a palette onto a site it was not chosen
+for produces exactly the generic result this whole skill exists to prevent. Read
+the one nearest the brief to see how a finished direction argues its palette,
+phrases its Don'ts so the gate can act on them, and writes component treatments —
+the section real DESIGN.md files most often omit. Then write one for this site.
+One of them, `warm-craft`, is a worked example of the other thing worth copying:
+how to declare a deliberate waiver for an anti-slop rule instead of tripping it. Confirm that the response says both
 `saved: true` and `activated: true`; an incomplete document is preserved as a
 draft with `activation_blocked: true`, never silently made active.
 
@@ -92,6 +102,16 @@ always safe; a surface-specific read ability, where installed, can read a
 builder's global kit more precisely, but the rendered-output read works on any
 surface without it. This is the accurate, fast way to seed — or **update** — a
 direction from what the site already looks like.
+
+`wppilot/adopt-design-from-site` does this read for you and returns a DESIGN.md
+draft: the block theme's `theme.json` palette and font families, the standard
+Customizer colours, and — where a builder module is installed — that builder's
+own kit, merged most-authoritative-first. It saves nothing, and it reports the
+adopted palette's contrast alongside the draft, because an inherited palette was
+never chosen and finding out it cannot carry body text is worth knowing before
+anyone builds on it. What it cannot recover is the reasoning: which colour is the
+accent rather than merely present, what the site must never do. Add that, then
+save.
 
 When you synthesize a DESIGN.md from an existing site, **estimate the `dials`
 and write them explicitly** — never omit them on this path. The defaults
@@ -351,7 +371,9 @@ interactions, a coded theme's GSAP); this is the discipline they share.
 
 - **Every control passes contrast.** Check button text against its own background,
   and form text, placeholders and focus rings against their section (WCAG AA: 4.5:1
-  for body, 3:1 for large). A ghost button over a photo needs a scrim or a stroke;
+  for body, 3:1 for large). `wppilot/check-contrast` does the arithmetic against
+  the active palette and reports which pairs are safe for text — run it when you
+  set a direction, not after a user reports the page is unreadable. A ghost button over a photo needs a scrim or a stroke;
   white-on-white CTAs and near-white form text are banned.
 - **One label per intent.** "Get in touch", "Contact us" and "Let's talk" are the
   same action — pick one label and use it in the nav, hero and footer. Two CTAs of
@@ -410,6 +432,18 @@ always wins over the default rule.
 - `not_checked` lists structural rules the check cannot see from a string
   (hero-in-viewport, centered mega-hero, three equal cards, eyebrow overuse,
   zigzag cap). Self-audit those by hand.
+
+Then check the **published** page with `wppilot/verify-rendered-page`. The
+pre-flight reads the string you produced; this fetches what the server actually
+sends, which is your output plus the theme, the builder and every other plugin.
+It reports heading order, images without alt text, empty elements, PHP notices
+that made it into the markup, page weight, and the colours and faces actually
+present. A build can pass every check on its own output and still land on a page
+whose accent is the theme's, because the theme's stylesheet loads last.
+
+It does not run JavaScript, fetch external stylesheets, or compute the cascade,
+and its `not_checked` list says so. Read that list before telling a user a page
+is clean.
 
 A violation is a **surgical correction, not a cue to rebuild**: change only the
 token or word the `evidence` points to, then re-check. Never discard a good
