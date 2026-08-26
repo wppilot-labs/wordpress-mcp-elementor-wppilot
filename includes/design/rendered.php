@@ -273,7 +273,10 @@ function headings(DOMXPath $xpath, array &$summary): array
             'severity' => 'warn',
             'message' => sprintf(
                 /* translators: %d: number of h1 elements. */
-                __('The page has %d h1 elements; one is the convention.', domain: 'wppilot'),
+                __(
+                    'The page has %d h1 elements; one is the convention. On a builder page this is usually the theme printing the post title above a hero that already carries one: switch the page to the builder\'s own full-width or canvas template, or demote the hero heading.',
+                    domain: 'wppilot',
+                ),
                 $h1,
             ),
             'evidence' => (string) $h1,

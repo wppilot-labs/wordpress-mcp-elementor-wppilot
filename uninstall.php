@@ -20,6 +20,9 @@ declare(strict_types=1);
  * - wp-content/wppilot-sandbox/ holds PHP written through the sandbox. That is
  *   the site owner's own code, and deleting source is not recoverable, so it
  *   stays. The directory is inert once the plugin is gone.
+ * - Designs and skills are documents somebody wrote, for the same reason. They
+ *   are removed only when the site has explicitly opted in by setting
+ *   wppilot_delete_content_on_uninstall; absent means keep.
  * - Nothing outside WPPilot's own prefixes is touched.
  */
 
@@ -79,6 +82,8 @@ function wppilot_uninstall_options(): array
         'wppilot_oauth_encryption_key',
         // includes/environment.php + includes/abilities/policy.php
         'wppilot_ai_abilities_enabled',
+        // Read before this loop runs; see wppilot_uninstall_current_site().
+        'wppilot_delete_content_on_uninstall',
         'wppilot_ai_abilities_domain',
         'wppilot_ability_rules',
         // includes/safety.php
@@ -112,17 +117,53 @@ function wppilot_uninstall_options(): array
 }
 
 /**
- * Post types whose posts belong to WPPilot.
+ * Post types holding data WPPilot generated, which goes with the plugin.
  *
  * @return list<string>
  */
-function wppilot_uninstall_post_types(): array
+function wppilot_uninstall_machine_post_types(): array
+{
+    return [
+        // The Block Editor queue: pending batches for a runtime that no longer
+        // exists once the plugin is gone.
+        'wppilot_gb_change',
+    ];
+}
+
+/**
+ * Post types holding what the site owner wrote, which does not.
+ *
+ * A design is a document somebody authored: a palette argued for, rules about
+ * what the site must never do, reasoning that took a conversation to produce.
+ * A skill is the same. Neither can be regenerated from anything left behind,
+ * and both used to be deleted here without asking — the same decision as
+ * deleting a site's posts, made silently on the way out.
+ *
+ * This file already draws that line for the sandbox directory, on the grounds
+ * that it holds the owner's own code and deleting source is not recoverable.
+ * Authored content is the same category and now gets the same treatment.
+ *
+ * @return list<string>
+ */
+function wppilot_uninstall_authored_post_types(): array
 {
     return [
         'wppilot_skill',
         'wppilot_design',
-        'wppilot_gb_change',
     ];
+}
+
+/**
+ * Whether the site asked for its authored content to be destroyed too.
+ *
+ * Opt-in, and read before any option is deleted. Absent means keep, so a site
+ * that never made the choice keeps its designs and skills.
+ */
+function wppilot_uninstall_should_delete_authored(): bool
+{
+    $choice = get_option('wppilot_delete_content_on_uninstall', false);
+
+    return $choice === '1' || $choice === 1 || $choice === true;
 }
 
 /**
@@ -218,8 +259,17 @@ function wppilot_uninstall_current_site(): void
         wp_clear_scheduled_hook($hook);
     }
 
-    foreach (wppilot_uninstall_post_types() as $post_type) {
+    // Read before the options are deleted below, or the answer is gone by the
+    // time it is asked for.
+    $delete_authored = wppilot_uninstall_should_delete_authored();
+
+    foreach (wppilot_uninstall_machine_post_types() as $post_type) {
         wppilot_uninstall_delete_posts($post_type);
+    }
+    if ($delete_authored) {
+        foreach (wppilot_uninstall_authored_post_types() as $post_type) {
+            wppilot_uninstall_delete_posts($post_type);
+        }
     }
 
     foreach (wppilot_uninstall_options() as $option) {
