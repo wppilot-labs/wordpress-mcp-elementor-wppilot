@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.8.0
+Stable tag: 1.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -150,6 +150,11 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.9.0 =
+* New ability: wppilot/check-contrast. Computes WCAG contrast ratios for every pair in the active design's palette and reports which surfaces can carry body text at AA. Ask it what to put on a background and it answers with the design's own colours instead of defaulting to black or white, and it names a palette that cannot produce readable text at all rather than leaving that to be discovered page by page.
+* The active design is now put in front of the agent automatically. Its palette, type stack and Don't rules are appended to the server instructions every session, so an agent starts a build already knowing the direction rather than having to ask for it. Prevention is cheaper than a refusal; the design block is fenced and marked untrusted, because a design file may have been imported from anywhere.
+* No permission changes. One new read-only ability; existing connections keep working and do not need re-authorising.
 
 = 1.8.0 =
 * New: the active design can now be enforced on the write path. Under **WPPilot > Settings > Design direction on writes**, choose Off, Warn and record, or Refuse the write. A write using a colour outside the palette, a font outside the type stack, or something the design's own Don't rules forbid is either recorded in the change ledger or refused outright.
