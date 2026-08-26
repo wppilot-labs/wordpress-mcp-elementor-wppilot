@@ -37,19 +37,59 @@ $page_style = $page_accent !== '' ? '--ds-accent:' . $page_accent : '';
         esc_url(add_query_arg(['page' => Admin\PAGE_SLUG, 'import' => 1], admin_url('admin.php')))
     ; ?>" class="page-title-action"><?php esc_html_e('Import DESIGN.md', domain: 'wppilot'); ?></a>
     <hr class="wp-header-end" />
+
+    <?php require __DIR__ . '/hero.php'; ?>
+
+    <?php
+    /**
+     * Tabs on this screen.
+     *
+     * Merging Brand Kit in left eight stacked sections in one column, which is
+     * a scroll rather than a screen. Tabs are query-argument rather than
+     * scripted so a POST can return to the tab it came from, and so a link to
+     * one is a link somebody can send.
+     *
+     * @param array<string, string> $tabs Slug to label.
+     */
+    $tabs = apply_filters('wppilot_design_panel_tabs', [
+        'designs' => __('Your designs', domain: 'wppilot'),
+        'starters' => __('Starter kits', domain: 'wppilot'),
+    ]);
+    $tab = isset($_GET['tab']) && is_string($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'designs';
+    if (!isset($tabs[$tab])) {
+        $tab = 'designs';
+    }
+    ?>
+    <nav class="nav-tab-wrapper wppilot-design-tabs">
+        <?php foreach ($tabs as $tab_slug => $tab_label): ?>
+            <a
+                class="nav-tab<?php echo $tab_slug === $tab ? ' nav-tab-active' : ''; ?>"
+                href="<?php echo esc_url(add_query_arg(
+                    ['page' => Admin\PAGE_SLUG, 'tab' => $tab_slug],
+                    admin_url('admin.php'),
+                )); ?>"
+            ><?php echo esc_html($tab_label); ?></a>
+        <?php endforeach; ?>
+    </nav>
+
+    <?php if ($tab !== 'designs' && $tab !== 'starters') {
+        /**
+         * A tab another plugin registered.
+         *
+         * @param string $active_slug The active design's slug, or ''.
+         */
+        do_action('wppilot_design_panel_tab_' . $tab, $active_slug);
+    } ?>
+
+    <?php if ($tab === 'starters') {
+        require __DIR__ . '/starters.php';
+    } ?>
+
+    <?php if ($tab === 'designs'): ?>
     <p class="wppilot-design-intro"><?php esc_html_e(
-        'Your site has one design direction: the active design your AI builds within. It is created for this site from a brief, not picked from a catalog. On every page the AI also enforces a floor of anti-slop rules.',
+        'One design is active at a time, and it is the one your AI builds within. Every colour and typeface on this page is enforced on the write path: a page that reaches for something else is refused, not quietly corrected.',
         domain: 'wppilot',
     ); ?></p>
-
-    <?php if ($library === []): ?>
-        <div class="wppilot-design-empty">
-            <p><?php esc_html_e(
-                'No design system yet. Ask your AI agent to create one for this site, or import a DESIGN.md.',
-                domain: 'wppilot',
-            ); ?></p>
-        </div>
-    <?php endif; ?>
 
     <div class="wppilot-design-gallery">
         <?php foreach ($library as $entry):
@@ -148,21 +188,5 @@ $page_style = $page_accent !== '' ? '--ds-accent:' . $page_accent : '';
             </article>
         <?php endforeach; ?>
     </div>
-
-    <?php
-    /**
-     * Sections other plugins add to this screen.
-     *
-     * The design and the things done with it belong on one screen. Pro's Brand
-     * Kit was a second menu item whose every section was about the active
-     * design — what it looks like, whether its palette is readable, where it can
-     * be written — which meant two entries that sounded like the same thing and
-     * no way to guess which one to open.
-     *
-     * @param string $active_slug The active design's slug, or '' when none is active.
-     */
-    do_action('wppilot_design_panel_sections', $active_slug);
-    ?>
-
-    <?php require __DIR__ . '/starters.php'; ?>
+    <?php endif; ?>
 </div>

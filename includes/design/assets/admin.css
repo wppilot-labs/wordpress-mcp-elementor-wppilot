@@ -1297,3 +1297,186 @@ ul.wppilot-doc-list {
     font-size: 12px;
     color: #646970;
 }
+
+/* ------------------------------------------------------------------ hero
+   The active design, in its own colours, above everything else. The first
+   question on this screen is "what is my site set to right now", and it was
+   previously answered somewhere inside a list, in hex. */
+
+.wppilot-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 0;
+    margin: 20px 0 24px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
+
+@media (max-width: 960px) {
+    .wppilot-hero {
+        grid-template-columns: 1fr;
+    }
+}
+
+.wppilot-hero-specimen {
+    position: relative;
+    padding: 32px 32px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.wppilot-hero-kicker {
+    margin: 0 0 14px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    opacity: .5;
+}
+
+.wppilot-hero-display {
+    margin: 0 0 10px;
+    font-size: 34px;
+    line-height: 1.06;
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+.wppilot-hero-sample {
+    margin: 0 0 20px;
+    font-size: 15px;
+    line-height: 1.6;
+    opacity: .78;
+    max-width: 42ch;
+}
+
+.wppilot-hero-cta {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: var(--wppilot-radius, 8px);
+    background: var(--wppilot-accent, #2271b1);
+    color: var(--wppilot-bg, #fff);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Flush to the bottom edge, so the palette reads as the ground the specimen
+   sits on rather than as another row of chips. */
+.wppilot-hero-swatches {
+    display: flex;
+    margin: 28px -32px 0;
+    height: 44px;
+}
+
+.wppilot-hero-swatch {
+    flex: 1 1 0;
+}
+
+.wppilot-hero-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 32px;
+    border-inline-start: 1px solid #e6e7e8;
+}
+
+@media (max-width: 960px) {
+    .wppilot-hero-facts {
+        border-inline-start: 0;
+        border-block-start: 1px solid #e6e7e8;
+    }
+}
+
+.wppilot-hero-facts h2 {
+    margin: 0;
+    padding: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.wppilot-hero-desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #50575e;
+}
+
+.wppilot-hero-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.wppilot-hero-chips li {
+    margin: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f0f0f1;
+    color: #50575e;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.wppilot-hero-chips li.is-ok {
+    background: #edfaef;
+    color: #14622a;
+}
+
+.wppilot-hero-chips li.is-warn {
+    background: #fcf3e3;
+    color: #8a5700;
+}
+
+.wppilot-hero-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+/* Empty state. Somebody with no design needs a route in, not a status panel. */
+.wppilot-hero-empty {
+    grid-template-columns: 1fr;
+    background: linear-gradient(180deg, #fbfbfc 0%, #fff 100%);
+}
+
+.wppilot-hero-empty-body {
+    padding: 40px 32px;
+    max-width: 68ch;
+}
+
+.wppilot-hero-empty-body h2 {
+    margin: 0 0 10px;
+    padding: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.wppilot-hero-empty-body p {
+    margin: 0 0 10px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #50575e;
+}
+
+.wppilot-hero-empty-routes {
+    color: #1d2327 !important;
+}
+
+/* ------------------------------------------------------------------ tabs */
+
+.wppilot-design-tabs {
+    margin: 8px 0 22px;
+}
+
+.wppilot-brand-kit {
+    margin-top: 4px;
+}
