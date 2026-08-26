@@ -103,5 +103,8 @@ function wppilot_change_public_summary(array $entry): array
         'reversible' => ($rollback['reversible'] ?? false) === true,
         'rollback_reason' => (string) ($rollback['reason'] ?? ''),
         'rolled_back' => ($entry['rolled_back'] ?? false) === true,
+        // Only present when the design gate found something. Omitted rather
+        // than reported empty, so a clean ledger stays readable.
+        'design' => is_array($entry['design'] ?? null) && $entry['design'] !== [] ? $entry['design'] : null,
     ];
 }

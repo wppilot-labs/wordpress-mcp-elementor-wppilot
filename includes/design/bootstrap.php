@@ -25,6 +25,7 @@ require_once __DIR__ . '/cpt.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/revisions.php';
 require_once __DIR__ . '/library.php';
+require_once __DIR__ . '/gate.php';
 require_once __DIR__ . '/abilities/categories.php';
 require_once __DIR__ . '/abilities/list-design-library.php';
 require_once __DIR__ . '/abilities/get-active-design.php';
@@ -56,3 +57,12 @@ add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Save\\register
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Check\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Get\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Delete\\register', priority: 999);
+
+// The design gate sits with the other write-path checks: rate limiting at 6,
+// preview at 8, Pro's approval queue at 9. Design runs at 7, between the limiter
+// and preview — a write that is off-direction should be refused before anybody
+// is asked to review a diff of it.
+add_filter('wppilot_settings_sections', __NAMESPACE__ . '\Gate\register_setting');
+add_filter('wppilot_pre_ability_execute', __NAMESPACE__ . '\Gate\filter_pre_ability_execute', priority: 7, accepted_args: 3);
+add_filter('mcp_adapter_pre_tool_call', __NAMESPACE__ . '\Gate\filter_pre_mcp_tool_call', priority: 7, accepted_args: 2);
+add_filter('wppilot_modern_mcp_pre_ability_execute', __NAMESPACE__ . '\Gate\filter_pre_ability_execute', priority: 7, accepted_args: 3);

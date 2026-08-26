@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.7.0
+Stable tag: 1.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -150,6 +150,12 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.8.0 =
+* New: the active design can now be enforced on the write path. Under **WPPilot > Settings > Design direction on writes**, choose Off, Warn and record, or Refuse the write. A write using a colour outside the palette, a font outside the type stack, or something the design's own Don't rules forbid is either recorded in the change ledger or refused outright.
+* A refusal names the offending value and the palette entry to use instead, chosen by the role the colour was playing rather than by raw numeric distance, so the agent can correct it in one step instead of guessing again.
+* Builder-agnostic: colours and fonts are read out of the write itself, so the same check covers Elementor settings, Bricks trees, Flatsome shortcodes, Gutenberg block specs and raw HTML without per-builder parsing. rgb(), rgba(), hsl() and hsla() values are normalised, so the same colour is judged the same way whichever notation a builder uses.
+* Off by default, and it does nothing at all until a design is active. Only the palette, the type stack and the design's Don't rules are gated; the copy and anti-slop rules stay in wppilot/check-design, where an agent asks for a judgement rather than being blocked by one.
 
 = 1.7.0 =
 * New ability: wppilot/search-images. Searches Openverse — WordPress.org's openly-licensed media search — for CC-licensed and public-domain images, with licence, licence-type, orientation, extension and source filters. No API key and no account. Every result carries a ready-made attribution string, and the ability's own description tells the agent to carry it into the caption when importing, because attribution is a licence obligation for every CC licence except CC0 and the public domain mark.
