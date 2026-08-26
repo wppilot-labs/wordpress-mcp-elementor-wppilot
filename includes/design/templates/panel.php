@@ -148,4 +148,6 @@ $page_style = $page_accent !== '' ? '--ds-accent:' . $page_accent : '';
             </article>
         <?php endforeach; ?>
     </div>
+
+    <?php require __DIR__ . '/starters.php'; ?>
 </div>

@@ -1148,3 +1148,152 @@ ul.wppilot-doc-list {
     font-size: 13px;
     line-height: 1.5;
 }
+
+/* ---------------------------------------------------------------- starters
+   A palette is understood as colour, not as text. The swatch band is the
+   largest thing in the card for that reason: hex codes are the caption, not
+   the content. */
+
+.wppilot-starters {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid #dcdcde;
+}
+
+.wppilot-starters-head h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+}
+
+.wppilot-starters-head p {
+    margin: 0 0 24px;
+    max-width: 70ch;
+    color: #50575e;
+}
+
+.wppilot-starters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.wppilot-starter {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.wppilot-starter-swatches {
+    display: flex;
+    height: 108px;
+}
+
+.wppilot-starter-swatch {
+    position: relative;
+    flex: 1 1 0;
+    transition: flex-grow .18s ease;
+}
+
+/* The hex only appears when a swatch is asked about. Printing six codes at
+   rest turns the band back into the list it replaced. */
+.wppilot-starter-swatch em {
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-end: 6px;
+    width: 100%;
+    text-align: center;
+    font-style: normal;
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .65);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+
+.wppilot-starter-swatches:hover .wppilot-starter-swatch em {
+    opacity: 1;
+}
+
+.wppilot-starter-swatches:hover .wppilot-starter-swatch:hover {
+    flex-grow: 1.6;
+}
+
+.wppilot-starter-specimen {
+    padding: 20px;
+    background: var(--st-bg);
+    color: var(--st-ink);
+    border-block: 1px solid rgba(0, 0, 0, .08);
+}
+
+.wppilot-starter-eyebrow {
+    margin: 0 0 10px;
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    opacity: .55;
+}
+
+.wppilot-starter-display {
+    margin: 0 0 8px;
+    font-size: 26px;
+    line-height: 1.1;
+    font-weight: 700;
+}
+
+.wppilot-starter-body {
+    margin: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    opacity: .8;
+}
+
+.wppilot-starter-button {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: var(--st-accent);
+    color: var(--st-bg);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.wppilot-starter-body-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 20px 20px;
+}
+
+.wppilot-starter-body-col h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.wppilot-starter-desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #50575e;
+}
+
+.wppilot-starter-contrast {
+    margin: 0;
+    font-size: 12px;
+    color: #1a7f37;
+}
+
+.wppilot-starter-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.wppilot-starter-taken {
+    font-size: 12px;
+    color: #646970;
+}
