@@ -100,6 +100,7 @@ function register_post_handlers(): void
     add_action('admin_post_wppilot_design_import', __NAMESPACE__ . '\\handle_import');
     add_action('admin_post_wppilot_design_save', __NAMESPACE__ . '\\handle_save');
     add_action('admin_post_wppilot_design_duplicate', __NAMESPACE__ . '\\handle_duplicate');
+    add_action('admin_post_wppilot_design_use_starter', __NAMESPACE__ . '\\handle_use_starter');
     add_action('admin_post_wppilot_design_restore', __NAMESPACE__ . '\\handle_restore');
     add_action('admin_post_wppilot_design_delete', __NAMESPACE__ . '\\handle_delete');
 }
@@ -496,4 +497,56 @@ function handle_delete(): void
     }
     wp_delete_post($post_id, force_delete: true);
     redirect_with_notice('success', __('Design deleted.', domain: 'wppilot'));
+}
+
+/**
+ * Copy a starter direction into this site's own library.
+ *
+ * A copy, never a reference. The starter is a place to begin, and the moment a
+ * site adopts one it becomes that site's document to edit, rename and argue
+ * with. Nothing is shared back, so a later change to the shipped starters cannot
+ * alter a live site's design.
+ *
+ * Deliberately does not activate it. Adopting a palette somebody else chose and
+ * putting it straight into production is the failure this whole module exists to
+ * prevent; the copy opens in the editor so the reasoning gets rewritten for this
+ * business first.
+ */
+function handle_use_starter(): void
+{
+    require_capability_and_nonce('wppilot_design_use_starter');
+
+    $slug_raw = $_POST['slug'] ?? '';
+    $starter = \WPPilot\Design\Examples\find(is_string($slug_raw) ? $slug_raw : '');
+    if ($starter === null) {
+        redirect_with_notice('error', __('That starter kit does not exist.', domain: 'wppilot'));
+        return;
+    }
+
+    $new_slug = unique_user_slug($starter['slug']);
+    $result = \WPPilot\Design\Store\save($starter['content'], $new_slug, actor: 'user');
+    if ($result['slug'] === '') {
+        redirect_with_notice('error', __('Could not copy that starter kit.', domain: 'wppilot'));
+        return;
+    }
+
+    $post = \WPPilot\Design\Store\find_user_post($result['slug']);
+    set_transient(
+        'wppilot_design_admin_notice_' . get_current_user_id(),
+        [
+            'type' => 'success',
+            'message' => __(
+                'Copied into your designs. Change the palette and the wording to suit this business, then activate it. A starter used unchanged will look like a starter.',
+                domain: 'wppilot',
+            ),
+        ],
+        expiration: 30,
+    );
+
+    $args = ['page' => PAGE_SLUG];
+    if ($post instanceof \WP_Post) {
+        $args['design'] = $post->ID;
+    }
+    wp_safe_redirect(add_query_arg($args, admin_url('admin.php')));
+    exit();
 }

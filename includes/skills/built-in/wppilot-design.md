@@ -63,7 +63,7 @@ compositional posture (see dials). Make each feel deliberate, never a generic
 template. The user picks; you write the full DESIGN.md and call
 `wppilot/save-design` (`activate: true`).
 
-`wppilot/list-design-examples` holds seven worked directions — light and dark,
+`wppilot/list-design-examples` holds seven worked directions (the same set the Design screen offers as **starter kits**) — light and dark,
 serif and sans, dense and airy, quiet and loud. They are **reference, not a
 menu**: nothing applies one, and copying a palette onto a site it was not chosen
 for produces exactly the generic result this whole skill exists to prevent. Read
