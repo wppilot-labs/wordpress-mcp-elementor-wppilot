@@ -54,7 +54,7 @@ function find(string $slug): ?array
  *   name: string,
  *   colors: array<string, string>,
  *   fonts: array<string, string>,
- *   token_sources: array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string},
+ *   token_sources: array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, scale: string},
  *   readiness: array{ready: bool, sync_ready: bool, errors: list<string>, warnings: list<string>}
  * }|null
  */

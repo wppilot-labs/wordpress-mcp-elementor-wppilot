@@ -12,9 +12,16 @@ typography:
   heading:
     fontFamily: "Libre Franklin"
     fontWeight: "700"
+    fontSize: "40px"
+    lineHeight: "1.15"
+    letterSpacing: "0"
   body:
     fontFamily: "Source Sans 3"
     fontWeight: "400"
+    fontSize: "19px"
+    lineHeight: "1.6"
+    letterSpacing: "0"
+    measure: "66"
 spacing:
   sm: "0.5rem"
   md: "1.25rem"

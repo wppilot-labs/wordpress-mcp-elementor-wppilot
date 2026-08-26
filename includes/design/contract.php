@@ -69,7 +69,7 @@ function ability_output_properties(): array
  *   },
  *   dials: array{variance: float, density: float, motion: float},
  *   guidance: array{dos: list<string>, donts: list<string>},
- *   token_sources: array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string},
+ *   token_sources: array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, scale: string},
  *   readiness: array{ready: bool, sync_ready: bool, errors: list<string>, warnings: list<string>},
  *   waivers: list<string>
  * }
@@ -110,7 +110,7 @@ function inspect(string $content): array
  *   components: array<string, string>,
  *   dials: array<string, string>
  * } $tokens
- * @param array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string} $sources
+ * @param array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, scale: string} $sources
  * @return array{ready: bool, sync_ready: bool, errors: list<string>, warnings: list<string>}
  */
 function readiness(array $tokens, array $sources): array
@@ -171,7 +171,7 @@ function required_token_errors(array $tokens): array
 }
 
 /**
- * @param array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string} $sources
+ * @param array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, scale: string} $sources
  * @return list<string>
  */
 function readiness_warnings(array $sources): array
@@ -195,6 +195,18 @@ function readiness_warnings(array $sources): array
     }
     if ($sources['spacing'] === 'missing') {
         $warnings[] = __('No spacing tokens are declared.', domain: 'wppilot');
+    }
+    if ($sources['scale'] === 'partial') {
+        $warnings[] = __(
+            'The type scale declares sizes but no line height. Large type at the browser default leading is the most recognisable untouched-web look there is; set lineHeight on at least the heading and body roles.',
+            domain: 'wppilot',
+        );
+    }
+    if ($sources['scale'] === 'missing') {
+        $warnings[] = __(
+            'No type scale is declared, so each page will pick its own heading and body sizes. Declare fontSize and lineHeight on the heading and body roles to keep pages consistent with one another.',
+            domain: 'wppilot',
+        );
     }
     if ($sources['rounded'] === 'missing') {
         $warnings[] = __('No corner-radius tokens are declared.', domain: 'wppilot');
@@ -220,7 +232,7 @@ function readiness_warnings(array $sources): array
  *   components: array<string, string>,
  *   dials: array<string, string>
  * } $tokens
- * @return array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string}
+ * @return array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, scale: string}
  */
 function token_sources(string $content, array $tokens): array
 {
@@ -231,7 +243,38 @@ function token_sources(string $content, array $tokens): array
         'rounded' => token_source($content, key: 'rounded', values: $tokens['rounded']),
         'components' => token_source($content, key: 'components', values: $tokens['components']),
         'dials' => token_source($content, key: 'dials', values: $tokens['dials']),
+        'scale' => scale_source($tokens['typography']),
     ];
+}
+
+/**
+ * Whether the design declares a type scale.
+ *
+ * Not a top-level key like the others: sizes and leading live inside the
+ * typography roles, so this asks whether the roles that matter carry them
+ * rather than whether a section exists.
+ *
+ * @param array<string, array<string, string>> $typography
+ */
+function scale_source(array $typography): string
+{
+    $sized = false;
+    $led = false;
+    foreach ($typography as $props) {
+        if (!is_array($props)) {
+            continue;
+        }
+        $sized = $sized || ($props['fontSize'] ?? '') !== '';
+        $led = $led || ($props['lineHeight'] ?? '') !== '';
+    }
+    if (!$sized) {
+        return 'missing';
+    }
+
+    // Sizes without leading is the half that causes the damage: big type at a
+    // browser-default line-height is the most recognisable untouched-web look
+    // there is, so it is reported as partial rather than as present.
+    return $led ? 'explicit' : 'partial';
 }
 
 /** @param array<array-key, mixed> $values */

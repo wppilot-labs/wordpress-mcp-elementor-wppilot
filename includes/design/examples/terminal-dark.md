@@ -12,9 +12,16 @@ typography:
   heading:
     fontFamily: "IBM Plex Sans"
     fontWeight: "600"
+    fontSize: "38px"
+    lineHeight: "1.15"
+    letterSpacing: "-0.01em"
   body:
     fontFamily: "IBM Plex Sans"
     fontWeight: "400"
+    fontSize: "15px"
+    lineHeight: "1.6"
+    letterSpacing: "0"
+    measure: "78"
   mono:
     fontFamily: "IBM Plex Mono"
 spacing:

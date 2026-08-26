@@ -1480,3 +1480,23 @@ ul.wppilot-doc-list {
 .wppilot-brand-kit {
     margin-top: 4px;
 }
+
+/* Whether the site is actually wearing this design. The screen showed what the
+   design is and nothing about whether it had reached anything. */
+.wppilot-hero-applied {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.wppilot-hero-applied.is-written {
+    color: #14622a;
+}
+
+.wppilot-hero-applied.is-pending {
+    color: #8a5700;
+}
+
+.wppilot-hero-applied a {
+    margin-inline-start: 4px;
+}

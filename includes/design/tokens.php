@@ -870,13 +870,48 @@ function css_vars(array $tokens): array
     if ($body !== '') {
         $vars['--wppilot-font-body'] = $body;
     }
-    $heading_weight = pick_typography_prop(
-        $tokens['typography'],
-        ['heading', 'display', 'headline', 'title', 'hero'],
-        prop: 'fontWeight',
-    );
+    $heading_roles = ['heading', 'display', 'headline', 'title', 'hero'];
+    $body_roles = ['body', 'text', 'paragraph'];
+
+    $heading_weight = pick_typography_prop($tokens['typography'], $heading_roles, prop: 'fontWeight');
     if ($heading_weight !== '') {
         $vars['--wppilot-weight-heading'] = $heading_weight;
+    }
+    $body_weight = pick_typography_prop($tokens['typography'], $body_roles, prop: 'fontWeight');
+    if ($body_weight !== '') {
+        $vars['--wppilot-weight-body'] = $body_weight;
+    }
+
+    // The type scale. The parser has always read these — a nested typography
+    // role accepts any property — but nothing downstream looked at them, so a
+    // design could declare its sizes and every page still invented its own.
+    // Sizes and leading are what make one page look like the next; without them
+    // a heading is 38px here and 44px six pages later and no check can see it.
+    foreach ([
+        '--wppilot-size-heading' => [$heading_roles, 'fontSize'],
+        '--wppilot-size-body' => [$body_roles, 'fontSize'],
+    ] as $var => [$roles, $prop]) {
+        $value = pick_typography_prop($tokens['typography'], $roles, prop: $prop);
+        if ($value !== '') {
+            $vars[$var] = css_length($value);
+        }
+    }
+    foreach ([
+        '--wppilot-leading-heading' => [$heading_roles, 'lineHeight'],
+        '--wppilot-leading-body' => [$body_roles, 'lineHeight'],
+        '--wppilot-tracking-heading' => [$heading_roles, 'letterSpacing'],
+        '--wppilot-tracking-body' => [$body_roles, 'letterSpacing'],
+    ] as $var => [$roles, $prop]) {
+        $value = pick_typography_prop($tokens['typography'], $roles, prop: $prop);
+        if ($value !== '') {
+            // Leading is a unitless ratio as often as it is a length, and
+            // css_length() would append px to 1.15 and destroy it.
+            $vars[$var] = is_numeric($value) ? $value : css_value($value);
+        }
+    }
+    $measure = pick_typography_prop($tokens['typography'], $body_roles, prop: 'measure');
+    if ($measure !== '') {
+        $vars['--wppilot-measure'] = is_numeric($measure) ? $measure . 'ch' : css_value($measure);
     }
     $radius = $tokens['rounded']['md'] ?? first_value($tokens['rounded']);
     if ($radius !== '') {

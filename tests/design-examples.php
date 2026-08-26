@@ -84,6 +84,36 @@ foreach ($slugs as $slug) {
         "{$slug}: no component treatments — the section most real DESIGN.md files omit is the one these exist to demonstrate",
     );
 
+    // The scale is the half of typography that keeps page six looking like
+    // page one. A shipped example without it teaches every site copied from it
+    // to invent its own sizes.
+    example_check(
+        $inspection['token_sources']['scale'] === 'explicit',
+        sprintf('%s: type scale is %s, want explicit', $slug, $inspection['token_sources']['scale']),
+    );
+    foreach (['heading', 'body'] as $role) {
+        $props = $inspection['tokens']['typography'][$role] ?? [];
+        foreach (['fontSize', 'lineHeight'] as $prop) {
+            example_check(
+                ($props[$prop] ?? '') !== '',
+                sprintf('%s: %s role declares no %s', $slug, $role, $prop),
+            );
+        }
+    }
+    // Display type takes less leading than body, never more: large type at a
+    // browser default is the untouched-web look these examples exist to model
+    // out of existence.
+    $head_lead = (float) ($inspection['tokens']['typography']['heading']['lineHeight'] ?? 0);
+    $body_lead = (float) ($inspection['tokens']['typography']['body']['lineHeight'] ?? 0);
+    example_check(
+        $head_lead > 0.0 && $head_lead <= 1.25,
+        sprintf('%s: heading leading is %.2f, want <= 1.25', $slug, $head_lead),
+    );
+    example_check(
+        $body_lead >= 1.4 && $body_lead > $head_lead,
+        sprintf('%s: body leading is %.2f, want >= 1.4 and looser than the heading', $slug, $body_lead),
+    );
+
     $ink_ratio = ($bg !== '' && $ink !== '') ? Contrast\ratio($ink, $bg) : 0.0;
     $accent_ratio = ($bg !== '' && $accent !== '') ? Contrast\ratio($accent, $bg) : 0.0;
     example_check(

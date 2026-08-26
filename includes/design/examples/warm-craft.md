@@ -14,9 +14,16 @@ typography:
   heading:
     fontFamily: "Bitter"
     fontWeight: "600"
+    fontSize: "46px"
+    lineHeight: "1.1"
+    letterSpacing: "-0.01em"
   body:
     fontFamily: "Karla"
     fontWeight: "400"
+    fontSize: "17px"
+    lineHeight: "1.65"
+    letterSpacing: "0"
+    measure: "68"
 spacing:
   sm: "0.75rem"
   md: "1.5rem"
