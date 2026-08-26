@@ -9,7 +9,39 @@
 
 .wppilot-design {
     --ds-mono: ui-monospace, "DM Mono", "JetBrains Mono", Consolas, monospace;
-    max-width: 1180px;
+
+    /* The screen's own design system.
+     *
+     * A page about design systems had none: corner radii ran 3, 4, 6, 10 and
+     * 12px across neighbouring elements, three different shadows, and four
+     * greys for the same border. Nobody reads those numbers, but the eye reads
+     * their disagreement, and a tool that judges other people's consistency has
+     * to hold its own.
+     *
+     * Deliberately separate from the --wppilot-* custom properties. Those carry
+     * the site's design and are worn only by the specimens; these are the
+     * chrome the specimens sit in, and the two must never borrow from each
+     * other or a dark site design would repaint the admin. */
+    --ds-radius-sm: 6px;
+    --ds-radius: 10px;
+    --ds-radius-lg: 14px;
+    --ds-pill: 999px;
+
+    --ds-line: #dfe1e4;
+    --ds-line-soft: #ebedef;
+    --ds-surface: #fff;
+    --ds-sunken: #f7f8f9;
+    --ds-ink: #1d2327;
+    --ds-muted: #59636e;
+    --ds-brand: #2271b1;
+
+    --ds-shadow-sm: 0 1px 2px rgba(16, 24, 40, .04);
+    --ds-shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 1px 2px rgba(16, 24, 40, .04);
+    --ds-shadow-lg: 0 4px 16px rgba(16, 24, 40, .08);
+
+    --ds-gap: 20px;
+
+    max-width: 1240px;
 }
 
 .wppilot-design-intro {
@@ -35,10 +67,10 @@
     display: flex;
     flex-direction: column;
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 6px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     overflow: hidden;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    box-shadow: var(--ds-shadow-sm);
     transition: border-color 0.1s ease;
 }
 .wppilot-design-card2:hover {
@@ -96,7 +128,7 @@
 .wppilot-design-active-badge {
     display: inline-block;
     padding: 3px 10px;
-    border-radius: 12px;
+    border-radius: var(--ds-radius);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -107,7 +139,7 @@
 .wppilot-design-incomplete-badge {
     display: inline-block;
     padding: 3px 10px;
-    border-radius: 12px;
+    border-radius: var(--ds-radius);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -127,7 +159,7 @@
     align-items: center;
     align-self: flex-start;
     padding: 2px 8px;
-    border-radius: 3px;
+    border-radius: var(--ds-radius-sm);
     background: #f4f4f5;
     color: #52525b;
     font-size: 11px;
@@ -157,9 +189,9 @@
     padding: 48px 24px;
     margin: 0 0 20px;
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 6px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
+    box-shadow: var(--ds-shadow-sm);
 }
 .wppilot-design-empty p {
     margin: 0;
@@ -238,11 +270,11 @@
 }
 .wppilot-detail-block {
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 6px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     padding: 20px 24px;
     margin-bottom: 20px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    box-shadow: var(--ds-shadow-sm);
 }
 .wppilot-detail-block h2 {
     font-size: 18px;
@@ -254,7 +286,7 @@
 .wppilot-detail-count {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 3px;
+    border-radius: var(--ds-radius-sm);
     background: #f4f4f5;
     color: #52525b;
     font-size: 11px;
@@ -282,8 +314,8 @@
     display: flex;
     flex-direction: column;
     padding: 8px;
-    border: 1px solid #dcdcde;
-    border-radius: 4px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     background: #fff;
 }
 .wppilot-palette-swatch {
@@ -461,7 +493,7 @@
     color: var(--wppilot-ink, #15171c) !important;
     font-family: var(--wppilot-font-body, sans-serif) !important;
     border: 1px solid color-mix(in srgb, var(--wppilot-ink, #15171c) 12%, transparent) !important;
-    border-radius: 6px !important;
+    border-radius: var(--ds-radius-sm) !important;
     padding: clamp(20px, 3vw, 32px) !important;
     display: flex !important;
     flex-direction: column !important;
@@ -502,7 +534,7 @@
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
     padding: 5px 11px !important;
-    border-radius: 999px !important;
+    border-radius: var(--ds-pill) !important;
     background: color-mix(in srgb, var(--wppilot-accent, #2271b1) 14%, transparent) !important;
     color: color-mix(in srgb, var(--wppilot-accent, #2271b1) 80%, var(--wppilot-ink, #15171c)) !important;
 }
@@ -576,8 +608,8 @@
     flex-direction: column;
     gap: 4px;
     padding: 14px 16px;
-    border: 1px solid #dcdcde;
-    border-radius: 4px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     background: #fff;
 }
 .wppilot-anim-name {
@@ -665,8 +697,8 @@
     font-family: var(--ds-mono);
     font-size: 12px;
     background: #f6f7f7;
-    border: 1px solid #dcdcde;
-    border-radius: 3px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     padding: 1px 6px;
     color: #1d2327;
 }
@@ -686,8 +718,8 @@
     margin-left: -1.4em;
     margin-bottom: 6px;
     padding: 8px 12px 8px 36px;
-    border-radius: 4px;
-    border: 1px solid #dcdcde;
+    border-radius: var(--ds-radius-sm);
+    border: 1px solid var(--ds-line);
     color: #1d2327;
 }
 .wppilot-doc li.wppilot-doc-do {
@@ -806,7 +838,7 @@ ul.wppilot-doc-list {
     list-style: none;
     margin: 16px 0 0;
     padding: 0;
-    border-top: 1px solid #dcdcde;
+    border-top: 1px solid var(--ds-line);
 }
 .wppilot-history-item {
     display: grid;
@@ -835,7 +867,7 @@ ul.wppilot-doc-list {
 }
 .wppilot-history-state {
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: var(--ds-radius);
     font-size: 11px;
     font-weight: 600;
 }
@@ -867,8 +899,8 @@ ul.wppilot-doc-list {
     white-space: pre-wrap;
     color: #2c3338;
     background: #f6f7f7;
-    border: 1px solid #dcdcde;
-    border-radius: 4px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     padding: 16px;
     max-height: 360px;
     overflow: auto;
@@ -879,11 +911,11 @@ ul.wppilot-doc-list {
 /* ── Import. ─────────────────────────────────────────────────────────────── */
 .wppilot-design-import {
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 6px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     padding: 20px 24px;
     margin: 0 0 20px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    box-shadow: var(--ds-shadow-sm);
     max-width: 820px;
 }
 .wppilot-design-import label,
@@ -895,7 +927,7 @@ ul.wppilot-doc-list {
     font-family: var(--ds-mono);
     font-size: 12.5px;
     line-height: 1.6;
-    border-radius: 4px;
+    border-radius: var(--ds-radius-sm);
 }
 
 /* ── Editor view. ────────────────────────────────────────────────────────── */
@@ -904,17 +936,17 @@ ul.wppilot-doc-list {
 }
 .wppilot-design-edit-form {
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 6px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
     padding: 20px 24px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    box-shadow: var(--ds-shadow-sm);
 }
 .wppilot-design-edit-form .description {
     color: #646970;
 }
 .wppilot-design-edit-form .CodeMirror {
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-sm);
 }
 .wppilot-design-edit-grid {
     display: grid;
@@ -1157,7 +1189,7 @@ ul.wppilot-doc-list {
 .wppilot-starters {
     margin-top: 48px;
     padding-top: 32px;
-    border-top: 1px solid #dcdcde;
+    border-top: 1px solid var(--ds-line);
 }
 
 .wppilot-starters-head h2 {
@@ -1181,8 +1213,8 @@ ul.wppilot-doc-list {
     display: flex;
     flex-direction: column;
     background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 10px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
     overflow: hidden;
 }
 
@@ -1309,8 +1341,8 @@ ul.wppilot-doc-list {
     gap: 0;
     margin: 20px 0 24px;
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 10px;
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
     overflow: hidden;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
@@ -1381,13 +1413,13 @@ ul.wppilot-doc-list {
     flex-direction: column;
     gap: 12px;
     padding: 32px;
-    border-inline-start: 1px solid #e6e7e8;
+    border-inline-start: 1px solid var(--ds-line-soft);
 }
 
 @media (max-width: 960px) {
     .wppilot-hero-facts {
         border-inline-start: 0;
-        border-block-start: 1px solid #e6e7e8;
+        border-block-start: 1px solid var(--ds-line-soft);
     }
 }
 
@@ -1418,7 +1450,7 @@ ul.wppilot-doc-list {
 .wppilot-hero-chips li {
     margin: 0;
     padding: 4px 10px;
-    border-radius: 999px;
+    border-radius: var(--ds-pill);
     background: #f0f0f1;
     color: #50575e;
     font-size: 12px;
@@ -1499,4 +1531,247 @@ ul.wppilot-doc-list {
 
 .wppilot-hero-applied a {
     margin-inline-start: 4px;
+}
+
+/* ------------------------------------------------- one language, every section
+ *
+ * The screen had grown three of them: a hero built for this release, a card
+ * gallery from an earlier one, and a starter shelf from a third. Each was
+ * defensible alone and together they read as three plugins stacked. What
+ * follows is not new decoration — it is the same card, the same heading rhythm
+ * and the same buttons applied across all of them, so the eye stops noticing
+ * the seams and starts reading the content. */
+
+.wppilot-design h1.wp-heading-inline {
+    font-size: 23px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+}
+
+/* Section headings. Every section owned a different size and weight; they are
+   one rank now, with the rule doing the separating rather than the type. */
+.wppilot-design h2:not(.wppilot-hero-facts h2):not(.wppilot-starter-body-col h2) {
+    margin: 32px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: var(--ds-ink);
+}
+
+.wppilot-design .wppilot-design-intro,
+.wppilot-brand-kit > p:first-of-type {
+    margin: 0 0 20px;
+    max-width: 78ch;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ds-muted);
+}
+
+/* Cards: hero, gallery, starters and the Pro panels share one surface. */
+.wppilot-hero,
+.wppilot-design-card2,
+.wppilot-starter,
+.wppilot-design-empty {
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius-lg);
+    background: var(--ds-surface);
+    box-shadow: var(--ds-shadow);
+}
+
+.wppilot-design-card2:hover,
+.wppilot-starter:hover {
+    border-color: #c9ccd0;
+    box-shadow: var(--ds-shadow-lg);
+    transition: box-shadow .16s ease, border-color .16s ease;
+}
+
+.wppilot-design-card2.is-active {
+    border-color: var(--ds-brand);
+    box-shadow: 0 0 0 1px var(--ds-brand), var(--ds-shadow);
+}
+
+.wppilot-design-gallery,
+.wppilot-starters-grid {
+    gap: var(--ds-gap);
+}
+
+/* Tabs. WordPress' own nav-tab is a 2010 artefact of the grey admin; this keeps
+   its markup and semantics and gives it a current shape. */
+.wppilot-design-tabs.nav-tab-wrapper {
+    border-bottom: 1px solid var(--ds-line);
+    padding-bottom: 0;
+    margin: 20px 0 24px;
+}
+
+.wppilot-design-tabs .nav-tab {
+    margin: 0 2px -1px 0;
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-bottom-color: transparent;
+    border-radius: var(--ds-radius-sm) var(--ds-radius-sm) 0 0;
+    background: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ds-muted);
+}
+
+.wppilot-design-tabs .nav-tab:hover {
+    background: var(--ds-sunken);
+    color: var(--ds-ink);
+}
+
+.wppilot-design-tabs .nav-tab-active,
+.wppilot-design-tabs .nav-tab-active:hover {
+    border-color: var(--ds-line);
+    border-bottom-color: var(--ds-surface);
+    background: var(--ds-surface);
+    color: var(--ds-ink);
+    font-weight: 600;
+}
+
+/* Buttons. The specimen is the only thing on this page allowed to wear the
+   site's design; the controls beside it were raw WordPress grey, which made the
+   specimen look like a screenshot pasted into a settings page. */
+.wppilot-design .button,
+.wppilot-brand-kit .button {
+    border-radius: var(--ds-radius-sm);
+    border-color: var(--ds-line);
+    padding: 4px 14px;
+    height: auto;
+    min-height: 32px;
+    font-size: 13px;
+    line-height: 22px;
+}
+
+.wppilot-design .button-primary,
+.wppilot-brand-kit .button-primary {
+    border-color: var(--ds-brand);
+}
+
+.wppilot-design .button-link {
+    border: 0;
+    padding: 4px 6px;
+    color: var(--ds-muted);
+    text-decoration: none;
+    min-height: 0;
+}
+
+.wppilot-design .button-link:hover {
+    color: var(--ds-brand);
+    text-decoration: underline;
+}
+
+/* Chips read as data, not as decoration: one weight, one size, tabular figures
+   so 16.7:1 and 4.5:1 line up when they sit next to each other. */
+.wppilot-hero-chips li {
+    border-radius: var(--ds-radius-sm);
+    background: var(--ds-sunken);
+    border: 1px solid var(--ds-line-soft);
+    color: var(--ds-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.wppilot-hero-chips li.is-ok {
+    background: #f2faf4;
+    border-color: #cfe9d7;
+    color: #12652a;
+}
+
+.wppilot-hero-chips li.is-warn {
+    background: #fdf6e9;
+    border-color: #f0dfbc;
+    color: #7c5000;
+}
+
+/* The hero carries the page, so it gets the room to. */
+.wppilot-hero {
+    margin: 4px 0 8px;
+}
+
+.wppilot-hero-specimen {
+    padding: 36px 36px 0;
+}
+
+.wppilot-hero-facts {
+    padding: 32px 36px;
+    gap: 10px;
+}
+
+.wppilot-hero-facts h2 {
+    font-size: 19px;
+    letter-spacing: -.01em;
+}
+
+.wppilot-hero-desc {
+    max-width: 52ch;
+    color: var(--ds-muted);
+}
+
+.wppilot-hero-swatches {
+    margin: 32px -36px 0;
+    height: 40px;
+}
+
+/* Starter cards: the swatch band is the content, so it gets the height, and the
+   body column stops competing with it. */
+.wppilot-starter-swatches {
+    height: 120px;
+}
+
+.wppilot-starter-body-col h3 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -.005em;
+}
+
+.wppilot-starter-desc {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ds-muted);
+}
+
+.wppilot-starter-contrast {
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: #12652a;
+}
+
+.wppilot-starters {
+    margin-top: 40px;
+    padding-top: 28px;
+    border-top: 1px solid var(--ds-line);
+}
+
+/* Pro's tables inherit the same surface rather than WordPress' striped default. */
+.wppilot-brand-kit .widefat {
+    border: 1px solid var(--ds-line);
+    border-radius: var(--ds-radius);
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    box-shadow: var(--ds-shadow-sm);
+}
+
+.wppilot-brand-kit .widefat td {
+    border-bottom: 1px solid var(--ds-line-soft);
+    padding: 12px 14px;
+}
+
+.wppilot-brand-kit .widefat tr:last-child td {
+    border-bottom: 0;
+}
+
+.wppilot-brand-kit .widefat.striped tbody tr:nth-child(odd) {
+    background: none;
+}
+
+.wppilot-brand-kit .widefat tbody tr:hover {
+    background: var(--ds-sunken);
+}
+
+.wppilot-brand-kit textarea,
+.wppilot-brand-kit input[type="text"] {
+    border-radius: var(--ds-radius-sm);
+    border-color: var(--ds-line);
 }
