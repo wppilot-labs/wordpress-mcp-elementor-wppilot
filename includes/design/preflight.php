@@ -528,8 +528,15 @@ function dont_matches(string $output, array $donts): array
             if ($keyword === '') {
                 continue;
             }
-            // Word-boundary match so "inter" hits the font Inter, not "pointer".
-            if (preg_match('/\b' . preg_quote($keyword, delimiter: '/') . '/i', $output) !== 1) {
+            // Bounded at both ends. A leading boundary alone stopped "inter"
+            // matching "pointer" and let it match "interrogate", "interest"
+            // and "internal" - words an accounting or engineering site uses on
+            // nearly every page, each reported as a possible violation of a
+            // rule about a typeface. The trailing boundary is added only when
+            // the keyword ends in a word character, so tokens like "rgb("
+            // still match the way they read.
+            $trailing = preg_match('/\w$/', $keyword) === 1 ? '\b' : '';
+            if (preg_match('/\b' . preg_quote($keyword, delimiter: '/') . $trailing . '/i', $output) !== 1) {
                 continue;
             }
             $out[] = [
