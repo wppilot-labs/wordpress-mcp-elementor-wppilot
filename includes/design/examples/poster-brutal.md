@@ -11,9 +11,16 @@ typography:
   heading:
     fontFamily: "Archivo Black"
     fontWeight: "400"
+    fontSize: "96px"
+    lineHeight: "0.94"
+    letterSpacing: "-0.03em"
   body:
     fontFamily: "Archivo"
     fontWeight: "400"
+    fontSize: "18px"
+    lineHeight: "1.5"
+    letterSpacing: "0"
+    measure: "64"
 spacing:
   sm: "0.5rem"
   md: "1.5rem"

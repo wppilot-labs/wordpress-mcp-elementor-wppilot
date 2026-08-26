@@ -11,9 +11,16 @@ typography:
   heading:
     fontFamily: "Fraunces"
     fontWeight: "700"
+    fontSize: "58px"
+    lineHeight: "1.04"
+    letterSpacing: "-0.02em"
   body:
     fontFamily: "Source Serif 4"
     fontWeight: "400"
+    fontSize: "18px"
+    lineHeight: "1.7"
+    letterSpacing: "0"
+    measure: "70"
 spacing:
   sm: "0.75rem"
   md: "1.5rem"

@@ -12,9 +12,16 @@ typography:
   heading:
     fontFamily: "Cormorant Garamond"
     fontWeight: "500"
+    fontSize: "52px"
+    lineHeight: "1.06"
+    letterSpacing: "0.01em"
   body:
     fontFamily: "Jost"
     fontWeight: "300"
+    fontSize: "17px"
+    lineHeight: "1.7"
+    letterSpacing: "0.01em"
+    measure: "62"
 spacing:
   sm: "1rem"
   md: "2.5rem"

@@ -123,7 +123,7 @@ function merge_source(array &$result, array $source): void
             continue;
         }
         $clean = [];
-        foreach (['fontFamily', 'fontWeight', 'fontSize'] as $prop) {
+        foreach (['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'measure'] as $prop) {
             if (($props[$prop] ?? '') !== '' && is_scalar($props[$prop])) {
                 $clean[$prop] = (string) $props[$prop];
             }

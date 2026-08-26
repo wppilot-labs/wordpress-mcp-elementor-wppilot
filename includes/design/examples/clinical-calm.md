@@ -12,9 +12,16 @@ typography:
   heading:
     fontFamily: "Newsreader"
     fontWeight: "500"
+    fontSize: "44px"
+    lineHeight: "1.12"
+    letterSpacing: "-0.01em"
   body:
     fontFamily: "Figtree"
     fontWeight: "400"
+    fontSize: "17px"
+    lineHeight: "1.75"
+    letterSpacing: "0"
+    measure: "68"
 spacing:
   sm: "0.75rem"
   md: "1.75rem"

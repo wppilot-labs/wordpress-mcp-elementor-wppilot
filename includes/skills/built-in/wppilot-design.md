@@ -495,6 +495,16 @@ Shapes, Components, Do's and Don'ts). Be exact — name fonts and hex values,
 never categories. Colors must include `bg`, `ink`, and `accent`; typography must
 include both `heading` and `body`. These five roles are the activation minimum.
 
+**Declare the type scale, not just the faces.** `fontSize` and `lineHeight` on
+the heading and body roles are what keep page six looking like page one; without
+them every page picks its own sizes and nothing can see the drift. Display sits
+tight (1.0-1.15), body stays comfortable (around 1.5-1.75), and `measure` caps
+the line length in characters. A design that declares sizes without leading is
+warned about, because large type at the browser default is the most recognisable
+untouched-web look there is. Where the Pro brand kit is installed these are
+written into the builder's own typography presets, so they apply site-wide
+rather than page by page.
+
 `dials` are three 0-1 knobs for how layouts should feel: `variance` (symmetry →
 asymmetry), `density` (airy → packed), `motion` (static → kinetic). Honor them
 when composing — high `variance` means asymmetric, offset structure and the
@@ -517,9 +527,15 @@ typography:
   heading:
     fontFamily: "Cabinet Grotesk, sans-serif"
     fontWeight: "700"
+    fontSize: "48px"
+    lineHeight: "1.08"
+    letterSpacing: "-0.015em"
   body:
     fontFamily: "General Sans, sans-serif"
     fontWeight: "400"
+    fontSize: "17px"
+    lineHeight: "1.65"
+    measure: "68"
 spacing:
   sm: "8px"
   md: "16px"
