@@ -26,12 +26,15 @@ require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/revisions.php';
 require_once __DIR__ . '/library.php';
 require_once __DIR__ . '/gate.php';
+require_once __DIR__ . '/context.php';
+require_once __DIR__ . '/contrast.php';
 require_once __DIR__ . '/abilities/categories.php';
 require_once __DIR__ . '/abilities/list-design-library.php';
 require_once __DIR__ . '/abilities/get-active-design.php';
 require_once __DIR__ . '/abilities/activate-design.php';
 require_once __DIR__ . '/abilities/save-design.php';
 require_once __DIR__ . '/abilities/check-design.php';
+require_once __DIR__ . '/abilities/check-contrast.php';
 require_once __DIR__ . '/abilities/get-design.php';
 require_once __DIR__ . '/abilities/delete-design.php';
 require_once __DIR__ . '/admin.php';
@@ -55,6 +58,7 @@ add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\GetActive\\reg
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Activate\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Save\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Check\\register', priority: 999);
+add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Contrast\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Get\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Delete\\register', priority: 999);
 
@@ -66,3 +70,7 @@ add_filter('wppilot_settings_sections', __NAMESPACE__ . '\Gate\register_setting'
 add_filter('wppilot_pre_ability_execute', __NAMESPACE__ . '\Gate\filter_pre_ability_execute', priority: 7, accepted_args: 3);
 add_filter('mcp_adapter_pre_tool_call', __NAMESPACE__ . '\Gate\filter_pre_mcp_tool_call', priority: 7, accepted_args: 2);
 add_filter('wppilot_modern_mcp_pre_ability_execute', __NAMESPACE__ . '\Gate\filter_pre_ability_execute', priority: 7, accepted_args: 3);
+
+// Priority 11, just after the skills catalogue at 10: an agent should read what
+// the site can do before it reads what the site looks like.
+add_filter('wppilot_discover_abilities_instructions', __NAMESPACE__ . '\Context\inject', priority: 11);
