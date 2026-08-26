@@ -918,3 +918,13 @@ if (!function_exists('sanitize_key')) {
         return preg_replace('/[^a-z0-9_\-]/', '', strtolower($key)) ?? '';
     }
 }
+
+if (!function_exists('sanitize_title')) {
+    function sanitize_title(string $title): string
+    {
+        $title = strtolower(trim($title));
+        $title = preg_replace('/[^a-z0-9]+/', '-', $title) ?? '';
+
+        return trim($title, '-');
+    }
+}

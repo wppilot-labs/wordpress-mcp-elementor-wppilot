@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
- * Version: 1.9.0
+ * Version: 1.10.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
