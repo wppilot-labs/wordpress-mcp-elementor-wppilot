@@ -163,7 +163,37 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result)
         'result' => wppilot_result_summary($result),
         'rollback' => $rollback,
         'rolled_back' => false,
+        // What the design gate saw, when it saw anything. In warn mode the write
+        // proceeds and this is the only record that it drifted, which is the
+        // point: a site owner who is not ready to refuse writes can still audit
+        // where the direction slipped.
+        'design' => wppilot_change_design_findings($ability_name),
     ]);
+}
+
+/**
+ * Design-gate findings for the write being recorded, if the gate ran.
+ *
+ * Read from the gate's own request-scoped store rather than passed down the
+ * call chain: the gate runs on a filter well before this function, and
+ * threading a value through every transport to reach it would put design
+ * plumbing in four files that have nothing to do with design.
+ *
+ * @return array<string, mixed>
+ */
+function wppilot_change_design_findings(string $ability_name): array
+{
+    if (!function_exists('WPPilot\Design\Gate\pending_findings')) {
+        return [];
+    }
+    /** @var array<string, mixed> $findings */
+    $findings = \WPPilot\Design\Gate\pending_findings();
+    if (($findings['ability'] ?? '') !== $ability_name) {
+        return [];
+    }
+    unset($findings['ability']);
+
+    return $findings;
 }
 
 /**
