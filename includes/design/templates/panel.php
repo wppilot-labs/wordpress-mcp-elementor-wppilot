@@ -149,5 +149,20 @@ $page_style = $page_accent !== '' ? '--ds-accent:' . $page_accent : '';
         <?php endforeach; ?>
     </div>
 
+    <?php
+    /**
+     * Sections other plugins add to this screen.
+     *
+     * The design and the things done with it belong on one screen. Pro's Brand
+     * Kit was a second menu item whose every section was about the active
+     * design — what it looks like, whether its palette is readable, where it can
+     * be written — which meant two entries that sounded like the same thing and
+     * no way to guess which one to open.
+     *
+     * @param string $active_slug The active design's slug, or '' when none is active.
+     */
+    do_action('wppilot_design_panel_sections', $active_slug);
+    ?>
+
     <?php require __DIR__ . '/starters.php'; ?>
 </div>
