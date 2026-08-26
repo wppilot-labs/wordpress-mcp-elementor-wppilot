@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.10.0
+Stable tag: 1.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -151,7 +151,7 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 
 == Changelog ==
 
-= 1.10.0 =
+= 1.8.0 =
 * New ability: wppilot/adopt-design-from-site. On any site that is not brand new, the brand already exists - in the theme's global styles, in the customizer, in the pages somebody built - and a fresh direction invented alongside it produces work that clashes with every page already there. This reads what the site already has and returns a DESIGN.md draft, with the adopted palette's contrast reported alongside it, because an inherited palette was never chosen and finding out it cannot carry body text is worth knowing before anybody builds on it. Nothing is saved; review the draft, add the reasoning it cannot know, then save it.
 * New ability: wppilot/list-design-examples. Seven worked example directions - light and dark, serif and sans, dense and airy, quiet and loud - shipped as real DESIGN.md files that pass the contract. They are reference, not a menu: nothing applies one, deliberately. Fifty selectable palettes produce fifty sites that look like the palette rather than like the business, which is the failure the design system exists to prevent. Read the nearest one to see how a finished direction argues its palette and phrases its rules, then write one for the site in front of you. One of them is a worked example of declaring a deliberate waiver for an anti-slop rule rather than tripping it.
 * New ability: wppilot/verify-rendered-page. Everything else checks the string an agent produced. This fetches a published page and checks what the server actually sends - heading order, images without alt text, empty elements, PHP notices that made it into the markup, page weight, and the colours and faces actually present. A build can pass every check on its own output and still land on a page whose accent is the theme's, because the theme's stylesheet loads last. It does not run JavaScript or fetch external stylesheets, and its result says so.
@@ -164,13 +164,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * The rendered check follows the page's own same-origin stylesheets now, ranked so builder-generated CSS is read first. Elementor writes every widget's colour and typeface into a per-post stylesheet, so a reader limited to inline styles reported a correctly styled page as carrying none of its design. Quoted font families were invisible too, which is most of them.
 * The Design screen was rebuilt around the active design: it opens with that design rendered in its own colours and faces, beside the facts that decide whether it is usable, and the rest is tabs rather than one long column.
 * Three new abilities, all read-only. No permission changes; existing connections keep working and do not need re-authorising.
-
-= 1.9.0 =
 * New ability: wppilot/check-contrast. Computes WCAG contrast ratios for every pair in the active design's palette and reports which surfaces can carry body text at AA. Ask it what to put on a background and it answers with the design's own colours instead of defaulting to black or white, and it names a palette that cannot produce readable text at all rather than leaving that to be discovered page by page.
 * The active design is now put in front of the agent automatically. Its palette, type stack and Don't rules are appended to the server instructions every session, so an agent starts a build already knowing the direction rather than having to ask for it. Prevention is cheaper than a refusal; the design block is fenced and marked untrusted, because a design file may have been imported from anywhere.
 * No permission changes. One new read-only ability; existing connections keep working and do not need re-authorising.
-
-= 1.8.0 =
 * New: the active design can now be enforced on the write path. Under **WPPilot > Settings > Design direction on writes**, choose Off, Warn and record, or Refuse the write. A write using a colour outside the palette, a font outside the type stack, or something the design's own Don't rules forbid is either recorded in the change ledger or refused outright.
 * A refusal names the offending value and the palette entry to use instead, chosen by the role the colour was playing rather than by raw numeric distance, so the agent can correct it in one step instead of guessing again.
 * Builder-agnostic: colours and fonts are read out of the write itself, so the same check covers Elementor settings, Bricks trees, Flatsome shortcodes, Gutenberg block specs and raw HTML without per-builder parsing. rgb(), rgba(), hsl() and hsla() values are normalised, so the same colour is judged the same way whichever notation a builder uses.
