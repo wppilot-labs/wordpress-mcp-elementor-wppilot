@@ -119,7 +119,14 @@ function handle_create(): void
 {
     require_capability_and_nonce('wppilot_skill_create');
     $input = collect_input_from_post();
-    $result = SkillWrite\execute($input + ['on_conflict' => 'fail']);
+    $status_raw = $_POST['status'] ?? 'publish';
+    $result = SkillWrite\execute($input + [
+        'on_conflict' => 'fail',
+        // A body typed into this form is literal, not a double-encoded tool
+        // argument, and the form's Enabled/Disabled select must be honoured.
+        'literal_content' => true,
+        'status' => is_string($status_raw) && $status_raw === 'draft' ? 'draft' : 'publish',
+    ]);
     if (is_wp_error($result)) {
         redirect_with_notice('error', $result->get_error_message());
         return;
@@ -158,7 +165,9 @@ function handle_update(): void
         return;
     }
 
-    $content = Parser\unescape_content($input['content']);
+    // A body typed into this form is literal: stripcslashes() here would turn
+    // a regex \d into d and eat backslashes out of Windows paths.
+    $content = $input['content'];
     if (strlen($content) > Parser\MAX_BODY_BYTES) {
         redirect_with_notice('error', __('Body exceeds 1 MB.', domain: 'wppilot'), $post_id);
         return;
@@ -191,14 +200,15 @@ function handle_update(): void
     $status_raw = $_POST['status'] ?? 'publish';
     $status = is_string($status_raw) && $status_raw === 'draft' ? 'draft' : 'publish';
 
-    wp_update_post([
+    // wp_update_post() unslashes internally, so hand it slashed data.
+    wp_update_post(wp_slash([
         'ID' => $post_id,
         'post_title' => $new_title,
         'post_name' => $new_title,
         'post_excerpt' => $input['description'],
         'post_content' => $content,
         'post_status' => $status,
-    ]);
+    ]));
     update_post_meta($post_id, Cpt\META_ENABLE_PROMPT, $input['enable_prompt']);
     update_post_meta($post_id, Cpt\META_ENABLE_AGENTIC, $input['enable_agentic']);
 
@@ -215,6 +225,7 @@ function handle_delete(): void
 {
     $post_id = read_post_id();
     require_capability_and_nonce('wppilot_skill_delete_' . $post_id);
+    load_skill_post($post_id);
     wp_trash_post($post_id);
     Notices\set_pending_reload_notice();
     wp_safe_redirect(add_query_arg(['page' => PAGE_SLUG, 'trashed' => '1'], admin_url('admin.php')));
@@ -235,6 +246,7 @@ function handle_permanent_delete(): void
 {
     $post_id = read_post_id();
     require_capability_and_nonce('wppilot_skill_permanent_delete_' . $post_id);
+    load_skill_post($post_id);
     wp_delete_post($post_id, force_delete: true);
     Notices\set_pending_reload_notice();
     wp_safe_redirect(add_query_arg(['page' => PAGE_SLUG, 'deleted' => '1'], admin_url('admin.php')));
@@ -365,6 +377,8 @@ function process_one_upload(array $file, string $on_conflict): string|\WP_Error
         'title' => $title_seed,
         'description' => $parsed['description'],
         'content' => $parsed['body'],
+        // A file on disk is literal text, never a double-encoded tool argument.
+        'literal_content' => true,
         'enable_prompt' => $parsed['enable_prompt'],
         'enable_agentic' => $parsed['enable_agentic'],
         'on_conflict' => $on_conflict,

@@ -135,6 +135,12 @@ function wppilot_edit_file($input)
         return new WP_Error('no_change', 'old_string and new_string are identical. No edit needed.');
     }
 
+    // substr_count() throws a ValueError on an empty needle under PHP 8, which
+    // would be an uncaught fatal rather than a refusal.
+    if ($old_string === '') {
+        return new WP_Error('empty_old_string', 'old_string must not be empty. Use write-file to create or replace a whole file.');
+    }
+
     $content = file_get_contents($resolved);
     if ($content === false) {
         return new WP_Error('read_failed', sprintf('Could not read file: %s', $resolved));

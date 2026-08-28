@@ -381,7 +381,9 @@ function handle_save(): void
     \WPPilot\Design\Revisions\snapshot_current($post);
     $updated = wp_update_post([
         'ID' => $post_id,
-        'post_title' => $parsed['name'] !== '' ? $parsed['name'] : $new_slug,
+        // wp_update_post() unslashes every string it is given, so the title
+        // needs the same slashing the content already gets.
+        'post_title' => wp_slash($parsed['name'] !== '' ? $parsed['name'] : $new_slug),
         'post_name' => $new_slug,
         'post_content' => wp_slash($content),
     ], wp_error: true);

@@ -83,7 +83,14 @@ function execute(array $input): array|WP_Error
     // catalog until the user fills one in (see `Sources\discoverable()`).
     $description = trim((string) ($input['description'] ?? ''));
 
-    $content = Parser\unescape_content((string) ($input['content'] ?? ''));
+    // The double-JSON unescape exists for AI clients that encode their tool
+    // arguments twice. A body typed into the admin form or read from an
+    // uploaded .md file is already literal, and running it through
+    // stripcslashes() there would eat regexes and Windows paths.
+    $content_raw = (string) ($input['content'] ?? '');
+    $content = ($input['literal_content'] ?? false) === true
+        ? $content_raw
+        : Parser\unescape_content($content_raw);
     if (strlen($content) > Parser\MAX_BODY_BYTES) {
         return new WP_Error('body_too_large', __('Body exceeds 1 MB.', domain: 'wppilot'));
     }
@@ -115,7 +122,7 @@ function execute(array $input): array|WP_Error
 
     $postarr = [
         'post_type' => Cpt\POST_TYPE,
-        'post_status' => 'publish',
+        'post_status' => ($input['status'] ?? 'publish') === 'draft' ? 'draft' : 'publish',
         'post_title' => $slug,
         'post_name' => $slug,
         'post_excerpt' => $description,

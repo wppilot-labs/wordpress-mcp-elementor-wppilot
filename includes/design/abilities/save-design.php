@@ -74,7 +74,7 @@ function register(): void
 
 function execute(array $input): array|WP_Error
 {
-    $content = stripcslashes((string) ($input['content'] ?? ''));
+    $content = Parser\unescape_content((string) ($input['content'] ?? ''));
     if (strlen($content) > Parser\MAX_BYTES) {
         return new WP_Error('too_large', __('DESIGN.md exceeds the size limit.', domain: 'wppilot'));
     }

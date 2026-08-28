@@ -141,3 +141,23 @@ function normalize_slug(string $raw): string
     }
     return $candidate;
 }
+
+
+/**
+ * Undo the double-JSON encoding some AI clients apply to tool arguments.
+ *
+ * Only a body with no real line breaks but literal `\n` sequences carries that
+ * signature. Running stripcslashes() over every submission ate the backslashes
+ * out of Windows paths (`C:\temp` -> `C:<TAB>emp`) and regexes (`\d` -> `d`),
+ * corrupting documents from every correctly-encoded client.
+ */
+function unescape_content(string $raw): string
+{
+    if (str_contains($raw, "\n") || str_contains($raw, "\r")) {
+        return $raw;
+    }
+    if (!str_contains($raw, '\n') && !str_contains($raw, '\r')) {
+        return $raw;
+    }
+    return stripcslashes($raw);
+}

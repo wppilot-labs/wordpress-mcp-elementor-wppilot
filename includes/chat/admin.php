@@ -48,7 +48,7 @@ function wppilot_enqueue_chat_assets(string $hook): void
         return;
     }
 
-    $asset_file = __DIR__ . '/assets/chat/index.asset.php';
+    $asset_file = dirname(__DIR__) . '/assets/chat/index.asset.php';
     // @mago-expect analysis:mixed-assignment
     $asset = is_file($asset_file) ? (require $asset_file) : ['dependencies' => [], 'version' => WPPILOT_VERSION];
     if (!is_array($asset)) {

@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, agent, automation
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.8.0
+Stable tag: 1.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -150,6 +150,22 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.8.1 =
+* Fixed wppilot/reorder-menu-items destroying the menu it was asked to reorder. wp_update_nav_menu_item() merges its own defaults over whatever it is not given and rewrites the item, so a call carrying only a position blanked the label, cleared the link, reset the type to "custom" and flattened the nesting of every item it touched - and reported success. Reordering now seeds each write with the item's existing values first, the same way upsert-menu-item already did.
+* Fixed the Chat screen rendering nothing. Its script was enqueued from a build manifest looked for one directory too deep, so the file was never found and the fallback declared no dependencies at all: the bundle printed before wp-element and wp-components and threw on execution, leaving an empty page with no error anybody could see.
+* Fixed a site-wide fatal reachable through wppilot/update-site-settings. Any string was accepted as timezone_string, and an identifier PHP cannot resolve makes wp_timezone() throw from inside current_time() and wp_date() - every request that formats a date, for everyone, until the option is repaired by hand. A typo'd timezone is now refused with the setting named.
+* Fixed skill and design bodies being corrupted on the way in. Escape processing meant for AI clients that JSON-encode their tool arguments twice was applied to every submission, so a Windows path in a skill turned C:\temp into C:<TAB>emp and a regex \d+ into d+ - silently, on save, for content typed into wp-admin or read from an uploaded .md file. The rescue now runs only on a body carrying the signature it exists for: no real line breaks, but literal \n sequences where they should be.
+* Fixed backslashes being stripped from comments, skill bodies and design titles. wp_insert_comment(), wp_update_comment() and wp_update_post() unslash what they are given, so anything handed to them unslashed arrived one round of stripping short.
+* Fixed a Block Editor batch that failed at commit becoming permanently stuck. The retry re-serialized the same spec to byte-identical content, WordPress reported "no change" as false, and the item was failed for it - with a message blaming WordPress - on that attempt and on every attempt after it.
+* Fixed the "Get Pro" link never appearing on the Plugins page. The filter it hooked was built from the wrong path, naming a file that does not exist, so nothing ever called it.
+* Fixed an uncaught fatal in wppilot/edit-file when old_string was empty. PHP 8 throws on an empty needle rather than returning a count, so the ability died instead of refusing. It now refuses and points at write-file.
+* Fixed wppilot/set-featured-image and wppilot/update-post reporting a failure when the requested image was already the featured image. Both are idempotent by declaration and were the one thing a retry could not do.
+* Fixed a 500 on a Chat session update carrying an empty or non-JSON body, which reached a typed helper as null.
+* Fixed the Preview screen describing a preview that expires in 23 hours as having expired 23 hours ago. The relative-time helper is used for both a creation date and an expiry and only ever said "ago".
+* Fixed a new skill created as Disabled going live immediately. The form offered the choice and the create path ignored it, publishing every skill regardless.
+* Trashing or permanently deleting a skill now verifies the post type first, as every other action on that screen already did.
+* The web-apps panel no longer walks you through an OAuth sign-in on a site where the OAuth routes are deliberately not served. On a public plain-HTTP site those endpoints 404 by design; the panel now says so and points at the access token instead of contradicting the method card next to it.
 
 = 1.8.0 =
 * New ability: wppilot/adopt-design-from-site. On any site that is not brand new, the brand already exists - in the theme's global styles, in the customizer, in the pages somebody built - and a fresh direction invented alongside it produces work that clashes with every page already there. This reads what the site already has and returns a DESIGN.md draft, with the adopted palette's contrast reported alongside it, because an inherited palette was never chosen and finding out it cannot carry body text is worth knowing before anybody builds on it. Nothing is saved; review the draft, add the reasoning it cannot know, then save it.

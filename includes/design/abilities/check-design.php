@@ -70,7 +70,7 @@ function register(): void
             'required' => ['ok', 'violations'],
         ],
         'execute_callback' => static function (array $input): array|WP_Error {
-            $output = stripcslashes((string) ($input['output'] ?? ''));
+            $output = Parser\unescape_content((string) ($input['output'] ?? ''));
             if (strlen($output) > Parser\MAX_BYTES) {
                 return new WP_Error('too_large', __('Output exceeds the size limit.', domain: 'wppilot'));
             }
