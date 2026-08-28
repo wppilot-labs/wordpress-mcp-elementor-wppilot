@@ -189,7 +189,10 @@ function wordpress_set_featured_image(array $input): array|WP_Error
 
     $previous = (int) get_post_thumbnail_id($post_id);
 
-    if (set_post_thumbnail($post_id, $attachment_id) === false) {
+    // set_post_thumbnail() answers false when the attachment is already the
+    // thumbnail, because update_post_meta() reports no change. This ability is
+    // annotated idempotent, so re-setting the same image must succeed.
+    if (set_post_thumbnail($post_id, $attachment_id) === false && $previous !== $attachment_id) {
         return new WP_Error(
             'set_featured_image_failed',
             sprintf('The featured image of post %d could not be set.', $post_id),

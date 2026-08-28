@@ -206,10 +206,20 @@ function relative_time(string $iso): string
     if ($timestamp === false) {
         return '';
     }
+    $now = time();
+    // human_time_diff() is direction-agnostic, so a future moment — an expiry
+    // that has not passed — would otherwise be rendered as "... ago".
+    if ($timestamp > $now) {
+        return sprintf(
+            /* translators: %s: human-readable time difference, e.g. "5 mins" */
+            __('in %s', domain: 'wppilot'),
+            human_time_diff($now, $timestamp),
+        );
+    }
     return sprintf(
         /* translators: %s: human-readable time difference, e.g. "5 mins" */
         __('%s ago', domain: 'wppilot'),
-        human_time_diff($timestamp, time()),
+        human_time_diff($timestamp, $now),
     );
 }
 

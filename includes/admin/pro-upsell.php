@@ -297,7 +297,7 @@ add_action(
  * Add a "Get Pro" action link on the Plugins page row for WPPilot Free.
  */
 add_filter(
-    'plugin_action_links_' . plugin_basename(dirname(__DIR__) . '/wppilot.php'),
+    'plugin_action_links_' . plugin_basename(dirname(__DIR__, 2) . '/wppilot.php'),
     static function (array $links): array {
         if (wppilot_pro_is_active()) {
             return $links;

@@ -1750,7 +1750,11 @@ function complete_item(int $item_id, string $lease_owner, string $content, mixed
     }
 
     $staged = update_post_meta($item->ID, META_FINALIZED_CONTENT, wp_slash($content));
-    if ($staged === false) {
+    // update_metadata() also answers false when the new value is identical to
+    // the stored one — a retry after a failed commit stages byte-identical
+    // content and must not be failed for it. Only an actual mismatch on disk
+    // is a staging failure.
+    if ($staged === false && get_post_meta($item->ID, META_FINALIZED_CONTENT, single: true) !== $content) {
         return fail_item(
             $item->ID,
             $lease_owner,

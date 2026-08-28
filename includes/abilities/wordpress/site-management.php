@@ -460,6 +460,19 @@ function wordpress_validate_site_settings(array $input): ?WP_Error
         $effective[$key] = $sanitizers[$key]($value);
     }
 
+    if (array_key_exists('timezone_string', $input)) {
+        // An identifier core cannot resolve makes wp_timezone() throw from
+        // new DateTimeZone(), which fatals every request that formats a date.
+        $timezone = $sanitizers['timezone_string']($input['timezone_string']);
+        if ($timezone !== '' && !in_array($timezone, timezone_identifiers_list(), strict: true)) {
+            return new WP_Error(
+                'wppilot_invalid_timezone',
+                'timezone_string must be a PHP timezone identifier, such as Europe/Copenhagen.',
+                ['status' => 422, 'setting' => 'timezone_string', 'value' => $timezone],
+            );
+        }
+    }
+
     foreach (['page_on_front', 'page_for_posts'] as $key) {
         $post_id = (int) $effective[$key];
         if ($post_id === 0) {

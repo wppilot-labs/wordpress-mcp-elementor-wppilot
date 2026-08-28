@@ -368,7 +368,10 @@ function wordpress_update_post_thumbnail(int $post_id, array $input, array &$upd
         return new WP_Error('invalid_attachment', sprintf('Attachment %d not found.', $thumb_id));
     }
 
-    if (set_post_thumbnail($post_id, $thumb_id) === false) {
+    // set_post_thumbnail() answers false when the attachment is already the
+    // thumbnail, because update_post_meta() reports no change. That is the
+    // requested state, not a failure.
+    if (set_post_thumbnail($post_id, $thumb_id) === false && (int) get_post_thumbnail_id($post_id) !== $thumb_id) {
         return new WP_Error('thumbnail_failed', 'Failed to set featured image.');
     }
 

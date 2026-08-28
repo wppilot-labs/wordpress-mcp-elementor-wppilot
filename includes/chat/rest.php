@@ -139,7 +139,7 @@ function wppilot_chat_rest_list_sessions(): array
 
 function wppilot_chat_rest_create_session(WP_REST_Request $request): array|WP_Error
 {
-    $params = $request->get_json_params();
+    $params = $request->get_json_params() ?? [];
     $message = is_string($params['message'] ?? null) ? sanitize_textarea_field($params['message']) : '';
     $attachments = wppilot_chat_request_attachments($params);
     if (is_wp_error($attachments)) {
@@ -219,7 +219,7 @@ function wppilot_chat_rest_update_session(WP_REST_Request $request): array|WP_Er
         return wppilot_chat_not_found();
     }
 
-    $params = $request->get_json_params();
+    $params = $request->get_json_params() ?? [];
     $message = is_string($params['message'] ?? null) ? sanitize_textarea_field($params['message']) : '';
     $edit_message_id = is_string($params['message_id'] ?? null) ? sanitize_text_field($params['message_id']) : '';
     if ($edit_message_id !== '') {
@@ -362,7 +362,7 @@ function wppilot_chat_rest_approval(WP_REST_Request $request): array|WP_Error
         return $session;
     }
 
-    $params = $request->get_json_params();
+    $params = $request->get_json_params() ?? [];
     $call_id = is_string($params['tool_call_id'] ?? null) ? sanitize_text_field($params['tool_call_id']) : '';
     $decision = is_string($params['decision'] ?? null) ? sanitize_key($params['decision']) : '';
     if ($call_id === '' || !in_array($decision, ['approve', 'deny', 'allow_session', 'yolo'], strict: true)) {
@@ -386,7 +386,7 @@ function wppilot_chat_rest_execute_tool(WP_REST_Request $request): array|WP_Erro
         return $session;
     }
 
-    $params = $request->get_json_params();
+    $params = $request->get_json_params() ?? [];
     $call_id = is_string($params['tool_call_id'] ?? null) ? sanitize_text_field($params['tool_call_id']) : '';
     $call_index = wppilot_chat_find_tool_call_index($session, $call_id);
     if ($call_index === null) {
@@ -438,7 +438,7 @@ function wppilot_chat_rest_execute_tool(WP_REST_Request $request): array|WP_Erro
  */
 function wppilot_chat_request_session(WP_REST_Request $request): array|WP_Error
 {
-    $params = $request->get_json_params();
+    $params = $request->get_json_params() ?? [];
     $session_id = is_string($params['session_id'] ?? null) ? sanitize_text_field($params['session_id']) : '';
     if ($session_id === '' && is_string($request['id'] ?? null)) {
         $session_id = sanitize_text_field($request['id']);

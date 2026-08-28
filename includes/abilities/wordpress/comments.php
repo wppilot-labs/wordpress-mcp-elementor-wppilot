@@ -364,15 +364,17 @@ function wordpress_create_comment(array $input): array|WP_Error
     }
 
     $user = wp_get_current_user();
+    // wp_insert_comment()/wp_update_comment() unslash internally, so unslashed
+    // input arrives one round of backslash-stripping short.
     $commentarr = [
         'comment_post_ID' => $post_id,
-        'comment_content' => (string) $input['content'],
+        'comment_content' => wp_slash((string) $input['content']),
         'comment_parent' => (int) ($input['parent_id'] ?? 0),
         'comment_type' => 'comment',
         'comment_approved' => $status === 'approve' ? 1 : 0,
         'user_id' => (int) $user->ID,
-        'comment_author' => (string) ($input['author_name'] ?? $user->display_name),
-        'comment_author_email' => (string) ($input['author_email'] ?? $user->user_email),
+        'comment_author' => wp_slash((string) ($input['author_name'] ?? $user->display_name)),
+        'comment_author_email' => wp_slash((string) ($input['author_email'] ?? $user->user_email)),
     ];
 
     $comment_id = wp_insert_comment($commentarr);
@@ -405,10 +407,10 @@ function wordpress_update_comment(array $input): array|WP_Error
 
     $commentarr = ['comment_ID' => $comment_id];
     if (isset($input['content'])) {
-        $commentarr['comment_content'] = (string) $input['content'];
+        $commentarr['comment_content'] = wp_slash((string) $input['content']);
     }
     if (isset($input['author_name'])) {
-        $commentarr['comment_author'] = (string) $input['author_name'];
+        $commentarr['comment_author'] = wp_slash((string) $input['author_name']);
     }
     if (count($commentarr) === 1) {
         return new WP_Error('nothing_to_update', 'Supply at least one field to change.', ['status' => 422]);

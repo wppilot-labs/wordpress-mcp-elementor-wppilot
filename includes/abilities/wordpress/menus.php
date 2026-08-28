@@ -322,7 +322,9 @@ function wordpress_reorder_menu_items(array $input): array|WP_Error
         return $menu;
     }
 
-    $existing = wp_get_nav_menu_items($menu_id);
+    // post_status "any" so draft items — which list-menu-items reports — can be
+    // reordered too instead of being refused as not-in-menu.
+    $existing = wp_get_nav_menu_items($menu_id, ['post_status' => 'any']);
     if (!is_array($existing)) {
         return new WP_Error(
             'menu_items_unavailable',
@@ -333,7 +335,7 @@ function wordpress_reorder_menu_items(array $input): array|WP_Error
 
     $owned = [];
     foreach ($existing as $item) {
-        $owned[(int) $item->ID] = true;
+        $owned[(int) $item->ID] = $item;
     }
 
     // Validate the whole list before writing any of it: a partially applied
@@ -376,7 +378,12 @@ function wordpress_reorder_menu_items(array $input): array|WP_Error
 
     $updated = [];
     foreach ($plan as $step) {
-        $args = ['menu-item-position' => $step['position']];
+        // wp_update_nav_menu_item() merges its defaults and rewrites the whole
+        // item, so a position-only update would blank the label, URL, type and
+        // parent of every touched item. Seed the item's existing values first,
+        // the same way upsert-menu-item does.
+        $args = wordpress_existing_menu_item_args($owned[$step['item_id']]);
+        $args['menu-item-position'] = $step['position'];
         if ($step['set_parent']) {
             $args['menu-item-parent-id'] = $step['parent_id'];
         }

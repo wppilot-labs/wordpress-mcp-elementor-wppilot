@@ -46,7 +46,7 @@ final class CoreSurfaceTest extends TestCase
     public function testCoreSurfaceRegistersWithFreeAlone(): void
     {
         self::assertNotEmpty(WPPILOT_TEST_BOOT_ABILITIES);
-        self::assertCount(61, WPPILOT_TEST_BOOT_ABILITIES);
+        self::assertCount(62, WPPILOT_TEST_BOOT_ABILITIES);
     }
 
     public function testNoAbilityIsRegisteredTwice(): void

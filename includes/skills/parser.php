@@ -29,6 +29,17 @@ const MAX_BODY_BYTES = 1_048_576; // 1 MB
  */
 function unescape_content(string $raw): string
 {
+    // Only rescue a body that actually shows the double-encoding signature:
+    // no real line breaks, but literal `\n` sequences where they should be.
+    // Running stripcslashes() over ordinary markdown ate the backslashes out
+    // of Windows paths (`C:\temp` -> `C:<TAB>emp`) and regexes (`\d` -> `d`),
+    // silently corrupting bodies from every correctly-encoded client.
+    if (str_contains($raw, "\n") || str_contains($raw, "\r")) {
+        return $raw;
+    }
+    if (!str_contains($raw, '\n') && !str_contains($raw, '\r')) {
+        return $raw;
+    }
     return stripcslashes($raw);
 }
 

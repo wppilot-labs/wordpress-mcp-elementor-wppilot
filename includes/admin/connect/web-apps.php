@@ -163,11 +163,22 @@ function wppilot_render_web_apps_config_section(string $oauth_url, string $token
     </div>
 
     <div id="wppilot-webapps-content" style="display:none; margin-top:16px;">
-        <p class="wppilot-legend" style="margin:0 0 6px;"><?php esc_html_e(
-            'Sign in with OAuth',
-            domain: 'wppilot',
-        ); ?></p>
-        <ol id="wppilot-webapp-oauth-steps" style="margin:0 0 18px 20px; padding:0;"></ol>
+        <?php if (!wppilot_oauth_transport_allowed()): ?>
+            <?php // The OAuth routes are not served on a public plain-HTTP site,
+                  // so walking someone through an endpoint that 404s would be a
+                  // dead end with no explanation. The method card is disabled for
+                  // the same condition; say so here rather than disagreeing with it. ?>
+            <p class="description" style="margin:0 0 18px;"><?php esc_html_e(
+                'Sign in with OAuth needs HTTPS, so it is unavailable on this site. Use the access token below instead.',
+                domain: 'wppilot',
+            ); ?></p>
+        <?php else: ?>
+            <p class="wppilot-legend" style="margin:0 0 6px;"><?php esc_html_e(
+                'Sign in with OAuth',
+                domain: 'wppilot',
+            ); ?></p>
+            <ol id="wppilot-webapp-oauth-steps" style="margin:0 0 18px 20px; padding:0;"></ol>
+        <?php endif; ?>
 
         <div id="wppilot-webapp-token-wrap">
             <p class="wppilot-legend" style="margin:0 0 6px;"><?php esc_html_e(
@@ -194,6 +205,10 @@ function wppilot_render_web_apps_config_section(string $oauth_url, string $token
 
         function fill(listId, steps) {
             var list = document.getElementById(listId);
+            // The OAuth list is not rendered when the transport is unavailable.
+            if (!list) {
+                return;
+            }
             list.innerHTML = '';
             steps.forEach(function (step) {
                 var li = document.createElement('li');
