@@ -123,7 +123,54 @@ function normalize(array $raw): array|WP_Error
             ['status' => 422],
         );
     }
+    $gradients = [];
     foreach ($raw_surfaces as $name => $value) {
+        // A surface may be a gradient rather than a flat colour. A page that
+        // has one and a spec that cannot say so produces a flat band where the
+        // reference has a wash, and there is no way to describe the difference
+        // in a palette of hex values.
+        if (is_array($value)) {
+            $stops = [];
+            /** @var mixed $raw_stops */
+            $raw_stops = $value['stops'] ?? [];
+            if (is_array($raw_stops)) {
+                foreach (array_values($raw_stops) as $index => $stop) {
+                    $stop_hex = Preflight\normalize_hex((string) (is_array($stop) ? ($stop['color'] ?? '') : $stop));
+                    if ($stop_hex === '') {
+                        continue;
+                    }
+                    $stops[] = [
+                        'color' => $stop_hex,
+                        'offset' => is_array($stop) && array_key_exists('offset', $stop)
+                            ? max(0, min(100, (int) $stop['offset']))
+                            : (int) ($index === 0 ? 0 : 100),
+                    ];
+                }
+            }
+            if (count($stops) < 2) {
+                return new WP_Error(
+                    'wppilot_spec_gradient_stops',
+                    sprintf(
+                        /* translators: %s: surface name */
+                        __('Gradient surface "%s" needs at least two colour stops.', domain: 'wppilot'),
+                        (string) $name,
+                    ),
+                    ['status' => 422],
+                );
+            }
+            $key = sanitize_key((string) $name);
+            $gradients[$key] = [
+                'type' => (string) ($value['type'] ?? 'linear') === 'radial' ? 'radial' : 'linear',
+                'angle' => (int) ($value['angle'] ?? 180),
+                'stops' => $stops,
+            ];
+            // The first stop doubles as the flat colour, so every rule that
+            // reasons about a surface — contrast, readable text, the grader —
+            // keeps working without learning about gradients.
+            $surfaces[$key] = $stops[0]['color'];
+            continue;
+        }
+
         $hex = Preflight\normalize_hex((string) $value);
         if ($hex === '') {
             return new WP_Error(
@@ -170,6 +217,7 @@ function normalize(array $raw): array|WP_Error
         'section_padding_mobile' => max(0.0, (float) ($raw['section_padding_mobile'] ?? 0)),
         'gap' => max(0.0, (float) ($raw['gap'] ?? 32)),
         'surfaces' => $surfaces,
+        'gradients' => $gradients,
         'radius' => $radius,
         'type' => $type,
         'sections' => $sections,
@@ -341,8 +389,23 @@ function normalize_sections(array $raw, array $surface_names): array|WP_Error
  * @param  list<mixed> $raw
  * @return list<array<string, mixed>>|WP_Error
  */
-function normalize_blocks(array $raw, int $section_index): array|WP_Error
+function normalize_blocks(array $raw, int $section_index, int $depth = 0): array|WP_Error
 {
+    // Groups nest, and a spec that nests without limit is a spec that can hang
+    // the builder. Four levels is more than any real page needs and shallow
+    // enough that a runaway structure is refused rather than walked.
+    if ($depth > 4) {
+        return new WP_Error(
+            'wppilot_spec_block_depth',
+            sprintf(
+                /* translators: %d: section index */
+                __('Section %d nests groups more than four deep.', domain: 'wppilot'),
+                $section_index,
+            ),
+            ['status' => 422],
+        );
+    }
+
     $known = block_types();
     $out = [];
     foreach (array_values($raw) as $position => $block) {
@@ -403,8 +466,31 @@ function normalize_blocks(array $raw, int $section_index): array|WP_Error
         /** @var array<string, mixed> $styles */
         $styles = is_array($block['styles'] ?? null) ? $block['styles'] : [];
 
+        // A group holds other blocks and carries its own layout, fill and
+        // styling. It is what turns a fixed component list into a composable
+        // one: a chat panel, a tabbed preview, a bordered feature row and a
+        // hundred shapes nobody has thought of are all a group with children,
+        // so the vocabulary no longer has to grow a type every time a reference
+        // contains something new. Without it the only sections that could be
+        // built were the ones this file happened to anticipate, which is the
+        // real reason a matched page kept coming out as a column of paragraphs.
+        $children = [];
+        if ($type === 'group') {
+            $nested = normalize_blocks(
+                is_array($block['blocks'] ?? null) ? $block['blocks'] : [],
+                $section_index,
+                $depth + 1,
+            );
+            if ($nested instanceof WP_Error) {
+                return $nested;
+            }
+            $children = $nested;
+        }
+
         $out[] = [
             'type' => $type,
+            'blocks' => $children,
+            'layout' => sanitize_key((string) ($block['layout'] ?? 'stack')),
             'styles' => $styles,
             'src' => esc_url_raw((string) ($block['src'] ?? '')),
             'query' => trim((string) ($block['query'] ?? '')),
@@ -454,6 +540,7 @@ function block_types(): array
         'quote',
         'divider',
         'spacer',
+        'group',
     ];
 }
 
@@ -481,10 +568,33 @@ function roles(array $spec): array
     $pad_mobile = (float) $spec['section_padding_mobile'];
     $pad_mobile = $pad_mobile > 0 ? $pad_mobile : max(40.0, round($pad * 0.45));
 
+    /** @var array<string, array<string, mixed>> $gradients */
+    $gradients = is_array($spec['gradients'] ?? null) ? $spec['gradients'] : [];
+
     foreach ($surfaces as $name => $hex) {
+        $background = array_key_exists($name, $gradients)
+            ? ['color' => $hex, 'background-overlay' => [[
+                '$$type' => 'background-gradient-overlay',
+                'value' => [
+                    'type' => $gradients[$name]['type'],
+                    'angle' => $gradients[$name]['angle'],
+                    'stops' => array_map(
+                        static fn(array $stop): array => [
+                            '$$type' => 'color-stop',
+                            'value' => [
+                                'color' => ['$$type' => 'color', 'value' => $stop['color']],
+                                'offset' => ['$$type' => 'number', 'value' => $stop['offset']],
+                            ],
+                        ],
+                        $gradients[$name]['stops'],
+                    ),
+                ],
+            ]]]
+            : ['color' => $hex];
+
         $out['surface-' . $name] = [
             'styles' => [
-                'background' => ['color' => $hex],
+                'background' => $background,
                 'padding' => [
                     'block-start' => $pad . 'px',
                     'block-end' => $pad . 'px',
