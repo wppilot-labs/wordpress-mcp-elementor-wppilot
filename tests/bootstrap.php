@@ -78,10 +78,11 @@ require_once dirname(__DIR__) . '/includes/change-log.php';
 // the pre-flight rules and the distinctiveness comparison. Only these four,
 // deliberately — the rest of the module registers abilities and reads a custom
 // post type, and the parts under test here decide things from their arguments
-// alone. distinct.php names Library for check(), but PHP resolves that lazily
+// alone. typefaces.php is pure data and one rule. distinct.php names Library
+// for check(), but PHP resolves that lazily
 // and the suite exercises compare(), which takes the other designs as an
 // argument precisely so the judgement can be tested without a database.
-foreach (['parser', 'tokens', 'preflight', 'distinct'] as $module) {
+foreach (['parser', 'tokens', 'preflight', 'distinct', 'typefaces'] as $module) {
     require_once dirname(__DIR__) . '/includes/design/' . $module . '.php';
 }
 

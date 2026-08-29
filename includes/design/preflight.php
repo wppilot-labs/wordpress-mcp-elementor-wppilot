@@ -32,6 +32,10 @@ const MECHANIZED = [
     'generic-names',
     'font-off-palette',
     'color-off-palette',
+    'accent-unused',
+    'accent-overused',
+    'type-off-scale',
+    'type-oversized',
     'design-dont',
 ];
 
@@ -136,6 +140,7 @@ function context(?string $design_md): array
             'allowed_fonts' => [],
             'allowed_colors' => [],
             'accent' => '',
+            'declared_sizes' => [],
             'donts' => [],
             'allows' => [],
         ];
@@ -157,6 +162,7 @@ function context(?string $design_md): array
         'allowed_fonts' => collect_allowed_fonts($tokens['typography']),
         'allowed_colors' => array_keys($colors),
         'accent' => normalize_hex(Tokens\pick_value($tokens['colors'], ['accent', 'primary', 'brand', 'action'])),
+        'declared_sizes' => declared_sizes($tokens['typography']),
         'donts' => extract_donts($design_md),
         'allows' => extract_allows($design_md),
     ];
@@ -227,6 +233,7 @@ function violations(string $output, array $ctx): array
         array_push($out, ...font_off_palette($output, $ctx['allowed_fonts']));
         array_push($out, ...color_off_palette($ctx['allowed_colors'], $hexes));
         array_push($out, ...color_proportion($output, $ctx['accent'], $ctx['allowed_colors']));
+        array_push($out, ...type_scale($output, $ctx['declared_sizes']));
         array_push($out, ...dont_matches($text, $ctx['donts']));
     }
 
@@ -333,6 +340,158 @@ function count_hexes(string $output, array $colors): array
     }
 
     return $counts;
+}
+
+/**
+ * Font sizes a design declares, in px, largest first.
+ *
+ * rem and em are resolved against 16px. That is an assumption, and a safe one:
+ * a design that has moved the root size has done something deliberate enough
+ * that a size check is not what will catch it.
+ *
+ * @param  array<string, array<string, string>> $typography
+ * @return list<float>
+ */
+function declared_sizes(array $typography): array
+{
+    $sizes = [];
+    foreach ($typography as $props) {
+        if (!is_array($props)) {
+            continue;
+        }
+        $px = size_to_px((string) ($props['fontSize'] ?? ''));
+        if ($px !== null) {
+            $sizes[] = $px;
+        }
+    }
+
+    $sizes = array_values(array_unique($sizes));
+    rsort($sizes);
+
+    return $sizes;
+}
+
+/**
+ * A CSS length as px, or null when it is not one this check can read.
+ */
+function size_to_px(string $value): ?float
+{
+    $value = strtolower(trim($value));
+    if ($value === '') {
+        return null;
+    }
+    $m = [];
+    if (preg_match('/^([0-9]*\.?[0-9]+)\s*(px|rem|em)?$/', $value, $m) !== 1) {
+        return null;
+    }
+    $number = (float) $m[1];
+    $unit = $m[2] ?? 'px';
+
+    return $unit === 'px' ? $number : $number * 16.0;
+}
+
+/**
+ * Whether the page is set on the scale the design declares.
+ *
+ * A design that declares its sizes and a page that ignores them is the failure
+ * this catches, and it is invisible on any single page: the heading is 44px
+ * here and 52px six pages later, each one defensible on its own and the set of
+ * them obviously unplanned. Nothing about either page is wrong, which is why no
+ * other rule sees it.
+ *
+ * Two things are asked, and deliberately not a third. Whether any declared size
+ * is actually used, and whether the largest thing on the page has run away from
+ * the largest size the design declares. What is not asked is whether every size
+ * on the page is a declared one — a design naming a heading and a body size
+ * cannot enumerate captions, small print and the four heading levels beneath it,
+ * so demanding an exact match would report a violation on every honest page and
+ * teach people to ignore the rule.
+ *
+ * @param  list<float> $declared
+ * @return list<array{rule: string, severity: string, message: string, evidence: string}>
+ */
+function type_scale(string $output, array $declared): array
+{
+    if ($declared === []) {
+        // The contract already says a design with no declared scale is
+        // incomplete. Saying it again here would be the same note twice.
+        return [];
+    }
+
+    $m = [];
+    $found = preg_match_all('/font-size\s*:\s*([0-9]*\.?[0-9]+\s*(?:px|rem|em))/i', $output, $m);
+    if ($found === false || $found === 0) {
+        return [];
+    }
+
+    $used = [];
+    foreach ($m[1] as $raw) {
+        $px = size_to_px((string) $raw);
+        if ($px !== null) {
+            $used[] = $px;
+        }
+    }
+    if ($used === []) {
+        return [];
+    }
+
+    /** @var list<array{rule: string, severity: string, message: string, evidence: string}> $out */
+    $out = [];
+
+    // Half a pixel, which covers rounding through a rem conversion and nothing
+    // else. A whole pixel of slack sounds harmless and swallows the real case:
+    // 17px against a declared 18px is a different decision, not a rounding
+    // artefact, and it is exactly the drift this rule exists to notice.
+    $on_scale = [];
+    foreach ($used as $size) {
+        foreach ($declared as $target) {
+            if (abs($size - $target) <= 0.5) {
+                $on_scale[] = $size;
+                break;
+            }
+        }
+    }
+
+    if ($on_scale === []) {
+        $out[] = [
+            'rule' => 'type-off-scale',
+            'severity' => 'warn',
+            'message' => sprintf(
+                /* translators: 1: comma-separated declared sizes, 2: comma-separated sizes the page uses */
+                __(
+                    'The design declares its type at %1$s and the page uses none of those sizes, setting %2$s instead. A declared scale that no page is set on is the same as no scale: every page picks its own sizes and the set of them never lines up.',
+                    domain: 'wppilot',
+                ),
+                implode(', ', array_map(static fn(float $s): string => rtrim(rtrim(number_format($s, 1), '0'), '.') . 'px', $declared)),
+                implode(', ', array_map(
+                    static fn(float $s): string => rtrim(rtrim(number_format($s, 1), '0'), '.') . 'px',
+                    array_slice(array_values(array_unique($used)), offset: 0, length: 6),
+                )),
+            ),
+            'evidence' => 'font-size: ' . rtrim(rtrim(number_format($used[0], 1), '0'), '.') . 'px',
+        ];
+    }
+
+    $largest_used = max($used);
+    $largest_declared = max($declared);
+    if ($largest_used > $largest_declared * 1.5) {
+        $out[] = [
+            'rule' => 'type-oversized',
+            'severity' => 'warn',
+            'message' => sprintf(
+                /* translators: 1: the largest size on the page, 2: the largest size the design declares */
+                __(
+                    'The largest type on the page is %1$s, against %2$s in the design. A hero that reaches well past the top of the scale is the scale being abandoned for one section rather than extended, and it makes every page with a hero a different size.',
+                    domain: 'wppilot',
+                ),
+                rtrim(rtrim(number_format($largest_used, 1), '0'), '.') . 'px',
+                rtrim(rtrim(number_format($largest_declared, 1), '0'), '.') . 'px',
+            ),
+            'evidence' => 'font-size: ' . rtrim(rtrim(number_format($largest_used, 1), '0'), '.') . 'px',
+        ];
+    }
+
+    return $out;
 }
 
 /**
