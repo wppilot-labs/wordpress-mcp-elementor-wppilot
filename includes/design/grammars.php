@@ -102,8 +102,25 @@ function all(): array
                 'align-items' => 'start',
             ],
             'parts' => ['first', 'second'],
+            // The offset itself. Without it this grammar described a drop and
+            // produced a plain 1fr/1fr row: two columns level with each other,
+            // which is the generic two-column shape the whole set exists to get
+            // away from. It went unnoticed because the section still looked
+            // fine, and the pages built on it quietly hand-tuned a top padding
+            // onto the second column to get the effect back, which is the
+            // hand-tuning a grammar is supposed to remove.
+            'part_styles' => [
+                'second' => [
+                    'margin' => ['block-start' => '5rem'],
+                ],
+            ],
             'responsive' => [
                 'mobile' => ['grid-template-columns' => '1fr'],
+                'part_styles' => [
+                    // In one column the drop is not an offset, it is a gap that
+                    // does not match any other gap on the page.
+                    'second' => ['mobile' => ['margin' => ['block-start' => '0rem']]],
+                ],
             ],
         ],
 
