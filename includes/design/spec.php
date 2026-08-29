@@ -312,6 +312,7 @@ function normalize_sections(array $raw, array $surface_names): array|WP_Error
             'layout' => $layout,
             'gap' => max(0.0, (float) ($section['gap'] ?? 0)),
             'inset' => (bool) ($section['inset'] ?? false),
+            'styles' => is_array($section['styles'] ?? null) ? $section['styles'] : [],
             'note' => trim((string) ($section['note'] ?? '')),
             'blocks' => $blocks,
         ];
@@ -378,6 +379,8 @@ function normalize_blocks(array $raw, int $section_index): array|WP_Error
                     continue;
                 }
                 $items[] = [
+                    'icon' => trim((string) ($item['icon'] ?? '')),
+                    'src' => esc_url_raw((string) ($item['src'] ?? '')),
                     'eyebrow' => trim((string) ($item['eyebrow'] ?? '')),
                     'title' => trim((string) ($item['title'] ?? '')),
                     'text' => trim((string) ($item['text'] ?? '')),
@@ -388,8 +391,25 @@ function normalize_blocks(array $raw, int $section_index): array|WP_Error
             }
         }
 
+        // Anything the vocabulary does not name. A closed component list keeps a
+        // spec portable and gradeable, and on its own it also makes every
+        // section that is not one of eleven shapes impossible to express, which
+        // is the complaint a closed list always earns. Styles ride alongside:
+        // the component decides the structure, and this decides everything
+        // else, so a caller is never stuck asking for a shape nobody
+        // anticipated. Values are passed to the builder as-is and validated
+        // there against the real style schema, so a wrong one is refused with a
+        // reason rather than silently dropped.
+        /** @var array<string, mixed> $styles */
+        $styles = is_array($block['styles'] ?? null) ? $block['styles'] : [];
+
         $out[] = [
             'type' => $type,
+            'styles' => $styles,
+            'src' => esc_url_raw((string) ($block['src'] ?? '')),
+            'query' => trim((string) ($block['query'] ?? '')),
+            'alt' => trim((string) ($block['alt'] ?? '')),
+            'align' => sanitize_key((string) ($block['align'] ?? '')),
             // Which column of a multi-column section this block belongs to.
             // Without it a section's blocks fall into the grid in reading order
             // and a hero of heading, text, buttons and a panel comes out as two
@@ -430,6 +450,10 @@ function block_types(): array
         'accordion',
         'logos',
         'media',
+        'image',
+        'quote',
+        'divider',
+        'spacer',
     ];
 }
 
