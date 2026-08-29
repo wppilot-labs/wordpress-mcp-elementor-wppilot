@@ -288,7 +288,37 @@ function wppilot_capture_before_image(string $ability_name, array $input): ?arra
     if ($ability_name === 'wppilot/woocommerce-add-order-note') {
         return ['type' => 'order-note-create'];
     }
-    return wppilot_capture_core_before_image($ability_name, $input);
+    $core = wppilot_capture_core_before_image($ability_name, $input);
+    if ($core !== null) {
+        return $core;
+    }
+
+    /**
+     * Before-image for an ability this plugin does not know about.
+     *
+     * Everything above covers the abilities the free plugin registers. Anything
+     * else — every builder, form, field and commerce ability another plugin
+     * adds — reached the ledger as a logged-but-irreversible row: recorded,
+     * visible in the Changes screen, and impossible to undo. Setting the wrong
+     * display condition on a header is exactly the mistake somebody wants back.
+     *
+     * A listener returns the same shape as the built-ins: an array carrying a
+     * `type`, and whatever that type's restore path needs. `wppilot_snapshot_post()`
+     * is the one to reach for when the effect lives on a post row — it captures
+     * fields, meta and terms, which is enough to restore any builder that keeps
+     * its document in post meta. Built-in captures always win; this only fills
+     * the gap they leave.
+     *
+     * @param array<string, mixed>|null $before  Null, unless an earlier listener supplied one.
+     * @param string                    $ability_name
+     * @param array<string, mixed>      $input
+     */
+    // @mago-expect analysis:mixed-assignment -- Filter output is validated against the snapshot shape below.
+    $supplied = apply_filters('wppilot_capture_before_image', null, $ability_name, $input);
+
+    return is_array($supplied) && is_string($supplied['type'] ?? null) && $supplied['type'] !== ''
+        ? $supplied
+        : null;
 }
 
 /**
@@ -529,7 +559,18 @@ function wppilot_snapshot_post(int $post_id): ?array
             $excluded_meta_keys[] = (string) $key;
             continue;
         }
-        $meta[(string) $key] = $values;
+        // get_post_meta() in its whole-post form hands back what is in the
+        // database, still serialized — unlike the single-key form, which
+        // unserializes for you. Restoring those raw strings through
+        // add_post_meta() serializes them a second time, so an array comes back
+        // as the literal string 'a:2:{...}' and every reader of that meta then
+        // sees a string where its own data used to be. Any post carrying
+        // serialized meta — an Elementor document, an ACF repeater, page
+        // settings — was silently corrupted by its own rollback.
+        // @mago-expect analysis:mixed-assignment -- Meta values stay opaque; only the serialization layer is removed.
+        $meta[(string) $key] = is_array($values)
+            ? array_map(static fn(mixed $value): mixed => maybe_unserialize($value), $values)
+            : $values;
     }
     $terms = [];
     $taxonomies = get_object_taxonomies((string) $post['post_type'], output: 'names');
