@@ -9,6 +9,7 @@ namespace WPPilot\Design\Distinct;
 
 use WPPilot\Design\Library;
 use WPPilot\Design\Preflight;
+use WPPilot\Design\Spec;
 use WPPilot\Design\Tokens;
 
 /**
@@ -380,5 +381,44 @@ function check(string $design_md, string $own_slug = ''): array
         ];
     }
 
-    return compare($me['colors'], $me['fonts'], $others);
+    $result = compare($me['colors'], $me['fonts'], $others);
+
+    // Structure, which the colour and pairing comparison above cannot see. A
+    // design can change every hex and both faces and keep the identical
+    // skeleton, and that skeleton is what a reader recognises before reading a
+    // word. Without this a second build of one template is reported as distinct
+    // because somebody made it blue.
+    if (function_exists('WPPilot\Design\Spec\get')) {
+        $mine = Spec\get($own_slug);
+        $my_skeleton = is_array($mine) ? Spec\skeleton($mine) : '';
+        if ($my_skeleton !== '') {
+            foreach ($others as $record) {
+                $theirs = Spec\get((string) $record['slug']);
+                if (!is_array($theirs)) {
+                    continue;
+                }
+                $distance = Spec\skeleton_distance($my_skeleton, Spec\skeleton($theirs));
+                if ($distance > 0.2) {
+                    continue;
+                }
+                $result['distinct'] = false;
+                $result['findings'][] = [
+                    'rule' => 'design-structure-repeat',
+                    'severity' => 'warn',
+                    'message' => sprintf(
+                        /* translators: 1: the other design name, 2: how much the skeletons differ */
+                        __(
+                            'This has almost the same page structure as "%1$s": the sections differ by %2$s. Two designs can share no colour and no typeface and still be the same page, and the order of grounds down a page is what somebody recognises before they read anything. Change what a section is, not just what colour it is.',
+                            domain: 'wppilot',
+                        ),
+                        (string) $record['name'],
+                        number_format($distance, 2),
+                    ),
+                ];
+                break;
+            }
+        }
+    }
+
+    return $result;
 }

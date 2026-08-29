@@ -1019,3 +1019,82 @@ function compare(array $spec, array $actual): array
 
     return ['score' => $score, 'matched' => count($diffs) === 0 ? 1 : 0, 'checked' => (int) $total, 'diffs' => $diffs];
 }
+
+/**
+ * A design's structure as one comparable string.
+ *
+ * Palette and type pairing already tell you whether two designs look alike.
+ * They say nothing about whether they are the same page, and a site can change
+ * every colour and every face while keeping the identical skeleton: paper hero,
+ * raised card grid, ink band, lime call. That is the shape a reader recognises
+ * before they read a word, and a distinctiveness check that ignores it will call
+ * two builds of one template distinct because the second one is blue.
+ *
+ * The signature is the sequence of surface role and layout, not the colours
+ * themselves. Two designs whose grounds differ but whose rhythm is identical
+ * should still match, because it is the rhythm that repeats.
+ */
+function skeleton(array $spec): string
+{
+    /** @var list<array<string, mixed>> $sections */
+    $sections = is_array($spec['sections'] ?? null) ? $spec['sections'] : [];
+    if ($sections === []) {
+        return '';
+    }
+
+    /** @var array<string, string> $surfaces */
+    $surfaces = is_array($spec['surfaces'] ?? null) ? $spec['surfaces'] : [];
+
+    $parts = [];
+    foreach ($sections as $section) {
+        $surface = (string) ($section['surface'] ?? '');
+        // Grounds are compared as light or dark rather than by name, so two
+        // designs that both open dark and follow it light match even when one
+        // calls its dark surface "ink" and the other "night".
+        $hex = (string) ($surfaces[$surface] ?? '');
+        $hsl = $hex !== '' ? Preflight\hex_to_hsl($hex) : null;
+        $tone = $hsl === null ? '?' : ((float) $hsl[2] < 0.5 ? 'd' : 'l');
+
+        /** @var list<array<string, mixed>> $blocks */
+        $blocks = is_array($section['blocks'] ?? null) ? $section['blocks'] : [];
+        $kinds = [];
+        foreach ($blocks as $block) {
+            $kinds[] = substr((string) ($block['type'] ?? ''), offset: 0, length: 2);
+        }
+
+        $parts[] = $tone . ':' . (string) ($section['layout'] ?? 'stack') . ':' . implode('', $kinds);
+    }
+
+    return implode('|', $parts);
+}
+
+/**
+ * How much two skeletons differ, 0 (identical) to 1 (nothing in common).
+ *
+ * Compared position by position rather than as a set, because the same sections
+ * in a different order is a different page and a set comparison would call it a
+ * perfect match. A length difference counts against the pair for the same
+ * reason: eight sections and fourteen are not the same page whatever they share.
+ */
+function skeleton_distance(string $a, string $b): float
+{
+    if ($a === '' || $b === '') {
+        return 1.0;
+    }
+    if ($a === $b) {
+        return 0.0;
+    }
+
+    $left = explode('|', $a);
+    $right = explode('|', $b);
+    $length = max(count($left), count($right));
+
+    $same = 0;
+    for ($i = 0; $i < $length; $i++) {
+        if (($left[$i] ?? '') !== '' && ($left[$i] ?? '') === ($right[$i] ?? '')) {
+            $same++;
+        }
+    }
+
+    return 1.0 - ($same / $length);
+}
