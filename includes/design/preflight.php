@@ -226,10 +226,113 @@ function violations(string $output, array $ctx): array
     if ($ctx['has_active']) {
         array_push($out, ...font_off_palette($output, $ctx['allowed_fonts']));
         array_push($out, ...color_off_palette($ctx['allowed_colors'], $hexes));
+        array_push($out, ...color_proportion($output, $ctx['accent'], $ctx['allowed_colors']));
         array_push($out, ...dont_matches($text, $ctx['donts']));
     }
 
     return $out;
+}
+
+/**
+ * How much of the page the accent is doing.
+ *
+ * A palette is four or five colours. A design is a decision about how much of
+ * each one there is — an accent spent on one word, one price and one button
+ * reads as deliberate, and the same accent behind six section backgrounds reads
+ * as a template that was recoloured. Every other colour rule here asks whether
+ * a colour is allowed; this one asks whether it is being used in the proportion
+ * the palette implies.
+ *
+ * The measure is how often each palette colour is named in the output, not the
+ * pixel area it covers, and those are not the same thing: one background
+ * declaration paints more of a page than ten link colours. It is a proxy, and a
+ * usable one, because a page that names its accent more often than its ground
+ * and its ink combined is almost always shouting.
+ *
+ * Both findings warn rather than fail. Proportion is a judgement, and a poster
+ * design that genuinely wants a field of accent is a legitimate thing to build.
+ *
+ * @param  list<string>         $allowed_colors
+ * @return list<array<string, string>>
+ */
+function color_proportion(string $output, string $accent, array $allowed_colors): array
+{
+    if ($accent === '' || $allowed_colors === []) {
+        return [];
+    }
+
+    $counts = count_hexes($output, $allowed_colors);
+    $total = array_sum($counts);
+    if ($total === 0) {
+        return [];
+    }
+
+    $accent_uses = $counts[$accent] ?? 0;
+
+    if ($accent_uses === 0) {
+        return [[
+            'rule' => 'accent-unused',
+            'severity' => 'warn',
+            'message' => sprintf(
+                /* translators: %s: the accent hex from the active design */
+                __(
+                    'The design declares %s as its accent and the page never uses it. An accent that appears nowhere leaves the page in its neutrals, which is the palette not being applied rather than a restrained use of it.',
+                    domain: 'wppilot',
+                ),
+                $accent,
+            ),
+        ]];
+    }
+
+    // A third of every palette mention is already generous for a colour whose
+    // job is to be the exception on the page.
+    $share = $accent_uses / $total;
+    if ($share > 0.34) {
+        return [[
+            'rule' => 'accent-overused',
+            'severity' => 'warn',
+            'message' => sprintf(
+                /* translators: 1: accent hex, 2: whole-number percentage */
+                __(
+                    'The accent %1$s accounts for %2$d%% of the colour this page names. An accent earns its force by being rare: spend it on one word, one number, one button per view, and let the ground and the ink carry everything else.',
+                    domain: 'wppilot',
+                ),
+                $accent,
+                (int) round($share * 100),
+            ),
+        ]];
+    }
+
+    return [];
+}
+
+/**
+ * Count how often each of the given colours is named in the output.
+ *
+ * Separate from find_hexes(), which answers which colours are present and
+ * deliberately discards the counts every other rule has no use for.
+ *
+ * @param  list<string> $colors
+ * @return array<string, int>
+ */
+function count_hexes(string $output, array $colors): array
+{
+    $counts = [];
+    $m = [];
+    if (preg_match_all('/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/', $output, $m) === false) {
+        return $counts;
+    }
+
+    $wanted = array_flip($colors);
+    foreach ($m[1] as $hex) {
+        $normalized = normalize_hex('#' . $hex);
+        if ($normalized === '' || !isset($wanted[$normalized])) {
+            continue;
+        }
+        $counts[$normalized] = ($counts[$normalized] ?? 0) + 1;
+    }
+
+    return $counts;
 }
 
 /**
