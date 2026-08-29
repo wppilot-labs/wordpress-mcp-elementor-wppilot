@@ -302,15 +302,135 @@ function normalize_sections(array $raw, array $surface_names): array|WP_Error
             );
         }
 
+        $blocks = normalize_blocks(is_array($section['blocks'] ?? null) ? $section['blocks'] : [], $index);
+        if ($blocks instanceof WP_Error) {
+            return $blocks;
+        }
+
         $out[] = [
             'surface' => $surface,
             'layout' => $layout,
             'gap' => max(0.0, (float) ($section['gap'] ?? 0)),
+            'inset' => (bool) ($section['inset'] ?? false),
             'note' => trim((string) ($section['note'] ?? '')),
+            'blocks' => $blocks,
         ];
     }
 
     return $out;
+}
+
+/**
+ * The blocks a section can be made of.
+ *
+ * Surfaces and a type scale describe how a page is coloured and set. They do
+ * not describe what is on it, and a spec that stops there produces a page with
+ * the right palette, the right sizes, and none of the things the reference
+ * actually contains: no console panel in the hero, no seven-item brief grid, no
+ * accordion, no stat row. That page matches on every measurement and looks
+ * nothing like the target, which is the trap in grading a reproduction by
+ * tokens alone.
+ *
+ * So the vocabulary is components, not markup. A caller says "a card grid of
+ * seven, each with an eyebrow, a title and a line" and the builder decides what
+ * a card is on its side. Naming the component rather than the element tree is
+ * what keeps a spec portable between builders, and what stops a page
+ * description from being a hand-built tree that only its author can maintain.
+ *
+ * @param  list<mixed> $raw
+ * @return list<array<string, mixed>>|WP_Error
+ */
+function normalize_blocks(array $raw, int $section_index): array|WP_Error
+{
+    $known = block_types();
+    $out = [];
+    foreach (array_values($raw) as $position => $block) {
+        if (!is_array($block)) {
+            continue;
+        }
+        $type = sanitize_key((string) ($block['type'] ?? ''));
+        if (!in_array($type, $known, strict: true)) {
+            return new WP_Error(
+                'wppilot_spec_block_type',
+                sprintf(
+                    /* translators: 1: section index, 2: block position, 3: the type named, 4: comma-separated valid types */
+                    __('Section %1$d block %2$d is type "%3$s". Use one of: %4$s.', domain: 'wppilot'),
+                    $section_index,
+                    $position,
+                    $type,
+                    implode(', ', $known),
+                ),
+                ['status' => 422],
+            );
+        }
+
+        /** @var list<array<string, mixed>> $items */
+        $items = [];
+        /** @var mixed $raw_items */
+        $raw_items = $block['items'] ?? [];
+        if (is_array($raw_items)) {
+            foreach (array_values($raw_items) as $item) {
+                if (is_string($item)) {
+                    $items[] = ['text' => $item];
+                    continue;
+                }
+                if (!is_array($item)) {
+                    continue;
+                }
+                $items[] = [
+                    'eyebrow' => trim((string) ($item['eyebrow'] ?? '')),
+                    'title' => trim((string) ($item['title'] ?? '')),
+                    'text' => trim((string) ($item['text'] ?? '')),
+                    'value' => trim((string) ($item['value'] ?? '')),
+                    'surface' => sanitize_key((string) ($item['surface'] ?? '')),
+                    'style' => sanitize_key((string) ($item['style'] ?? '')),
+                ];
+            }
+        }
+
+        $out[] = [
+            'type' => $type,
+            // Which column of a multi-column section this block belongs to.
+            // Without it a section's blocks fall into the grid in reading order
+            // and a hero of heading, text, buttons and a panel comes out as two
+            // columns of two, which is never what the reference did.
+            'column' => max(0, (int) ($block['column'] ?? 0)),
+            'role' => sanitize_key((string) ($block['role'] ?? '')),
+            'text' => trim((string) ($block['text'] ?? '')),
+            'surface' => sanitize_key((string) ($block['surface'] ?? '')),
+            'columns' => max(0, (int) ($block['columns'] ?? 0)),
+            'items' => $items,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * Component types a section may contain.
+ *
+ * Deliberately a closed list. An open one turns into free-form markup within a
+ * week, and free-form markup is the thing that cannot be graded, cannot be
+ * rebuilt on another builder, and cannot be changed centrally when the spec
+ * changes.
+ *
+ * @return list<string>
+ */
+function block_types(): array
+{
+    return [
+        'eyebrow',
+        'heading',
+        'text',
+        'buttons',
+        'cards',
+        'panel',
+        'list',
+        'stats',
+        'accordion',
+        'logos',
+        'media',
+    ];
 }
 
 /**
@@ -406,6 +526,81 @@ function roles(array $spec): array
             'mobile' => type_mobile($props),
         ];
     }
+
+    // Components. A spec that stopped at type and surfaces could colour a page
+    // correctly and still contain none of the things the reference is made of,
+    // so the filled blocks a page is actually built from are generated here
+    // from the same numbers rather than hand-written per page.
+    $radius = is_array($spec['radius'] ?? null) ? $spec['radius'] : [];
+    $card_radius = (float) ($radius['md'] ?? $radius['sm'] ?? 16);
+    $pill = (float) ($radius['pill'] ?? 999);
+    $gap = (float) $spec['gap'];
+
+    foreach ($surfaces as $name => $hex) {
+        $ink = readable_on($hex, $surfaces);
+
+        $out['card-' . $name] = [
+            'styles' => [
+                'background' => ['color' => $hex],
+                'border-radius' => $card_radius . 'px',
+                'padding' => [
+                    'block-start' => '32px',
+                    'block-end' => '32px',
+                    'inline-start' => '32px',
+                    'inline-end' => '32px',
+                ],
+                'display' => 'flex',
+                'flex-direction' => 'column',
+                'gap' => '12px',
+            ],
+            'mobile' => [],
+        ];
+
+        // A button on a ground is that ground's strongest counterpart filled
+        // in, with the ground itself as the label. Derived rather than declared
+        // because a spec that had to name a button colour per surface would
+        // name one of them wrong.
+        $out['button-' . $name] = [
+            'styles' => [
+                'background' => ['color' => $ink],
+                'color' => $hex,
+                'font-weight' => '600',
+                'padding' => [
+                    'block-start' => '18px',
+                    'block-end' => '18px',
+                    'inline-start' => '32px',
+                    'inline-end' => '32px',
+                ],
+                'border-radius' => $pill . 'px',
+                'border-width' => '0px',
+                'align-self' => 'flex-start',
+                'cursor' => 'pointer',
+            ],
+            'mobile' => [],
+        ];
+    }
+
+    $out['row'] = [
+        'styles' => [
+            'display' => 'flex',
+            'flex-direction' => 'row',
+            'gap' => '16px',
+            'flex-wrap' => 'wrap',
+            'align-items' => 'center',
+        ],
+        'mobile' => [],
+    ];
+
+    $out['stack'] = [
+        'styles' => [
+            'display' => 'flex',
+            'flex-direction' => 'column',
+            'gap' => $gap . 'px',
+            'align-items' => 'flex-start',
+            'width' => '100%',
+        ],
+        'mobile' => [],
+    ];
 
     return $out;
 }
