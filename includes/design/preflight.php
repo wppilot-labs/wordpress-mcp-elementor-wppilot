@@ -1048,15 +1048,25 @@ function extract_donts(string $md): array
                 str_contains($title, 'don') || in_array($title, ['guidelines', 'principles', 'rules'], strict: true);
             continue;
         }
-        if (!$capturing || preg_match('/^(?:[-*]|\d+[.)])\s+(.*)$/', trim($line), $m) !== 1) {
+        if (!$capturing) {
             continue;
         }
-        $text = trim($m[1]);
-        if ($text === '' || !is_dont($text)) {
+
+        // A bullet that wrapped across lines is one rule, not a rule and some
+        // orphaned words. Taking only the first line truncated the longer
+        // Don'ts mid-sentence, and the gate quotes these back verbatim when it
+        // refuses a page, so the refusal arrived missing the half that said
+        // what to do instead.
+        if (preg_match('/^(?:[-*]|\d+[.)])\s+(.*)$/', trim($line), $m) === 1) {
+            $items[] = trim($m[1]);
             continue;
         }
-        $items[] = $text;
+        if ($items !== [] && trim($line) !== '') {
+            $items[array_key_last($items)] .= ' ' . trim($line);
+        }
     }
+
+    $items = array_values(array_filter($items, static fn(string $text): bool => $text !== '' && is_dont($text)));
     return $items;
 }
 

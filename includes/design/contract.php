@@ -324,9 +324,24 @@ function guidance(string $content): array
         'rules',
     ]);
 
+    // The Don'ts come from the gate's own reader rather than from the section
+    // titles above. Those titles never included a section called plainly
+    // "Don't", which is the heading the shipped examples and the documented
+    // format actually use, so the contract reported a design as declaring no
+    // Don'ts while the gate was enforcing six of them and quoting them back in
+    // its refusals. Two readers of one document disagreeing is worse than
+    // either being wrong, and the gate's answer is the one that has teeth, so
+    // it is the one reported.
+    $donts = plain_items($parsed['donts']);
+    foreach (Preflight\extract_donts($content) as $dont) {
+        if (!in_array($dont, $donts, strict: true)) {
+            $donts[] = $dont;
+        }
+    }
+
     return [
         'dos' => plain_items($parsed['dos']),
-        'donts' => plain_items($parsed['donts']),
+        'donts' => $donts,
     ];
 }
 
