@@ -141,7 +141,9 @@ function all(): array
                 'card' => [
                     'position' => 'relative',
                     'z-index' => 2,
-                    'margin-block-start' => '-6rem',
+                    // margin is a dimensions prop in Elementor's schema, not a
+                    // set of logical longhands: margin-block-start is refused.
+                    'margin' => ['block-start' => '-6rem'],
                 ],
             ],
             'responsive' => [
@@ -149,7 +151,7 @@ function all(): array
                 // above it at 390px.
                 'mobile' => [],
                 'part_styles' => [
-                    'card' => ['mobile' => ['margin-block-start' => '-1.5rem']],
+                    'card' => ['mobile' => ['margin' => ['block-start' => '-1.5rem']]],
                 ],
             ],
         ],
