@@ -18,6 +18,7 @@ if (!defined('ABSPATH')) {
 
 require_once __DIR__ . '/parser.php';
 require_once __DIR__ . '/tokens.php';
+require_once __DIR__ . '/grammars.php';
 require_once __DIR__ . '/preflight.php';
 require_once __DIR__ . '/markdown.php';
 require_once __DIR__ . '/contract.php';
@@ -33,6 +34,7 @@ require_once __DIR__ . '/adopt.php';
 require_once __DIR__ . '/examples.php';
 require_once __DIR__ . '/abilities/categories.php';
 require_once __DIR__ . '/abilities/list-design-library.php';
+require_once __DIR__ . '/abilities/list-layout-grammars.php';
 require_once __DIR__ . '/abilities/get-active-design.php';
 require_once __DIR__ . '/abilities/activate-design.php';
 require_once __DIR__ . '/abilities/save-design.php';
@@ -67,6 +69,7 @@ add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Check\\registe
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Contrast\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\VerifyRendered\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Adopt\\register', priority: 999);
+add_action('wp_abilities_api_init', __NAMESPACE__ . '\Abilities\Grammars\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Examples\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Get\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Delete\\register', priority: 999);

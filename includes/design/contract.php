@@ -69,7 +69,7 @@ function ability_output_properties(): array
  *   },
  *   dials: array{variance: float, density: float, motion: float},
  *   guidance: array{dos: list<string>, donts: list<string>},
- *   token_sources: array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, scale: string},
+ *   token_sources: array{colors: string, typography: string, spacing: string, rounded: string, components: string, dials: string, layout: string, scale: string},
  *   readiness: array{ready: bool, sync_ready: bool, errors: list<string>, warnings: list<string>},
  *   waivers: list<string>
  * }
@@ -87,6 +87,7 @@ function inspect(string $content): array
             'spacing' => $all_tokens['spacing'],
             'rounded' => $all_tokens['rounded'],
             'components' => $all_tokens['components'],
+            'layout' => $all_tokens['layout'] ?? [],
         ],
         'dials' => Tokens\dials($all_tokens),
         'guidance' => guidance($content),
@@ -243,6 +244,7 @@ function token_sources(string $content, array $tokens): array
         'rounded' => token_source($content, key: 'rounded', values: $tokens['rounded']),
         'components' => token_source($content, key: 'components', values: $tokens['components']),
         'dials' => token_source($content, key: 'dials', values: $tokens['dials']),
+        'layout' => token_source($content, key: 'layout', values: $tokens['layout'] ?? []),
         'scale' => scale_source($tokens['typography']),
     ];
 }
