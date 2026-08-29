@@ -82,7 +82,7 @@ require_once dirname(__DIR__) . '/includes/change-log.php';
 // for check(), but PHP resolves that lazily
 // and the suite exercises compare(), which takes the other designs as an
 // argument precisely so the judgement can be tested without a database.
-foreach (['parser', 'tokens', 'preflight', 'contrast', 'distinct', 'typefaces', 'spec'] as $module) {
+foreach (['parser', 'tokens', 'preflight', 'contrast', 'seed', 'distinct', 'typefaces', 'spec'] as $module) {
     require_once dirname(__DIR__) . '/includes/design/' . $module . '.php';
 }
 
