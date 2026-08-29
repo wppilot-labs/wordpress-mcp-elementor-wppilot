@@ -10,6 +10,7 @@ namespace WPPilot\Design\Abilities\Get;
 use WP_Error;
 use WPPilot\Design\Abilities;
 use WPPilot\Design\Contract;
+use WPPilot\Design\Distinct;
 use WPPilot\Design\Library;
 use WPPilot\Design\Store;
 
@@ -63,6 +64,11 @@ function register(): void
                 return ['found' => false];
             }
 
+            // How this one sits against the rest of the library. Designs saved
+            // before this comparison existed never got the note at save time,
+            // and reviewing a design is the other moment it is worth knowing.
+            $distinct = Distinct\check($record['content'], $record['slug']);
+
             return array_merge([
                 'found' => true,
                 'slug' => $record['slug'],
@@ -70,6 +76,12 @@ function register(): void
                 'description' => $record['description'],
                 'content' => $record['content'],
                 'is_active' => Store\get_active_slug() === $record['slug'],
+                'distinctiveness' => [
+                    'distinct' => $distinct['distinct'],
+                    'compared_against' => $distinct['compared'],
+                    'nearest' => $distinct['nearest'],
+                    'findings' => $distinct['findings'],
+                ],
             ], Contract\inspect($record['content']));
         },
         'permission_callback' => 'wppilot_permission_callback',

@@ -29,6 +29,7 @@ require_once __DIR__ . '/library.php';
 require_once __DIR__ . '/gate.php';
 require_once __DIR__ . '/context.php';
 require_once __DIR__ . '/contrast.php';
+require_once __DIR__ . '/distinct.php';
 require_once __DIR__ . '/rendered.php';
 require_once __DIR__ . '/adopt.php';
 require_once __DIR__ . '/examples.php';
