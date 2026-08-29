@@ -223,7 +223,7 @@ function violations(string $output, array $ctx): array
 
     $out = [];
     array_push($out, ...em_dash($text, $ctx['allows']));
-    array_push($out, ...ai_purple($output, $ctx['accent'], $hexes));
+    array_push($out, ...ai_purple($output, $ctx['accent'], $hexes, $ctx['allowed_colors']));
     array_push($out, ...inter_font($output, $ctx['allowed_fonts']));
     array_push($out, ...warm_craft_palette($ctx['allows'], $ctx['allowed_colors'], $hexes));
     array_push($out, ...filler_copy($text));
@@ -537,7 +537,7 @@ function em_dash(string $output, array $allows): array
  * @param list<string> $hexes Distinct hex colors in the output, pre-scanned by the caller.
  * @return list<array{rule: string, severity: string, message: string, evidence: string}>
  */
-function ai_purple(string $output, string $accent, array $hexes): array
+function ai_purple(string $output, string $accent, array $hexes, array $allowed_colors = []): array
 {
     if ($accent !== '') {
         $accent_hsl = hex_to_hsl($accent);
@@ -546,10 +546,24 @@ function ai_purple(string $output, string $accent, array $hexes): array
         }
     }
 
+    // A purple the design declares anywhere in its palette is a decision, not
+    // the default this rule exists to catch. The accent was already exempt, but
+    // a brand whose violet is a secondary or a tertiary got warned about its
+    // own colour, and the warning told it to pick a non-purple accent "unless
+    // the brand is purple" while having no way to notice that it is. The Inter
+    // rule already works this way: naming the face in the design permits it.
+    $declared = [];
+    foreach ($allowed_colors as $color) {
+        $declared[normalize_hex((string) $color)] = true;
+    }
+
     $purples = [];
     foreach ($hexes as $hex) {
         $hsl = hex_to_hsl($hex);
         if ($hsl === null || !is_purple($hsl)) {
+            continue;
+        }
+        if (isset($declared[normalize_hex($hex)])) {
             continue;
         }
         $purples[$hex] = true;
