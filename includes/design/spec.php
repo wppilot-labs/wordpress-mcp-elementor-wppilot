@@ -428,6 +428,22 @@ function normalize_blocks(array $raw, int $section_index, int $depth = 0): array
             );
         }
 
+        if ($type === 'widget' && sanitize_key((string) ($block['widget'] ?? '')) === '') {
+            return new WP_Error(
+                'wppilot_spec_widget_name',
+                sprintf(
+                    /* translators: 1: section index, 2: block position */
+                    __(
+                        'Section %1$d block %2$d is a widget and names none. Set "widget" to an Elementor widget type; wppilot/elementor-get-schema with action "list" enumerates them.',
+                        domain: 'wppilot',
+                    ),
+                    $section_index,
+                    $position,
+                ),
+                ['status' => 422],
+            );
+        }
+
         /** @var list<array<string, mixed>> $items */
         $items = [];
         /** @var mixed $raw_items */
@@ -487,8 +503,22 @@ function normalize_blocks(array $raw, int $section_index, int $depth = 0): array
             $children = $nested;
         }
 
+        // Any Elementor widget, named and configured directly. The component
+        // list covers what most sections are made of and there are a hundred
+        // and ninety-two widgets on this install, so a closed list will always
+        // be missing the one a particular reference needs: a slider, a counter,
+        // a form, a gallery, a widget an addon pack installed last week. The
+        // named components stay because they are portable and gradeable; this
+        // is the door out of them, and its settings are validated against the
+        // real widget schema at build time rather than here, where nothing
+        // knows what a widget is.
+        /** @var array<string, mixed> $widget_settings */
+        $widget_settings = is_array($block['settings'] ?? null) ? $block['settings'] : [];
+
         $out[] = [
             'type' => $type,
+            'widget' => sanitize_key((string) ($block['widget'] ?? '')),
+            'settings' => $widget_settings,
             'blocks' => $children,
             'layout' => sanitize_key((string) ($block['layout'] ?? 'stack')),
             'styles' => $styles,
@@ -541,6 +571,9 @@ function block_types(): array
         'divider',
         'spacer',
         'group',
+        'tabs',
+        'toggle',
+        'widget',
     ];
 }
 
