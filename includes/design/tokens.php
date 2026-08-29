@@ -40,6 +40,7 @@ function extract(string $raw): array
     $rounded = [];
     $components = [];
     $dials = [];
+    $layout = [];
 
     $section = null;
     $token = null;
@@ -72,7 +73,11 @@ function extract(string $raw): array
                 continue;
             }
             $section = $value === ''
-            && in_array($key, ['colors', 'typography', 'spacing', 'rounded', 'components', 'dials'], strict: true)
+            && in_array(
+                $key,
+                ['colors', 'typography', 'spacing', 'rounded', 'components', 'dials', 'layout'],
+                strict: true,
+            )
                 ? $key
                 : null;
             $token = null;
@@ -97,6 +102,14 @@ function extract(string $raw): array
         }
         if ($section === 'dials' && $value !== '') {
             $dials[$key] = $value;
+            continue;
+        }
+        // Which compositions this design is built from — the grammar names and
+        // their parameters. Everything above describes how a page looks; this
+        // is the only group that describes how it is arranged, which is the
+        // difference between a palette and a design.
+        if ($section === 'layout' && $value !== '') {
+            $layout[$key] = $value;
             continue;
         }
         if ($section !== 'typography') {
@@ -138,6 +151,7 @@ function extract(string $raw): array
         'rounded' => $rounded,
         'components' => $components,
         'dials' => $dials,
+        'layout' => $layout,
     ];
 }
 
