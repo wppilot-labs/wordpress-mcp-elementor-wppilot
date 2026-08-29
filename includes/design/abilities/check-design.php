@@ -94,6 +94,14 @@ function register(): void
                 break;
             }
 
+            // Distinctiveness is deliberately not checked here. It is a fact
+            // about the design, not about this page, and this ability runs once
+            // per section of a build: reporting "your palette resembles Anchor"
+            // against every hero and every footer would be the same unactionable
+            // note a dozen times, and would re-parse the whole design library to
+            // produce it. It is reported once, where the design is proposed —
+            // see save-design and get-design.
+
             return [
                 'ok' => $ok,
                 'active' => $ctx['has_active'],

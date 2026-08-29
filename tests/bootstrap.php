@@ -74,6 +74,17 @@ require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
 // by reference, and only a real call proves the call sites still satisfy them.
 require_once dirname(__DIR__) . '/includes/change-log.php';
 
+// The design system's pure layers: the document parser, the token extractor,
+// the pre-flight rules and the distinctiveness comparison. Only these four,
+// deliberately — the rest of the module registers abilities and reads a custom
+// post type, and the parts under test here decide things from their arguments
+// alone. distinct.php names Library for check(), but PHP resolves that lazily
+// and the suite exercises compare(), which takes the other designs as an
+// argument precisely so the judgement can be tested without a database.
+foreach (['parser', 'tokens', 'preflight', 'distinct'] as $module) {
+    require_once dirname(__DIR__) . '/includes/design/' . $module . '.php';
+}
+
 // Registrations captured during load are the baseline the suite asserts against.
 // Snapshot them before any test calls WPPilot_Test_State::reset(). The full
 // registration arguments are kept alongside the names so a test can assert on

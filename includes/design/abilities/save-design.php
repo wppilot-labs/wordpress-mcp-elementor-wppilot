@@ -10,6 +10,7 @@ namespace WPPilot\Design\Abilities\Save;
 use WP_Error;
 use WPPilot\Design\Abilities;
 use WPPilot\Design\Contract;
+use WPPilot\Design\Distinct;
 use WPPilot\Design\Parser;
 use WPPilot\Design\Store;
 
@@ -110,11 +111,24 @@ function execute(array $input): array|WP_Error
         Store\set_active($result['slug']);
     }
 
+    // Whether this design is anything new. The contract above says the document
+    // is complete and internally consistent; it cannot say that this is the
+    // fourth site this quarter with a navy ground and the same two faces. That
+    // only shows up against the rest of the library, and the moment a design is
+    // proposed is the one moment somebody can still change their mind about it.
+    $distinct = Distinct\check($content, $result['slug']);
+
     return array_merge([
         'saved' => true,
         'slug' => $result['slug'],
         'name' => $result['name'],
         'activated' => $activate,
         'activation_blocked' => $activate_requested && !$activate,
+        'distinctiveness' => [
+            'distinct' => $distinct['distinct'],
+            'compared_against' => $distinct['compared'],
+            'nearest' => $distinct['nearest'],
+            'findings' => $distinct['findings'],
+        ],
     ], $inspection);
 }
