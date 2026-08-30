@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
- * Version: 1.9.0
+ * Version: 1.10.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -294,6 +294,10 @@ require_once __DIR__ . '/includes/admin/instructions.php';
 require_once __DIR__ . '/includes/admin/settings.php';
 require_once __DIR__ . '/includes/admin/dashboard.php';
 require_once __DIR__ . '/includes/preview/bootstrap.php';
+// Basic Elementor support. Self-gating: the module checks for Elementor and its
+// version floor before loading anything, so this require is inert on a site
+// without it.
+require_once __DIR__ . '/includes/elementor/bootstrap.php';
 
 // Loaded last: the lifecycle routines call into chat-schema, safety, helpers,
 // and the upsell, so every one of those must already be defined.

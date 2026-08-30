@@ -1,10 +1,10 @@
 === WPPilot ===
 Contributors: wppilot
-Tags: mcp, ai, claude, agent, automation
+Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.9.0
+Stable tag: 1.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,9 +12,19 @@ Connect Claude, Cursor, Codex and other AI clients to your WordPress site over M
 
 == Description ==
 
-WPPilot turns your WordPress site into an MCP (Model Context Protocol) server, so the AI client you already use can build in it directly instead of handing you code to paste. Pages, block-editor content, menus, taxonomies, media, SEO metadata: one prompt from you becomes hundreds of typed calls from the agent, each checked against your WordPress capabilities before it runs.
+WPPilot turns your WordPress site into an MCP (Model Context Protocol) server, so the AI client you already use can build in it directly instead of handing you code to paste. Pages, block-editor content, Elementor layouts, menus, taxonomies, media, SEO metadata: one prompt from you becomes hundreds of typed calls from the agent, each checked against your WordPress capabilities before it runs.
 
 It is built on the WordPress Abilities API and the official MCP Adapter, and it ships a compact tool set for discovery, inspection and execution rather than a sprawl of one-off endpoints.
+
+= Elementor editing, in the free plugin =
+
+If Elementor is active, WPPilot registers sixteen Elementor abilities alongside the WordPress ones. An agent can read a document's element tree, ask which widgets and which of the seventy-three atomic style properties this install actually offers, and then add, edit, move, duplicate, reorder and delete elements, and read and write page settings.
+
+It works on the element tree in postmeta, which is where an Elementor page actually lives; writing generated HTML into the post content changes nothing a visitor sees, and WPPilot refuses that write by name rather than reporting a success. Both element models are supported: v4 atomic elements with the atomic style schema, and classic v3 widgets and containers.
+
+Nothing needs configuring. The abilities appear when Elementor 3.6 or newer is active and stay absent otherwise, so an agent is never offered a tool that cannot work here. Elementor Pro is not required.
+
+Composing a whole page in one call, templates and theme parts, popups, forms, dynamic tags, global classes and variables are WPPilot Pro.
 
 A prompt library ships in wp-admin. The prompts name the abilities they call, in order, so a build does not stall halfway through with no explanation.
 
@@ -110,6 +120,12 @@ The MCP server requires WordPress 6.9 or newer and PHP 8.0 or newer. WPPilot Cha
 
 Yes. **WPPilot → Abilities** lists every registered ability, grouped by provider, and each one can be switched off individually. Disabled abilities disappear from discovery and cannot be executed.
 
+= Can an agent edit an Elementor page without Pro? =
+
+Yes. Sixteen Elementor abilities ship in this plugin and register themselves as soon as Elementor 3.6 or newer is active: read the document, inspect the widget and style schemas, add, edit, move, duplicate, reorder and delete elements, and read and write page settings. The design system is here too, so the agent has a palette, type and spacing ladders and a set of compositions to build against.
+
+What Pro adds is the authoring layer: building a whole page from one description or from a reproduction spec, templates and theme parts, display conditions, popups, Elementor Pro forms, dynamic tags, interactions, global classes and variables. Free can edit an Elementor page; Pro can compose one.
+
 = What does WPPilot Pro add? =
 
 Pro is for the plugins your site adds on top of WordPress: WooCommerce, page builders, forms, SEO suites, custom fields, themes and multilingual tools, plus persistent memory across conversations and an approval queue. It is a separate paid plugin from wppilot.co and is not required.
@@ -150,6 +166,14 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.10.0 =
+* Elementor editing is free. Sixteen abilities move out of Pro and into this plugin: read a document, discover the widgets and the seventy-three atomic style properties the install offers, inspect one widget's parameters, find elements, replace a document's tree, and add, edit, move, duplicate, reorder and delete elements, plus read and write page settings. They register when Elementor 3.6 or newer is active and stay absent otherwise.
+* Why this and not more: the design system already shipped here - a direction, a type scale, the compositions a page may be built from, and the checks that grade the result - while the builder that could apply any of it did not. A free install could derive a design it had no way to use. That is not a teaser, it is a dead end.
+* The line is drawn at editing. Composing a whole page from a description or a reproduction spec, templates and theme parts, display conditions, popups, forms, dynamic tags, interactions, global classes and variables remain Pro. Free can edit an Elementor page; Pro can compose one.
+* Pro no longer carries its own copy of the Elementor runtime, the tree and style helpers, or the primitive abilities. It imports them from here, so the two cannot drift apart on a site running both. WPPilot Pro 1.5.0 or newer is required alongside this release.
+* Fixed: a single unsupported property no longer takes down a whole `elementor-set-content` write. The offending key is dropped, the element keeps everything else, and the response names what was lost. Pass `strict` to refuse the write instead.
+* Fixed: a list-shaped style value, `transform` among them, raised a TypeError instead of being wrapped.
 
 = 1.9.0 =
 * The spec can describe a composition now, not only a stack. `grammars.php` has always named the shapes a page can be built from - a panel crossing a section boundary, layers on a common ground, a column that stays put while its neighbour scrolls, an element escaping the page edge - and `wppilot/list-layout-grammars` has always returned them. Nothing could ask for one. Every page this pipeline built came out as a stack of full-width bands, because a stack of bands was the only thing the vocabulary could say, and the grammar most worth having was the one that module describes as "the one thing a stack of bands can never do". Four new layouts close that: `bleed`, `layer`, `index-detail` and `overlap`.
