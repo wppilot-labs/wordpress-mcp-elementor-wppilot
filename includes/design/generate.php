@@ -334,35 +334,70 @@ function resolve_type(string $seed, array $brief): array|WP_Error
     $tracking = -1 * Seed\between($seed, 'display-tracking', 0.01, 0.05, 0.005);
     $leading = Seed\between($seed, 'display-leading', 0.92, 1.08, 0.02);
 
-    $h2 = round($body_size * ($ratio ** 3));
-    $h1 = round($body_size * ($ratio ** 4));
+    $body_leading = Seed\between($seed, 'body-leading', 1.5, 1.7, 0.05);
+
+    // The whole ladder, not three rungs of it.
+    //
+    // This emitted `heading`, `section` and `body`, which is enough to write a
+    // DESIGN.md and not enough to be checked against: every rule that asks
+    // whether a size is on the scale needs the scale to have more than three
+    // steps in it, and a spec needs all eight roles before a page can be built
+    // from one. Three declared sizes meant a page could use nine and still be
+    // reported as restrained, because there was almost nothing to be off.
+    //
+    // The rungs are powers of the one ratio rather than eight independent
+    // draws. That is what makes a scale read as a scale: the jumps are the same
+    // shape all the way up, so a heading two steps above another looks two
+    // steps above it rather than merely bigger.
+    $step = static fn(float $power): float => round($body_size * ($ratio ** $power));
+
+    $heading = static fn(float $power, float $leading_offset, float $tracking_scale): array => [
+        'fontFamily' => $display,
+        'fontWeight' => $weight,
+        'fontSize' => $step($power) . 'px',
+        'lineHeight' => (string) round($leading + $leading_offset, precision: 2),
+        'letterSpacing' => round($tracking * $tracking_scale, precision: 4) . 'em',
+    ];
 
     return [
         'display' => $display,
         'body' => $body,
         'ratio' => $ratio,
         'roles' => [
-            'heading' => [
-                'fontFamily' => $display,
-                'fontWeight' => $weight,
-                'fontSize' => $h1 . 'px',
-                'lineHeight' => (string) $leading,
-                'letterSpacing' => $tracking . 'em',
-            ],
-            'section' => [
-                'fontFamily' => $display,
-                'fontWeight' => $weight,
-                'fontSize' => $h2 . 'px',
-                'lineHeight' => (string) round($leading + 0.06, precision: 2),
-                'letterSpacing' => round($tracking * 0.85, precision: 4) . 'em',
-            ],
+            // Tracking loosens as the size drops, because the negative tracking
+            // that makes a hero look set makes body copy look broken.
+            'display' => $heading(5.0, 0.0, 1.0),
+            'h1' => $heading(4.0, 0.0, 1.0),
+            'h2' => $heading(3.0, 0.06, 0.85),
+            'h3' => $heading(2.0, 0.14, 0.6),
+            'card' => $heading(1.0, 0.28, 0.45),
             'body' => [
                 'fontFamily' => $body,
                 'fontWeight' => '400',
                 'fontSize' => $body_size . 'px',
-                'lineHeight' => (string) Seed\between($seed, 'body-leading', 1.5, 1.7, 0.05),
+                'lineHeight' => (string) $body_leading,
                 'letterSpacing' => '0',
                 'measure' => (string) Seed\between($seed, 'measure', 58.0, 72.0, 2.0),
+            ],
+            // Below body the ladder uses half steps. A full one would put small
+            // text at two thirds of body, which stops being small and starts
+            // being unreadable.
+            'small' => [
+                'fontFamily' => $body,
+                'fontWeight' => '400',
+                'fontSize' => $step(-0.5) . 'px',
+                'lineHeight' => (string) round($body_leading - 0.1, precision: 2),
+                'letterSpacing' => '0',
+                'measure' => (string) Seed\between($seed, 'small-measure', 46.0, 56.0, 2.0),
+            ],
+            // A label is read as a mark rather than as a sentence, so it takes
+            // weight instead of size and leads tight.
+            'label' => [
+                'fontFamily' => $body,
+                'fontWeight' => '600',
+                'fontSize' => $step(-1.0) . 'px',
+                'lineHeight' => '1.2',
+                'letterSpacing' => '0',
             ],
         ],
     ];

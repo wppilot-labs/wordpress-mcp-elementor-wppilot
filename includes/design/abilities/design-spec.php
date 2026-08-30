@@ -125,7 +125,42 @@ function register(): void
             $vocabulary = [
                 'layouts' => Spec\layouts(),
                 'type_roles' => Spec\type_roles(),
+                'block_types' => Spec\block_types(),
+                'states' => Spec\states(),
                 'sources' => Spec\SOURCES,
+                // An item used to be eight strings, and that is most of why
+                // every card this pipeline built looked like every other one.
+                // A model with the taste to design a pricing tier still emitted
+                // a heading and a paragraph, because a heading and a paragraph
+                // was the only sentence the vocabulary could say. Spelling the
+                // composed form out here is the difference between the shape
+                // being possible and it being discovered.
+                'items' => [
+                    'shorthand' => __(
+                        'icon, src, eyebrow, title, text, value. For the sets that really are a mark and two lines, which is most of them. Terser than composing, and correct.',
+                        domain: 'wppilot',
+                    ),
+                    'composed' => __(
+                        'blocks: a full block list, nested. Use it the moment the member is more than a mark and two lines. A pricing tier is a ribbon, a name, a muted eligibility line, a price row, a feature list and a button; none of that is expressible as shorthand, and reaching for shorthand anyway is what makes a set look like a table with padding.',
+                        domain: 'wppilot',
+                    ),
+                    'exclusive' => __(
+                        'An item is shorthand or composed, never both. Declaring blocks alongside a title is refused rather than guessed at.',
+                        domain: 'wppilot',
+                    ),
+                    'variant' => __(
+                        'Name a variant in the block\'s "variants" map, then set "variant" on the members that take it. The plugin ships no variant names: they are yours. This is how one tier reads as the chosen one, and a set whose members are all identical is the shape that reads as generated.',
+                        domain: 'wppilot',
+                    ),
+                    'styles_and_states' => __(
+                        'styles is a flat CSS map for what the vocabulary cannot name; states holds hover and focus. Both are available on blocks, items and variants, and both are validated against Elementor\'s real style schema at build time. Reaching for styles where a named field exists makes the spec ungradeable, so use it for what is genuinely unnameable.',
+                        domain: 'wppilot',
+                    ),
+                ],
+                'row_baseline' => __(
+                    'The layout a price needs: a figure at sixty pixels and a suffix at fourteen, sharing one baseline. Centring them instead is what makes a price look pasted on. Rows stay rows on a phone.',
+                    domain: 'wppilot',
+                ),
             ];
 
             $slug = trim((string) ($input['slug'] ?? ''));

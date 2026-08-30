@@ -36,6 +36,21 @@ if (!defined('ABSPATH')) {
  * Don't lines — is text from a file rather than instruction from the site. The
  * `wppilot-design` skill makes the same point at greater length; the fence and
  * the warning here are what protect the agent that never loads it.
+ *
+ * That fence is also why this file has two halves. Everything the design says
+ * about itself goes inside it as data. Everything the site says about how to
+ * build — contrast floors, one h1, populate before moving on — goes outside it
+ * as instruction, because those are ours and are the same on every install. A
+ * standard that sits inside the fence is a standard the agent has been told to
+ * distrust.
+ *
+ * What this carries is deliberately most of what a good hand-written brief
+ * carries. A well-written page prompt supplies a palette, a type stack, the
+ * ladders, the compositions worth using, and the standards a finished page has
+ * to meet — and then only works for the one page somebody pasted it into. This
+ * fires on every request, including the small ones nobody would write a brief
+ * for: "make the hero bigger" arrives with the same direction attached as a
+ * full build.
  */
 
 /** Longest a single Do/Don't line may be before it is trimmed. */
@@ -64,12 +79,16 @@ function inject(mixed $instructions): mixed
 function render(): string
 {
     $slug = Store\get_active_slug();
-    if ($slug === '') {
-        return '';
-    }
-    $record = Library\find($slug);
+    $record = $slug !== '' ? Library\find($slug) : null;
+
+    // No direction saved is the case worth saying something about rather than
+    // nothing. An agent told only "build a page" reaches for the statistical
+    // average — a centred hero over three equal cards — and the reason is that
+    // nothing on the site has told it what this site is. One line pointing at
+    // the derivation is the cheapest correction available, and it is the only
+    // moment where it can still be applied.
     if ($record === null) {
-        return '';
+        return cold_start();
     }
 
     $content = (string) $record['content'];
@@ -80,11 +99,30 @@ function render(): string
     $fonts = $ctx['allowed_fonts'];
     $donts = array_slice($ctx['donts'], offset: 0, length: MAX_RULES);
 
+    // The ladders. A palette without them is half a direction: an agent that
+    // knows the ink and not the spacing scale produces a page that is on brand
+    // and off rhythm, and every measurement it invents is one more value nothing
+    // else on the site uses.
+    $sizes = Preflight\declared_sizes($tokens['typography']);
+    $spacing = Preflight\declared_lengths($tokens['spacing']);
+    $radii = Preflight\declared_lengths($tokens['rounded']);
+
+    // Which compositions this design permits. Derived per site, and until now
+    // reachable only by an agent that thought to ask for it.
+    $grammars = [];
+    $declared = (string) ($tokens['layout']['grammars'] ?? '');
+    foreach (explode(',', $declared) as $grammar) {
+        $grammar = scrub($grammar);
+        if ($grammar !== '') {
+            $grammars[] = $grammar;
+        }
+    }
+
     // A design with no machine-readable palette, type stack or rules has
     // nothing an agent can act on, and a heading over an empty list reads as a
     // system that is not working.
-    if ($colors === [] && $fonts === [] && $donts === []) {
-        return '';
+    if ($colors === [] && $fonts === [] && $donts === [] && $sizes === [] && $spacing === []) {
+        return cold_start();
     }
 
     $lines = [
@@ -111,6 +149,22 @@ function render(): string
             $lines[] = '  ' . scrub((string) $font);
         }
     }
+    if ($sizes !== []) {
+        $lines[] = 'Type scale in px (do not introduce a size between these):';
+        $lines[] = '  ' . implode(', ', array_map(__NAMESPACE__ . '\\px', $sizes));
+    }
+    if ($spacing !== []) {
+        $lines[] = 'Spacing scale in px (every gap, padding and margin is one of these):';
+        $lines[] = '  ' . implode(', ', array_map(__NAMESPACE__ . '\\px', $spacing));
+    }
+    if ($radii !== []) {
+        $lines[] = 'Corner scale in px:';
+        $lines[] = '  ' . implode(', ', array_map(__NAMESPACE__ . '\\px', $radii));
+    }
+    if ($grammars !== []) {
+        $lines[] = 'Compositions this design permits:';
+        $lines[] = '  ' . implode(', ', $grammars);
+    }
     if ($donts !== []) {
         $lines[] = "Don'ts:";
         foreach ($donts as $dont) {
@@ -129,7 +183,76 @@ function render(): string
         $lines[] = 'Writes that leave the palette or the type stack are recorded against this site\'s change ledger.';
     }
 
+    foreach (standards() as $line) {
+        $lines[] = $line;
+    }
+
     return implode("\n", $lines) . "\n";
+}
+
+/**
+ * What a finished page owes, regardless of which design is active.
+ *
+ * Outside the fence on purpose: these are the site's rules, not the design
+ * file's, and an agent that has been told to distrust the block above should
+ * not have to guess which half it may act on.
+ *
+ * Short on purpose too. This rides along with every request on the install,
+ * including the ones that have nothing to do with pages, so it earns its place
+ * only by staying smaller than the cost of getting these wrong — and the two
+ * most expensive mistakes here, a page of stacked bands and a page half filled,
+ * are both cheap to prevent and expensive to correct after the write.
+ *
+ * @return list<string>
+ */
+function standards(): array
+{
+    return [
+        '',
+        '### Building against this direction',
+        '',
+        '- Ask `wppilot/list-layout-grammars` for the composition at each section index and build what it answers. A page whose sections all share one shape is a template with the fills swapped, and a stack of full-width bands is the shape a layout falls into when nobody chose one.',
+        '- Every gap, size and corner comes off the scales above. A value between two steps is the thing that stops edges lining up across sections that know nothing about each other.',
+        '- Give a set of three or more one member that differs. A set whose members are identical is a table with padding on it.',
+        '- Text clears 4.5:1 on the ground behind it, 3:1 at large sizes — check it over photographs and dark bands, not just on paper.',
+        '- Exactly one h1, headings descending without skips, descriptive alt text on every image, a visible label on every field.',
+        '- Fill each section completely — real copy, real prices, every image placed — before starting the next. Never scaffold empty containers to fill later.',
+        '- Build with the builder\'s native elements. Raw HTML or custom CSS inside a visual builder is a last resort for a detail that is genuinely impossible natively, never for a section.',
+        '- Pre-flight with `wppilot/check-design` before calling a page finished, and read the `not_checked` list: what it names, nobody has checked but you.',
+    ];
+}
+
+/**
+ * What to say when the site has no direction at all.
+ *
+ * This is the moment the whole design system exists for and the one it used to
+ * stay silent through. An agent asked to build a page against nothing produces
+ * the average of everything it has seen, and by the time anybody looks at the
+ * result the page is already written. Naming the derivation here costs a few
+ * lines and is the only correction available before the fact.
+ */
+function cold_start(): string
+{
+    return implode("\n", [
+        '',
+        '## No Design Direction Saved',
+        '',
+        'This site has no saved design direction, so nothing here says what it should look like. Do not start building a page from that position: asked for a page with no direction, any model returns the same competent, anonymous result, and the reason is the absence rather than the request.',
+        '',
+        'Before substantial visual work, derive one:',
+        '',
+        '- `wppilot/generate-design` resolves a brief into a complete direction — palette, type pairing, scale, corners, spacing and permitted compositions — derived from this site rather than chosen, so two sites with the same brief do not land on the same design.',
+        '- `wppilot/adopt-design-from-site` reads what the site already uses, when there is a brand to keep.',
+        '- `wppilot/compare-references` turns measurements of competitor pages into what to honour and what to diverge from, when the user can point at some.',
+        '',
+        'Save it with `wppilot/save-design`, then build against it.',
+    ]) . "\n";
+}
+
+/** A scale value as a plain integer where it is one, so a ladder reads as a ladder. */
+function px(float $value): string
+{
+    return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
 }
 
 /**

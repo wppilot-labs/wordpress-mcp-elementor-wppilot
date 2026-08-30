@@ -40,6 +40,47 @@ const MECHANIZED = [
 ];
 
 /**
+ * The rules that need a design to be active before they can run at all.
+ *
+ * Reporting the whole of MECHANIZED as checked when half of it was skipped is
+ * worse than reporting nothing: it converts "there was no design to check
+ * against" into "we checked and it was fine", which is the exact failure this
+ * module exists to prevent everywhere else.
+ */
+const DESIGN_CONDITIONAL = [
+    'font-off-palette',
+    'color-off-palette',
+    'accent-unused',
+    'accent-overused',
+    'type-off-scale',
+    'type-oversized',
+    'design-dont',
+];
+
+/**
+ * The rule ids that actually ran, given whether a design was active.
+ *
+ * @return list<string>
+ */
+function checked(bool $has_active): array
+{
+    $ran = $has_active
+        ? MECHANIZED
+        : array_values(array_diff(MECHANIZED, DESIGN_CONDITIONAL));
+
+    /**
+     * Rule ids contributed by an extension, so a rule that ran is reported as
+     * having run. A checker that under-reports its own coverage is the same
+     * failure as one that over-reports it.
+     *
+     * @param list<string> $ran
+     */
+    $extra = apply_filters('wppilot_design_checked', [], $has_active);
+
+    return array_values(array_unique([...$ran, ...(is_array($extra) ? $extra : [])]));
+}
+
+/**
  * Rules from the design-system philosophy that need a structured page model
  * (DOM/layout), which a raw output string cannot give. Reported so the agent
  * knows these were NOT covered rather than assuming a clean pass.
@@ -130,7 +171,7 @@ const DONT_LEXICON = [
  * Build the design context the rules compare against, from raw DESIGN.md.
  * Pass null when there is no active design — only universal rules will fire.
  *
- * @return array{has_active: bool, allowed_fonts: list<string>, allowed_colors: list<string>, accent: string, donts: list<string>, allows: list<string>}
+ * @return array{has_active: bool, allowed_fonts: list<string>, allowed_colors: list<string>, accent: string, declared_sizes: list<float>, declared_spacing: list<float>, declared_radii: list<float>, donts: list<string>, allows: list<string>}
  */
 function context(?string $design_md): array
 {
@@ -141,6 +182,8 @@ function context(?string $design_md): array
             'allowed_colors' => [],
             'accent' => '',
             'declared_sizes' => [],
+            'declared_spacing' => [],
+            'declared_radii' => [],
             'donts' => [],
             'allows' => [],
         ];
@@ -163,6 +206,11 @@ function context(?string $design_md): array
         'allowed_colors' => array_keys($colors),
         'accent' => normalize_hex(Tokens\pick_value($tokens['colors'], ['accent', 'primary', 'brand', 'action'])),
         'declared_sizes' => declared_sizes($tokens['typography']),
+        // The spacing and corner ladders, for the same reason the type ladder
+        // is here: a rule can only ask whether a value is on the scale if
+        // something says what the scale is.
+        'declared_spacing' => declared_lengths($tokens['spacing']),
+        'declared_radii' => declared_lengths($tokens['rounded']),
         'donts' => extract_donts($design_md),
         'allows' => extract_allows($design_md),
     ];
@@ -237,7 +285,20 @@ function violations(string $output, array $ctx): array
         array_push($out, ...dont_matches($text, $ctx['donts']));
     }
 
-    return $out;
+    /**
+     * Findings contributed by an extension.
+     *
+     * The rules here judge whether a page is on its palette, on its scale and
+     * free of the tells; the craft rules that judge whether it is *well made*
+     * live outside this plugin and hook in. Same finding shape, same warn-only
+     * contract: a rule that can block belongs in the gate's whitelist, and
+     * nothing reaching this filter is on it.
+     *
+     * @param list<array<string, string>> $out
+     */
+    $extra = apply_filters('wppilot_design_violations', $out, $output, $ctx);
+
+    return is_array($extra) ? $extra : $out;
 }
 
 /**
@@ -352,6 +413,35 @@ function count_hexes(string $output, array $colors): array
  * @param  array<string, array<string, string>> $typography
  * @return list<float>
  */
+/**
+ * A token map's values as px, deduplicated and ordered.
+ *
+ * The sibling of {@see declared_sizes}, for the maps that are already flat —
+ * spacing and corner radii — where the value is the length rather than a
+ * property inside it.
+ *
+ * @param  array<string, mixed> $tokens
+ * @return list<float>
+ */
+function declared_lengths(array $tokens): array
+{
+    $lengths = [];
+    foreach ($tokens as $value) {
+        if (is_array($value)) {
+            continue;
+        }
+        $px = size_to_px((string) $value);
+        if ($px !== null) {
+            $lengths[] = $px;
+        }
+    }
+
+    $lengths = array_values(array_unique($lengths));
+    sort($lengths);
+
+    return $lengths;
+}
+
 function declared_sizes(array $typography): array
 {
     $sizes = [];

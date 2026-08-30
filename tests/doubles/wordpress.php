@@ -620,6 +620,21 @@ if (!function_exists('esc_url_raw')) {
     }
 }
 
+if (!function_exists('get_home_url')) {
+    /**
+     * A fixed home URL, because the design seed is derived from it.
+     *
+     * Every derived value hangs off this string, so a suite that let it vary
+     * would assert on numbers that changed with the environment. Fixing it is
+     * also the point being tested elsewhere: the same site always resolves to
+     * the same design.
+     */
+    function get_home_url(?int $blog_id = null, string $path = ''): string
+    {
+        return 'https://wppilot.test' . $path;
+    }
+}
+
 if (!function_exists('add_action')) {
     /**
      * Hook registration is a no-op here.
@@ -635,8 +650,57 @@ if (!function_exists('add_action')) {
 }
 
 if (!function_exists('add_filter')) {
+    /**
+     * Filters, unlike actions, are recorded and really run.
+     *
+     * They started as the same no-op add_action still is, and that stopped being
+     * honest once the design checker began asking extensions to contribute
+     * rules: the whole point of that seam is that a filter changes the answer,
+     * and a double that always returns the input can only ever prove the
+     * unextended path. Actions stay a no-op because nothing here asserts on a
+     * side effect.
+     */
     function add_filter(string $hook, mixed $callback, int $priority = 10, int $accepted_args = 1): bool
     {
+        $GLOBALS['wp_filter'] ??= [];
+        $GLOBALS['wp_filter'][$hook][$priority][] = ['callback' => $callback, 'args' => $accepted_args];
+
+        return true;
+    }
+}
+
+if (!function_exists('apply_filters')) {
+    /**
+     * Run the recorded callbacks for a hook, lowest priority first.
+     *
+     * @param mixed ...$args
+     */
+    function apply_filters(string $hook, mixed $value, mixed ...$args): mixed
+    {
+        $registered = $GLOBALS['wp_filter'][$hook] ?? [];
+        if ($registered === []) {
+            return $value;
+        }
+
+        ksort($registered);
+        foreach ($registered as $callbacks) {
+            foreach ($callbacks as $entry) {
+                $accepted = (int) $entry['args'];
+                $value = $accepted <= 1
+                    ? $entry['callback']($value)
+                    : $entry['callback']($value, ...array_slice($args, offset: 0, length: $accepted - 1));
+            }
+        }
+
+        return $value;
+    }
+}
+
+if (!function_exists('remove_all_filters')) {
+    function remove_all_filters(string $hook): bool
+    {
+        unset($GLOBALS['wp_filter'][$hook]);
+
         return true;
     }
 }
