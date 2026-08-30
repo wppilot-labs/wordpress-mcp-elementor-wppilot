@@ -107,7 +107,7 @@ function register(): void
                 'active' => $ctx['has_active'],
                 'slug' => $ctx['has_active'] ? $slug : '',
                 'violations' => $violations,
-                'checked' => Preflight\MECHANIZED,
+                'checked' => Preflight\checked($ctx['has_active']),
                 'not_checked' => Preflight\STRUCTURAL_NOT_CHECKED,
             ];
         },

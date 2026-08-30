@@ -11,6 +11,7 @@ use WP_Error;
 use WPPilot\Design\Abilities;
 use WPPilot\Design\Contrast;
 use WPPilot\Design\Generate;
+use WPPilot\Design\Spec;
 use WPPilot\Design\Typefaces;
 
 if (!defined('ABSPATH')) {
@@ -76,6 +77,12 @@ function register(): void
                 'faces' => $resolved['faces'],
                 'scale_ratio' => $resolved['scale_ratio'],
                 'typography' => $resolved['typography'],
+                // The same scale in the shape a reproduction spec takes, so the
+                // spec agrees with the design about every number instead of
+                // being retyped from it. Forty numbers copied by hand is how a
+                // spec ends up grading a page against sizes its own design
+                // never declared.
+                'spec_type' => Spec\from_tokens($resolved['typography']),
                 'rounded' => $resolved['rounded'],
                 'spacing' => $resolved['spacing'],
                 'dials' => $resolved['dials'],
@@ -90,7 +97,7 @@ function register(): void
                 ),
                 'design_markdown' => document($resolved, trim((string) ($input['business'] ?? ''))),
                 'next' => __(
-                    'Read it, change what the brand actually requires, then save with wppilot/save-design. A derived value you keep is still a decision; a derived value you cannot justify should be overridden rather than shipped.',
+                    'Read it, change what the brand actually requires, then save with wppilot/save-design. A derived value you keep is still a decision; a derived value you cannot justify should be overridden rather than shipped. To make the design reproducible rather than merely written down, pass "spec_type" straight into wppilot/save-design-spec as the spec\'s type scale.',
                     domain: 'wppilot',
                 ),
             ];

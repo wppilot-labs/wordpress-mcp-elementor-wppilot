@@ -75,14 +75,18 @@ require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
 require_once dirname(__DIR__) . '/includes/change-log.php';
 
 // The design system's pure layers: the document parser, the token extractor,
-// the pre-flight rules and the distinctiveness comparison. Only these four,
-// deliberately — the rest of the module registers abilities and reads a custom
-// post type, and the parts under test here decide things from their arguments
-// alone. typefaces.php is pure data and one rule. distinct.php names Library
-// for check(), but PHP resolves that lazily
-// and the suite exercises compare(), which takes the other designs as an
-// argument precisely so the judgement can be tested without a database.
-foreach (['parser', 'tokens', 'preflight', 'contrast', 'seed', 'distinct', 'typefaces', 'spec'] as $module) {
+// the pre-flight rules, the distinctiveness comparison, the spec, and the
+// derivation that turns a brief into a design. Only the pure ones, deliberately
+// — the rest of the module registers abilities and reads a custom post type,
+// and the parts under test here decide things from their arguments alone.
+// typefaces.php and grammars.php are data plus a rule or two; gate.php is
+// included for its colour conversions rather than for the gate. distinct.php
+// names Library for check(), but PHP resolves that lazily and the suite
+// exercises compare(), which takes the other designs as an argument precisely
+// so the judgement can be tested without a database. generate.php reaches
+// get_home_url(), which the doubles pin so a derived design does not change
+// with the environment.
+foreach (['parser', 'tokens', 'preflight', 'contrast', 'gate', 'seed', 'distinct', 'typefaces', 'spec', 'grammars', 'generate', 'context'] as $module) {
     require_once dirname(__DIR__) . '/includes/design/' . $module . '.php';
 }
 

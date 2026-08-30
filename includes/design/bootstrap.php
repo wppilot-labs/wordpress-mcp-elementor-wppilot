@@ -44,6 +44,7 @@ require_once __DIR__ . '/abilities/list-typefaces.php';
 require_once __DIR__ . '/abilities/design-spec.php';
 require_once __DIR__ . '/abilities/generate-design.php';
 require_once __DIR__ . '/abilities/compare-references.php';
+require_once __DIR__ . '/abilities/check-composition.php';
 require_once __DIR__ . '/abilities/get-active-design.php';
 require_once __DIR__ . '/abilities/activate-design.php';
 require_once __DIR__ . '/abilities/save-design.php';
@@ -83,6 +84,7 @@ add_action('wp_abilities_api_init', __NAMESPACE__ . '\Abilities\Typefaces\regist
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\Abilities\DesignSpec\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\Abilities\GenerateDesign\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\Abilities\CompareReferences\register', priority: 999);
+add_action('wp_abilities_api_init', __NAMESPACE__ . '\Abilities\CheckComposition\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Examples\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Get\\register', priority: 999);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Delete\\register', priority: 999);
