@@ -7,6 +7,10 @@
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
 
+[![Download wppilot.zip](https://img.shields.io/badge/Download-wppilot.zip-D9FF63?style=for-the-badge&labelColor=142017)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases/latest/download/wppilot.zip)
+
+Installs straight into **Plugins - Add New - Upload Plugin**. That link always resolves to the newest release, so it does not go stale. Older versions are on the [releases page](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases). GitHub's own *Source code (zip)* is **not** installable: it has no `vendor/` and uses a versioned folder name.
+
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
 
 The free plugin is the **WordPress MCP server**, and since 1.10.0 it is also a working **Elementor MCP server**: 16 abilities that read an Elementor document, report the widgets and style properties your install actually offers, and add, edit, move, duplicate, reorder and delete elements in the tree. No licence, no key, no Pro install. [WPPilot Pro](https://wppilot.co/pro) then extends that same endpoint into a **WooCommerce MCP server** and a Bricks, Divi, Oxygen, Etch or WPBakery MCP server, and adds Elementor's authoring layer on top: whole-page composition, templates and theme parts, popups, forms, dynamic tags, global classes and variables.
@@ -74,7 +78,7 @@ WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom
 
 ## Quick start
 
-1. Download the latest `wppilot.zip` from [Releases](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases) and install it as `wp-content/plugins/wppilot`.
+1. [**Download `wppilot.zip`**](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases/latest/download/wppilot.zip) and install it as `wp-content/plugins/wppilot`, or upload it in **Plugins - Add New - Upload Plugin**.
    *A GitHub “Source code (zip)” download is **not** installable, it lacks `vendor/` and uses the wrong folder name.*
 2. Activate WPPilot.
 3. Open **WPPilot → Configuration** and leave **Production Safe** selected.
