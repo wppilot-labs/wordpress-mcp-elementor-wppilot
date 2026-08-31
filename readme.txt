@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.10.0
+Stable tag: 1.10.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,11 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.10.1 =
+* Fixed: OAuth sign-in failed with "Unknown client_id" for any client whose Client ID Metadata Document declares loopback callbacks without an `application_type`. OpenID Connect defaults that field to `web`, a web client may never redirect to loopback, and so the whole document was refused - which is every desktop MCP client registering this way, Claude Code among them. A document whose redirect URIs are all loopback or private-use is now read as `native`. One that declares `web`, or mixes a remote HTTPS callback into the list, is refused exactly as before.
+* Fixed: authorization then stopped at "redirect_uri not registered for this client" when the callback was spelled `localhost`. RFC 8252 section 7.3 lets a native client bind an ephemeral port, but the port-agnostic comparison recognises only the `127.0.0.1` and `[::1]` literals, so `http://localhost:53821/callback` was matched as an exact string against the registered `http://localhost/callback` and failed on the port. A loopback callback is now normalised onto the IPv4 literal on both sides before anything compares it.
+* Neither fix changes what a connected client may do on the site: the safety profile, the approval rules and the ability surface are untouched.
 
 = 1.10.0 =
 * Elementor editing is free. Sixteen abilities move out of Pro and into this plugin: read a document, discover the widgets and the seventy-three atomic style properties the install offers, inspect one widget's parameters, find elements, replace a document's tree, and add, edit, move, duplicate, reorder and delete elements, plus read and write page settings. They register when Elementor 3.6 or newer is active and stay absent otherwise.

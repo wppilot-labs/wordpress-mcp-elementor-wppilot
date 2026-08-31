@@ -82,6 +82,13 @@ function handle(): void
         return;
     }
 
+    // A `localhost` callback is normalised to `127.0.0.1` before anything compares it, so
+    // the ephemeral-port match below and league's identical check at the consent step both
+    // see a host they recognise as loopback. The client's registered URIs are normalised
+    // the same way when the metadata document is validated.
+    require_once dirname(__DIR__) . '/client-id-metadata.php';
+    $redirect_uri = \WPPilot\OAuth\ClientIdMetadata\normalize_loopback_uri($redirect_uri);
+
     $code_challenge = get_param('code_challenge');
     if ($code_challenge === '') {
         wp_die(esc_html__('code_challenge is required (PKCE mandatory).', domain: 'wppilot'), title: '', args: [

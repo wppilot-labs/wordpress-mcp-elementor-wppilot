@@ -288,7 +288,7 @@ function validate_document(array $document, string $client_id): array|WP_Error
         return new WP_Error('invalid_redirect_uris', 'The metadata document must declare at least one redirect URI.');
     }
 
-    $application_type = $document['application_type'] ?? 'web';
+    $application_type = $document['application_type'] ?? infer_application_type($redirect_uris);
     if (!in_array($application_type, ['web', 'native'], strict: true)) {
         return new WP_Error('invalid_application_type', 'application_type must be either "web" or "native".');
     }
@@ -302,19 +302,78 @@ function validate_document(array $document, string $client_id): array|WP_Error
         if ($error !== null) {
             return $error;
         }
-        $validated[] = $uri;
+        $validated[] = $application_type === 'native' ? normalize_loopback_uri($uri) : $uri;
     }
 
     return [
         'client_id' => $client_id,
         'client_name' => trim($name),
         'application_type' => (string) $application_type,
-        'redirect_uris' => $validated,
+        // Normalisation can collapse two declared URIs onto one (a client listing both
+        // the `localhost` and `127.0.0.1` spellings of the same callback), so the list
+        // is deduplicated rather than carrying a redundant entry into every comparison.
+        'redirect_uris' => array_values(array_unique($validated)),
         // Logo and policy URLs are carried for display only and are never
         // fetched: dereferencing them would reintroduce the SSRF sink this
         // module exists to close.
         'logo_uri' => is_string($document['logo_uri'] ?? null) ? $document['logo_uri'] : '',
     ];
+}
+
+/**
+ * Infer application_type for a document that does not declare one.
+ *
+ * OpenID Connect defaults an omitted application_type to "web", and a web
+ * client may never redirect to loopback, so the strict default rejects the
+ * whole document. Native clients in the wild publish loopback redirect URIs
+ * without declaring the field, and refusing them means refusing every desktop
+ * client that does this. When every declared URI is one only a native client
+ * is allowed to use, "native" is the sole reading that can be correct, so it
+ * is the one inferred; any other list keeps the OIDC default and is validated
+ * as a web client exactly as before.
+ *
+ * @param list<mixed> $redirect_uris
+ */
+function infer_application_type(array $redirect_uris): string
+{
+    foreach ($redirect_uris as $uri) {
+        if (!is_string($uri) || validate_redirect_uri($uri, 'native') !== null) {
+            return 'web';
+        }
+    }
+
+    return 'native';
+}
+
+/**
+ * Rewrite a loopback redirect URI's host to the IPv4 literal.
+ *
+ * RFC 8252 SS7.3 lets a native client bind an ephemeral port, so the port it
+ * calls back on is not the one it registered. League's RedirectUriValidator
+ * applies that port-agnostic comparison only to the `127.0.0.1` and `[::1]`
+ * literals, never to the `localhost` name, so a client registering
+ * `http://localhost/callback` and returning on `http://localhost:53821/callback`
+ * fails an exact-string match. Normalising both sides onto `127.0.0.1` puts
+ * them on league's loopback path instead. `localhost` is loopback by
+ * definition, so this never changes which machine receives the code.
+ *
+ * Anything that is not an http loopback URI is returned untouched.
+ */
+function normalize_loopback_uri(string $uri): string
+{
+    $parts = wp_parse_url($uri);
+    if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'http') {
+        return $uri;
+    }
+    if (strtolower((string) ($parts['host'] ?? '')) !== 'localhost') {
+        return $uri;
+    }
+
+    $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+    $path = (string) ($parts['path'] ?? '');
+    $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+
+    return 'http://127.0.0.1' . $port . $path . $query;
 }
 
 /**
