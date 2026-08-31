@@ -267,6 +267,61 @@ final class ClientIdMetadataTest extends TestCase
     }
 
     /**
+     * A desktop client that publishes loopback callbacks without declaring
+     * application_type is native by the only reading that can be correct.
+     * Falling back to the OIDC "web" default rejects the document outright,
+     * because a web client may not redirect to loopback - which is how Claude
+     * Code's own metadata document failed with "Unknown client_id".
+     */
+    public function testApplicationTypeIsInferredNativeFromLoopbackRedirects(): void
+    {
+        $document = $this->document([
+            'redirect_uris' => ['http://localhost/callback', 'http://127.0.0.1/callback'],
+        ]);
+        unset($document['application_type']);
+
+        $result = validate_document($document, 'https://app.example.com/c.json');
+
+        self::assertIsArray($result);
+        self::assertSame('native', $result['application_type']);
+        // Both spellings normalise onto the IPv4 literal and collapse to one entry.
+        self::assertSame(['http://127.0.0.1/callback'], $result['redirect_uris']);
+    }
+
+    /**
+     * Inference never rescues a document that is not unambiguously native: one
+     * remote HTTPS callback in the list keeps the whole document on the web
+     * path, where the loopback entry is refused as before.
+     */
+    public function testMixedRedirectsStayWebAndAreRefused(): void
+    {
+        $document = $this->document([
+            'redirect_uris' => ['https://app.example.com/callback', 'http://localhost/callback'],
+        ]);
+        unset($document['application_type']);
+
+        $result = validate_document($document, 'https://app.example.com/c.json');
+
+        self::assertInstanceOf(WP_Error::class, $result);
+        self::assertSame('invalid_redirect_uris', $result->get_error_code());
+    }
+
+    /**
+     * An explicitly declared web client is never re-read as native, so the
+     * inference cannot be used to smuggle a loopback callback past the check.
+     */
+    public function testDeclaredWebTypeIsNotOverriddenByInference(): void
+    {
+        $result = validate_document(
+            $this->document(['redirect_uris' => ['http://localhost/callback']]),
+            'https://app.example.com/c.json',
+        );
+
+        self::assertInstanceOf(WP_Error::class, $result);
+        self::assertSame('invalid_redirect_uris', $result->get_error_code());
+    }
+
+    /**
      * A logo URL is display metadata. Dereferencing it would reopen the SSRF
      * sink the rest of this module closes, so it is carried, never fetched.
      */
