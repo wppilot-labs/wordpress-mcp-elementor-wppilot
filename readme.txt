@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.10.1
+Stable tag: 1.10.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.10.2 =
+* Fixed: a native client that got through the authorization screen in 1.10.1 could still fail at the token exchange with "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed." The authorization endpoint normalises a `localhost` callback onto the IPv4 literal, so the issued code carries the normalised spelling, while the client sends the token request with the spelling it started with. The two are compared as exact strings and disagreed on the host name. The token endpoint now normalises the incoming `redirect_uri` the same way, so both sides are in one form. A client that never used a loopback callback is unaffected.
 
 = 1.10.1 =
 * Fixed: OAuth sign-in failed with "Unknown client_id" for any client whose Client ID Metadata Document declares loopback callbacks without an `application_type`. OpenID Connect defaults that field to `web`, a web client may never redirect to loopback, and so the whole document was refused - which is every desktop MCP client registering this way, Claude Code among them. A document whose redirect URIs are all loopback or private-use is now read as `native`. One that declares `web`, or mixes a remote HTTPS callback into the list, is refused exactly as before.

@@ -47,6 +47,19 @@ function handle(WP_REST_Request $req): WP_REST_Response
         ], 400);
     }
 
+    // The authorization endpoint normalises a `localhost` callback onto the IPv4 literal
+    // before the code is issued, so the code carries the normalised form. League compares
+    // that against this request's redirect_uri as an exact string, and a client that sends
+    // back the spelling it started with would fail the comparison on the host name alone.
+    // Normalising here puts both sides in the same form; a client that never used a
+    // loopback callback is unaffected, because the helper returns anything else untouched.
+    require_once dirname(__DIR__) . '/client-id-metadata.php';
+    $body_params = $req->get_body_params();
+    if (isset($body_params['redirect_uri']) && is_string($body_params['redirect_uri'])) {
+        $body_params['redirect_uri'] = \WPPilot\OAuth\ClientIdMetadata\normalize_loopback_uri($body_params['redirect_uri']);
+        $req->set_body_params($body_params);
+    }
+
     // Single use is enforced durably in the repositories: revokeAuthCode()/revokeRefreshToken()
     // atomically claim the credential (UPDATE ... WHERE revoked = 0) after league has validated it,
     // so a concurrent or repeated redemption cannot complete. No advisory lock is involved.
