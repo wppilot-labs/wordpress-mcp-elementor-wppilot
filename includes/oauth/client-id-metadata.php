@@ -377,6 +377,34 @@ function normalize_loopback_uri(string $uri): string
 }
 
 /**
+ * Normalise every loopback URI in a registered list, dropping duplicates.
+ *
+ * The other half of normalize_loopback_uri(). The authorization endpoint
+ * rewrites the URI a client *sends* onto `127.0.0.1`, and league's loopback
+ * comparison then matches host and path against the URIs the client
+ * *registered*. A Client ID Metadata Document goes through validate_document()
+ * and is normalised there, but a Dynamic Client Registration row is stored
+ * exactly as it was posted, so a client that registered `localhost` was
+ * compared as `127.0.0.1` against `localhost` and refused on the host name.
+ * Normalising the stored list on the way out of the repository puts both sides
+ * in one form, for rows written before this existed as much as after.
+ *
+ * @param list<mixed> $uris
+ * @return list<string>
+ */
+function normalize_loopback_uris(array $uris): array
+{
+    $normalized = [];
+    foreach ($uris as $uri) {
+        if (is_string($uri) && $uri !== '') {
+            $normalized[] = normalize_loopback_uri($uri);
+        }
+    }
+
+    return array_values(array_unique($normalized));
+}
+
+/**
  * Enforce the redirect-URI constraints for the declared application type.
  *
  * OpenID Connect's rules, which the revision requires clients to opt into by

@@ -48,28 +48,12 @@ Free covers the core surface: posts and pages, block-editor content, **Elementor
 
 **You do not have to phrase anything in a particular way.** A client's first call is discovery, and WPPilot answers with every ability registered on your install plus a catalogue of the skills available for them, carrying one instruction: if a skill matches the request, load its full instructions before starting the work. So "rebuild the pricing page and keep our spacing" already pulls in the right build skill, the element schemas and your existing design tokens without you naming any of it. Write your own prompts; the routing is on the site.
 
-The library is a shortcut, not a dependency. WPPilot ships a **prompt library** in wp-admin for the jobs people run most, and those prompts name the abilities they call rather than describing an outcome and hoping:
+The library is a shortcut, not a dependency. WPPilot ships a **prompt library** in wp-admin: ten complete landing-page briefs, one per industry, because "build me a bakery site" and "build me a law firm site" should not produce the same page. Each brief fixes a flat palette, a type pairing, a design signature that makes the page its own, the sections it must communicate, and the facts to use verbatim, then closes with one shared standards block: WCAG 2.1 AA, real photography in every slot, one SVG icon set, builder-native construction, and no half-built pages. Pick Elementor or the block editor on the screen and the brief is written for it.
 
-```text
-Create a new draft page titled "[PAGE TITLE]" using core Gutenberg blocks only.
-
-How the write works, so you do not get halfway and stall:
-1. wppilot/create-post, create the draft first. It defaults to draft; leave it there.
-2. wppilot/gutenberg-create-pending-batch, core blocks cannot be written straight
-   from the server, because the block editor's own JavaScript is what validates and
-   serialises them.
-3. wppilot/gutenberg-add-pending-change, queue the block tree against the new post.
-4. wppilot/gutenberg-enable-batch-finalization, then
-   wppilot/gutenberg-get-finalization-url, open that link and the batch commits.
-```
-
-That last part is the honest bit: **core blocks are not a headless write**. Anything the block editor validates in JavaScript needs a browser session to finalise, and the prompts say so rather than leaving you stuck at step three.
-
-WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom fields, SEO, themes, each with its own ability chains. The full published library is at <https://wppilot.co/prompts>.
+WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom fields, SEO, themes, each with its own ability chains.
 
 - 🌐 Website: <https://wppilot.co>
 - 🧱 What it builds: <https://wppilot.co/build>
-- 💬 Prompt library: <https://wppilot.co/prompts>
 - 📚 Documentation: <https://wppilot.co/docs>
 - 🔌 Client setup guides: <https://wppilot.co/wordpress-mcp>
 - 𝕏 Release notes and build demos: <https://x.com/WPPilotMCP>

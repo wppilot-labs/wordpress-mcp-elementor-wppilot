@@ -10,16 +10,17 @@ namespace WPPilot\PromptLibrary\Admin;
 use WPPilot\PromptLibrary;
 
 /**
- * The Prompts screen: pick a category, copy a prompt, paste it at your agent.
+ * The Prompts screen: pick a builder, pick an industry, copy the brief.
  *
  * Deliberately static HTML with a copy button and no server round-trip. A
- * prompt is text; the moment this screen needs saving, filtering or state it
- * has stopped being a library and started being an app nobody asked for.
+ * brief is text; the moment this screen needs saving, filtering or state it
+ * has stopped being a library and started being an app nobody asked for. The
+ * one piece of client-side behaviour is the builder picker, which rewrites the
+ * first line of every brief in place so what is copied names the editor the
+ * agent will actually be driving.
  *
- * Locked packs are shown, not hidden. Someone on the free plugin should be able
- * to see that the Elementor prompts exist and what they cover. That is the
- * honest version of an upsell, and it is also the answer to "does Pro have
- * anything for my builder?".
+ * Locked briefs are shown, not hidden: someone on the free plugin should be
+ * able to see that a Pro brief exists and what it covers.
  */
 
 if (!defined('ABSPATH')) {
@@ -58,7 +59,7 @@ function register_nav(mixed $map): mixed
  *
  * Uses the same filter the Dashboard reads, so this screen never calls into Pro
  * and never checks whether it is installed. An unlicensed Pro does not answer,
- * which is the correct reading: its packs are not available.
+ * which is the correct reading: its briefs are not available.
  */
 function pro_active(): bool
 {
@@ -68,131 +69,85 @@ function pro_active(): bool
     return is_array($status);
 }
 
-/**
- * Group the packs for display, preserving the order groups() declares.
- *
- * @param list<array<string, mixed>> $packs
- * @return array<string, list<array<string, mixed>>>
- */
-function grouped(array $packs): array
-{
-    $grouped = [];
-    foreach (array_keys(PromptLibrary\groups()) as $group) {
-        $matching = array_values(array_filter(
-            $packs,
-            static fn(array $pack): bool => ($pack['group'] ?? '') === $group,
-        ));
-        if ($matching !== []) {
-            $grouped[$group] = $matching;
-        }
-    }
-
-    return $grouped;
-}
-
 function render(): void
 {
     if (!\wppilot_current_user_can_manage()) {
         return;
     }
 
-    $packs = PromptLibrary\packs();
-    $groups = PromptLibrary\groups();
-    $grouped = grouped($packs);
+    $briefs = PromptLibrary\briefs();
+    $sectors = PromptLibrary\by_sector($briefs);
+    $builders = PromptLibrary\builders();
+    $default_builder = PromptLibrary\default_builder();
     $licensed = pro_active();
-    $locked = array_values(array_filter($packs, static fn(array $p): bool => $p['pro'] === true && !$licensed));
+    $free_count = count(array_filter($briefs, static fn(array $b): bool => ($b['pro'] ?? false) !== true));
 
     \wppilot_render_admin_header();
     ?>
     <div class="wrap">
         <h1><?php echo esc_html(\wppilot_nav_label(PromptLibrary\PAGE, __('Prompts', domain: 'wppilot'))); ?></h1>
         <p class="wppilot-lede"><?php esc_html_e(
-            'Ready-made instructions for your AI client. Copy one, edit the parts in brackets, and paste it wherever you talk to your agent.',
+            'A complete landing-page brief for each kind of business: palette, type, a design signature that makes the page its own, the sections it must carry, and the facts to use verbatim. Choose the builder, copy the brief, paste it at your agent.',
             domain: 'wppilot',
         ); ?></p>
         <?php // These are a shortcut, not the interface. Nobody should read this
               // screen and conclude their own wording will not work. ?>
         <p class="description" style="margin:-6px 0 18px;max-width:70ch;"><?php esc_html_e(
-            'You do not have to use any of these. Your agent asks this site what it can do before it starts, and loads the right skill on its own, so asking in your own words works just as well. These are here to save you the first hour.',
+            'You do not have to use any of these. Your agent asks this site what it can do before it starts and loads the right skill on its own, so asking in your own words works just as well. A brief this specific is what stops every business getting the same centred hero with three cards under it.',
             domain: 'wppilot',
         ); ?></p>
 
-        <?php if ($packs === []) {
+        <?php if ($briefs === []) {
             ?>
             <section class="wppilot-panel">
-                <p class="description"><?php esc_html_e('No prompt packs are available.', domain: 'wppilot'); ?></p>
+                <p class="description"><?php esc_html_e('No briefs are available.', domain: 'wppilot'); ?></p>
             </section>
             <?php
 
             return;
         } ?>
 
-        <div class="wppilot-client-tabs" id="wppilot-prompt-tabs">
-            <?php $first = true; ?>
-            <?php foreach ($grouped as $group => $group_packs) { ?>
-                <?php foreach ($group_packs as $pack) { ?>
-                    <button
-                        type="button"
-                        class="wppilot-client-tab wppilot-prompt-tab<?php echo $first ? ' active' : ''; ?>"
-                        data-pack="<?php echo esc_attr((string) $pack['slug']); ?>"
-                    >
-                        <?php echo esc_html((string) $pack['label']); ?>
-                        <?php if ($pack['pro'] === true && !$licensed) { ?>
-                            <span class="wppilot-prompt-lock" aria-label="<?php
-
-                            esc_attr_e('Pro', domain: 'wppilot'); ?>">&#128274;</span>
-                        <?php } ?>
-                    </button>
-                    <?php $first = false; ?>
+        <div class="wppilot-prompt-toolbar">
+            <label for="wppilot-prompt-builder"><?php esc_html_e('Build with', domain: 'wppilot'); ?></label>
+            <select id="wppilot-prompt-builder">
+                <?php foreach ($builders as $slug => $label) { ?>
+                    <option value="<?php echo esc_attr($slug); ?>"<?php selected($slug, $default_builder); ?>><?php
+                        echo esc_html($label); ?></option>
                 <?php } ?>
-            <?php } ?>
+            </select>
+            <span class="description"><?php esc_html_e(
+                'Written into the first line of every brief, so the agent builds with that editor\'s own elements.',
+                domain: 'wppilot',
+            ); ?></span>
         </div>
-        <p class="description" style="margin:6px 0 18px;"><?php
 
-        $labels = [];
-        foreach ($grouped as $group => $group_packs) {
-            $labels[] = sprintf('%s (%d)', $groups[$group] ?? $group, count($group_packs));
-        }
-        echo esc_html(implode(' · ', $labels));
+        <nav class="wppilot-client-tabs wppilot-prompt-sectors" aria-label="<?php esc_attr_e('Sectors', domain: 'wppilot'); ?>">
+            <?php foreach ($sectors as $sector => $sector_briefs) { ?>
+                <a class="wppilot-client-tab" href="#<?php echo esc_attr('wppilot-sector-' . sanitize_title($sector)); ?>">
+                    <?php echo esc_html($sector); ?>
+                    <span class="wppilot-prompt-count"><?php echo esc_html((string) count($sector_briefs)); ?></span>
+                </a>
+            <?php } ?>
+        </nav>
+        <p class="description" style="margin:6px 0 18px;"><?php
+        printf(
+            /* translators: %d: number of briefs included with the free plugin */
+            esc_html(_n(
+                single: '%d brief for a simple single-page site, each for a different industry.',
+                plural: '%d briefs for simple single-page sites, each for a different industry.',
+                number: $free_count,
+                domain: 'wppilot',
+            )),
+            $free_count,
+        );
         ?></p>
 
-        <?php $first = true; ?>
-        <?php foreach ($packs as $pack) { ?>
-            <div
-                class="wppilot-prompt-pack"
-                data-pack="<?php echo esc_attr((string) $pack['slug']); ?>"
-                <?php echo $first ? '' : 'hidden'; ?>
-            >
-                <?php render_pack($pack, $licensed); ?>
-            </div>
-            <?php $first = false; ?>
-        <?php } ?>
-
-        <?php if ($locked !== []) { ?>
-            <section class="wppilot-panel is-attention">
-                <h2 class="wppilot-setting-group__title"><?php esc_html_e(
-                    'More prompts with WPPilot Pro',
-                    domain: 'wppilot',
-                ); ?></h2>
-                <p><?php
-
-                printf(
-                    /* translators: 1: number of locked packs, 2: comma-separated pack names */
-                    esc_html(_n(
-                        single: '%1$d more pack is included with Pro: %2$s.',
-                        plural: '%1$d more packs are included with Pro: %2$s.',
-                        number: count($locked),
-                        domain: 'wppilot',
-                    )),
-                    count($locked),
-                    esc_html(implode(', ', array_map(static fn(array $p): string => (string) $p['label'], $locked))),
-                );
-                ?></p>
-                <p>
-                    <a class="button button-primary" href="https://wppilot.co/pricing/" target="_blank" rel="noopener">
-                        <?php esc_html_e('See WPPilot Pro', domain: 'wppilot'); ?>
-                    </a>
-                </p>
+        <?php foreach ($sectors as $sector => $sector_briefs) { ?>
+            <section class="wppilot-panel wppilot-prompt-sector" id="<?php echo esc_attr('wppilot-sector-' . sanitize_title($sector)); ?>">
+                <h2 class="wppilot-setting-group__title"><?php echo esc_html($sector); ?></h2>
+                <?php foreach ($sector_briefs as $brief) {
+                    render_brief($brief, $default_builder, $licensed);
+                } ?>
             </section>
         <?php } ?>
     </div>
@@ -250,18 +205,40 @@ function render(): void
             setTimeout(function () { button.textContent = original; }, 1800);
         }
 
-        var tabs = document.querySelectorAll('.wppilot-prompt-tab');
-        var packs = document.querySelectorAll('.wppilot-prompt-pack');
-        tabs.forEach(function (tab) {
-            tab.addEventListener('click', function () {
-                var want = tab.getAttribute('data-pack');
-                tabs.forEach(function (t) { t.classList.remove('active'); });
-                tab.classList.add('active');
-                packs.forEach(function (p) {
-                    p.hidden = p.getAttribute('data-pack') !== want;
-                });
+        // The builder picker rewrites the first line of every brief. The
+        // choice is remembered per browser: a person building Elementor sites
+        // should not have to say so on every visit.
+        var picker = document.getElementById('wppilot-prompt-builder');
+        var prefix = <?php echo wp_json_encode(PromptLibrary\BUILDER_LINE_PREFIX); ?>;
+        var storageKey = 'wppilotPromptBuilder';
+
+        function applyBuilder() {
+            if (!picker) {
+                return;
+            }
+            var label = picker.options[picker.selectedIndex] ? picker.options[picker.selectedIndex].text : '';
+            document.querySelectorAll('.wppilot-prompt__builder').forEach(function (line) {
+                line.textContent = prefix + label;
             });
-        });
+            try {
+                window.localStorage.setItem(storageKey, picker.value);
+            } catch (error) {
+                // Storage can be unavailable; the picker still works for this page view.
+            }
+        }
+
+        if (picker) {
+            try {
+                var remembered = window.localStorage.getItem(storageKey);
+                if (remembered && picker.querySelector('option[value="' + remembered + '"]')) {
+                    picker.value = remembered;
+                }
+            } catch (error) {
+                // Ignore: no storage, no memory, nothing lost.
+            }
+            picker.addEventListener('change', applyBuilder);
+            applyBuilder();
+        }
 
         document.querySelectorAll('.wppilot-prompt-copy').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -283,78 +260,69 @@ function render(): void
 }
 
 /**
- * One pack: its prompts, or the reason they are not shown.
+ * One brief: its heading, what makes it distinct, and the text to copy.
  *
- * @param array<string, mixed> $pack
+ * The builder line is rendered as its own span so the picker can rewrite it.
+ * Everything after it is the brief body plus the shared standards, exactly as
+ * compose() would return it for the default builder.
+ *
+ * @param array<string, mixed> $brief
  */
-function render_pack(array $pack, bool $licensed): void
+function render_brief(array $brief, string $builder, bool $licensed): void
 {
-    $is_locked = ($pack['pro'] ?? false) === true && !$licensed;
-    /** @var list<array{title: string, description: string, prompt: string}> $prompts */
-    $prompts = is_array($pack['prompts'] ?? null) ? $pack['prompts'] : [];
+    $slug = (string) ($brief['slug'] ?? '');
+    $industry = (string) ($brief['industry'] ?? '');
+    $title = (string) ($brief['title'] ?? $industry);
+    $description = (string) ($brief['description'] ?? '');
+    $signature = (string) ($brief['signature'] ?? '');
+    $pro = ($brief['pro'] ?? false) === true;
+    $is_locked = $pro && !$licensed;
+    $id = 'wppilot-brief-' . $slug;
     $copied = __('Copied', domain: 'wppilot');
     $copy_failed = __('Copy failed', domain: 'wppilot');
+    $composed = PromptLibrary\compose($brief, $builder);
+    $builder_line = PromptLibrary\builder_line($builder);
+    $rest = str_starts_with($composed, $builder_line) ? substr($composed, strlen($builder_line)) : "\n\n" . $composed;
     ?>
-    <section class="wppilot-panel">
-        <h2 class="wppilot-setting-group__title"><?php echo esc_html((string) $pack['label']); ?></h2>
-        <?php if ((string) ($pack['description'] ?? '') !== '') { ?>
-            <p class="description" style="margin-top:0;"><?php
-
-            echo esc_html((string) $pack['description']); ?></p>
-        <?php } ?>
-
-        <?php if ($is_locked) { ?>
-            <p><?php
-
-            printf(
-                /* translators: %d: number of prompts in this pack */
-                esc_html(_n(
-                    single: '%d prompt in this pack, included with WPPilot Pro.',
-                    plural: '%d prompts in this pack, included with WPPilot Pro.',
-                    number: count($prompts),
-                    domain: 'wppilot',
-                )),
-                count($prompts),
-            );
-            ?></p>
-            <ul class="wppilot-prompt-locked-list">
-                <?php foreach ($prompts as $prompt) { ?>
-                    <li>
-                        <strong><?php echo esc_html($prompt['title']); ?></strong>
-                        <?php if ($prompt['description'] !== '') { ?>, <?php echo esc_html($prompt['description']); ?>
-                        <?php } ?>
-                    </li>
+    <div class="wppilot-prompt" id="<?php echo esc_attr($id . '-card'); ?>">
+        <div class="wppilot-prompt__head">
+            <div>
+                <p class="wppilot-prompt__meta">
+                    <span class="wppilot-prompt__industry"><?php echo esc_html($industry); ?></span>
+                    <?php if ($pro) { ?>
+                        <span class="wppilot-prompt-lock" aria-label="<?php esc_attr_e('Pro', domain: 'wppilot'); ?>">&#128274;</span>
+                    <?php } ?>
+                </p>
+                <h3 class="wppilot-prompt__title"><?php echo esc_html($title); ?></h3>
+                <?php if ($description !== '') { ?>
+                    <p class="description" style="margin:2px 0 0;"><?php echo esc_html($description); ?></p>
                 <?php } ?>
-            </ul>
-        <?php } else { ?>
-            <?php foreach ($prompts as $index => $prompt) { ?>
-                <?php $id = 'wppilot-prompt-' . sanitize_key((string) $pack['slug']) . '-' . $index; ?>
-                <div class="wppilot-prompt">
-                    <div class="wppilot-prompt__head">
-                        <div>
-                            <h3 class="wppilot-prompt__title"><?php echo esc_html($prompt['title']); ?></h3>
-                            <?php if ($prompt['description'] !== '') { ?>
-                                <p class="description" style="margin:2px 0 0;"><?php
-
-                                echo esc_html($prompt['description']); ?></p>
-                            <?php } ?>
-                        </div>
-                        <button
-                            type="button"
-                            class="button wppilot-prompt-copy"
-                            data-target="<?php echo esc_attr($id); ?>"
-                            data-copied="<?php echo esc_attr($copied); ?>"
-                            data-failed="<?php echo esc_attr($copy_failed); ?>"
-                            aria-live="polite"
-                        ><?php esc_html_e('Copy', domain: 'wppilot'); ?></button>
-                    </div>
-                    <pre class="wppilot-prompt__body" id="<?php echo esc_attr($id); ?>"><?php
-
-                    echo esc_html($prompt['prompt']); ?></pre>
-                </div>
+                <?php if ($signature !== '') { ?>
+                    <p class="wppilot-prompt__signature"><strong><?php esc_html_e('Signature:', domain: 'wppilot'); ?></strong> <?php
+                        echo esc_html($signature); ?></p>
+                <?php } ?>
+            </div>
+            <?php if (!$is_locked) { ?>
+                <button
+                    type="button"
+                    class="button wppilot-prompt-copy"
+                    data-target="<?php echo esc_attr($id); ?>"
+                    data-copied="<?php echo esc_attr($copied); ?>"
+                    data-failed="<?php echo esc_attr($copy_failed); ?>"
+                    aria-live="polite"
+                ><?php esc_html_e('Copy brief', domain: 'wppilot'); ?></button>
             <?php } ?>
+        </div>
+        <?php if ($is_locked) { ?>
+            <p class="description" style="margin:0;"><?php esc_html_e(
+                'Included with WPPilot Pro.',
+                domain: 'wppilot',
+            ); ?></p>
+        <?php } else { ?>
+            <pre class="wppilot-prompt__body" id="<?php echo esc_attr($id); ?>"><span class="wppilot-prompt__builder"><?php
+                echo esc_html($builder_line); ?></span><?php echo esc_html($rest); ?></pre>
         <?php } ?>
-    </section>
+    </div>
     <?php
 }
 
