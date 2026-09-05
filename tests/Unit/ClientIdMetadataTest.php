@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 namespace WPPilot\Tests\Unit;
 
+use League\OAuth2\Server\RedirectUriValidators\RedirectUriValidator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WP_Error;
@@ -14,6 +15,8 @@ use WP_Error;
 use function WPPilot\OAuth\ClientIdMetadata\decode_document;
 use function WPPilot\OAuth\ClientIdMetadata\is_blocked_ip;
 use function WPPilot\OAuth\ClientIdMetadata\is_metadata_document_client_id;
+use function WPPilot\OAuth\ClientIdMetadata\normalize_loopback_uri;
+use function WPPilot\OAuth\ClientIdMetadata\normalize_loopback_uris;
 use function WPPilot\OAuth\ClientIdMetadata\redirect_uri_is_registered;
 use function WPPilot\OAuth\ClientIdMetadata\resolved_addresses_are_public;
 use function WPPilot\OAuth\ClientIdMetadata\validate_client_id_url;
@@ -431,5 +434,58 @@ final class ClientIdMetadataTest extends TestCase
     public function testWellFormedJsonObjectDecodes(): void
     {
         self::assertSame(['client_id' => 'x'], decode_document('{"client_id":"x"}'));
+    }
+
+    // ------------------------------------------------- loopback normalisation
+
+    /**
+     * The regression 1.10.1 introduced. A Dynamic Client Registration row keeps
+     * the URI as posted, the authorization endpoint now normalises the URI the
+     * client sends onto 127.0.0.1, and league's loopback comparison ignores the
+     * port but not the host. Both sides have to be normalised or a client that
+     * registered `localhost` (MCP Inspector, for one) is refused on the host
+     * name alone.
+     */
+    public function testStoredLocalhostCallbackMatchesNormalisedRequest(): void
+    {
+        $stored = ['http://localhost:6274/oauth/callback'];
+        $sent = normalize_loopback_uri('http://localhost:6274/oauth/callback');
+
+        // What the repository used to hand league, and why it failed.
+        self::assertFalse((new RedirectUriValidator($stored))->validateRedirectUri($sent));
+
+        // What it hands league now.
+        $validator = new RedirectUriValidator(normalize_loopback_uris($stored));
+        self::assertTrue($validator->validateRedirectUri($sent));
+        // RFC 8252 §7.3: the ephemeral port the client actually bound is ignored.
+        self::assertTrue($validator->validateRedirectUri(normalize_loopback_uri('http://localhost:53821/oauth/callback')));
+        // The path is still compared.
+        self::assertFalse($validator->validateRedirectUri(normalize_loopback_uri('http://localhost:6274/other')));
+    }
+
+    public function testNormalizeLoopbackUrisTouchesOnlyHttpLocalhost(): void
+    {
+        self::assertSame(
+            [
+                'http://127.0.0.1:6274/oauth/callback',
+                'http://127.0.0.1/cb?x=1',
+                'https://app.example.com/cb',
+                'cursor://anysphere.cursor-retrieval/oauth/callback',
+                'http://[::1]:9000/cb',
+            ],
+            normalize_loopback_uris([
+                'http://localhost:6274/oauth/callback',
+                'http://LOCALHOST/cb?x=1',
+                'https://app.example.com/cb',
+                'cursor://anysphere.cursor-retrieval/oauth/callback',
+                'http://[::1]:9000/cb',
+                // A client listing both spellings collapses to one entry.
+                'http://127.0.0.1:6274/oauth/callback',
+                // Garbage a hand-edited row could carry is dropped, not fatal.
+                '',
+                42,
+                null,
+            ]),
+        );
     }
 }
