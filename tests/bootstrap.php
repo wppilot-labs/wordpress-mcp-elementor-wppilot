@@ -55,6 +55,11 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
     require_once dirname(__DIR__) . '/includes/mcp/' . $module . '.php';
 }
 
+// The prompt library reads Markdown from disk and reaches WordPress only for
+// translation and the two filters, so it loads here for PromptLibraryTest: the
+// promise under test is that ten complete, distinct briefs ship.
+require_once dirname(__DIR__) . '/includes/prompt-library/packs.php';
+
 // The preview differ is pure — no WordPress state, no options, no registry — so
 // it loads on its own. That is the point of keeping it separate from the
 // projectors, which do read WordPress.

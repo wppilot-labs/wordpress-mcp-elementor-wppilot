@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.10.2
+Stable tag: 1.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,7 +26,7 @@ Nothing needs configuring. The abilities appear when Elementor 3.6 or newer is a
 
 Composing a whole page in one call, templates and theme parts, popups, forms, dynamic tags, global classes and variables are WPPilot Pro.
 
-A prompt library ships in wp-admin. The prompts name the abilities they call, in order, so a build does not stall halfway through with no explanation.
+A prompt library ships in wp-admin: ten complete landing-page briefs, one per industry, each with its own palette, type pairing, design signature and content facts, so a bakery and a law firm do not come out as the same page. Choose Elementor or the block editor on the screen and the brief is written for it.
 
 Full documentation is at [wppilot.co](https://wppilot.co).
 
@@ -166,6 +166,10 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.11.0 =
+* The prompt library is now one complete landing-page brief per industry. The earlier packs were organised by editor and by task and named ability chains, which taught the agent which calls to make and nothing about what to build, so every business got the same centred hero with three cards under it. Ten briefs ship - a bakery, a yoga studio, a dental clinic, a landscaper, a bookshop, a wedding photographer, a plumber, a family law firm, a pet groomer and a brewery taproom - and each carries a flat palette, a type pairing, a design signature that makes its page unlike the others, the sections it must communicate, verbatim content facts, and one shared standards block covering WCAG 2.1 AA, real photography, one icon set, builder-native construction and completeness. The Prompts screen gains a builder picker that writes the chosen editor into the first line of every brief.
+* Fixed: an OAuth client that registered through Dynamic Client Registration with a `localhost` callback, MCP Inspector among them, was refused with "redirect_uri not registered for this client" from 1.10.1 onward. That release began normalising the callback the client sends onto `127.0.0.1` before comparing it, but a registered row keeps the spelling it was posted with, and the loopback comparison ignores the port while still comparing the host. The stored list is now normalised the same way when it is read, which also repairs rows registered before this fix. Client ID Metadata Document clients were already normalised and are unaffected.
 
 = 1.10.2 =
 * Fixed: a native client that got through the authorization screen in 1.10.1 could still fail at the token exchange with "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed." The authorization endpoint normalises a `localhost` callback onto the IPv4 literal, so the issued code carries the normalised spelling, while the client sends the token request with the spelling it started with. The two are compared as exact strings and disagreed on the host name. The token endpoint now normalises the incoming `redirect_uri` the same way, so both sides are in one form. A client that never used a loopback callback is unaffected.

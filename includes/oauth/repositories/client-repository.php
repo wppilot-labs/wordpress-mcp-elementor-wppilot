@@ -94,10 +94,19 @@ final class ClientRepository implements ClientRepositoryInterface
         $entity->setIdentifier($row['client_id']);
         // @mago-expect analysis:mixed-argument
         $entity->setName($row['client_name']);
-        /** @var list<string> $uris */
         // @mago-expect analysis:mixed-argument
         $uris = json_decode($row['redirect_uris'], associative: true);
-        $entity->setRedirectUri($uris);
+        // A Dynamic Client Registration row stores its redirect URIs as posted,
+        // and 1.10.1 began normalising the URI the client *sends* onto the
+        // IPv4 literal before league compares the two. League's loopback match
+        // ignores the port but still compares the host, so a client registered
+        // as `http://localhost:6274/cb` and compared as `http://127.0.0.1:6274/cb`
+        // was refused. The stored list is normalised the same way on the way
+        // out, which also repairs rows written before this existed.
+        require_once dirname(__DIR__) . '/client-id-metadata.php';
+        $entity->setRedirectUri(\WPPilot\OAuth\ClientIdMetadata\normalize_loopback_uris(
+            is_array($uris) ? array_values($uris) : [],
+        ));
         // @mago-expect analysis:mixed-operand
         $entity->setIsConfidential((bool) $row['is_confidential']);
         return $entity;

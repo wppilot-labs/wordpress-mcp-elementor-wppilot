@@ -8,25 +8,27 @@ declare(strict_types=1);
 namespace WPPilot\PromptLibrary;
 
 /**
- * The prompt library: ready-made things to say to an agent.
+ * The prompt library: one complete landing-page brief per industry.
  *
- * WPPilot exposes 70 abilities, and the hardest part of using it is not the
- * connection. It is knowing what to ask for. "Rewrite my homepage" gets a
- * shrug; a prompt that names the page, the tone, the constraints and the
- * approval step gets work done. This library is that difference, written down.
+ * The earlier library was organised by editor and by task, and its prompts
+ * named ability chains. That taught the agent which calls to make and nothing
+ * about what to build, so two people asking for a bakery and a law firm got
+ * the same centred hero with three cards under it. This library is the other
+ * half: every entry is a finished creative brief for one kind of business,
+ * with a palette, a type pairing, a design signature that makes the page
+ * unlike the others, the sections it must carry, and the facts to use
+ * verbatim. The builder is chosen on the screen and written into the first
+ * line, so one brief serves Elementor and the block editor alike.
  *
- * Not to be confused with WPPilot\Skills\Prompts, which registers MCP
- * prompt-mode skills for the protocol. These are for humans: copy, paste into
- * your own client, edit to taste.
+ * Briefs are Markdown files in prompts/, one per industry, with a small
+ * front-matter block. The shared closing section — accessibility, real
+ * photography, one icon set, builder-native construction, completeness — lives
+ * once in prompts/_standards.md and is appended to every brief at read time,
+ * so tightening a rule tightens it everywhere.
  *
- * Free ships the Gutenberg and site-care packs. Pro adds editor, theme,
- * industry, commerce, and SEO packs through the `wppilot_prompt_packs` filter,
- * so this file never learns Pro exists and keeps working unchanged when it is
- * absent.
- *
- * To add prompts: append to the array in gutenberg_pack() here, or hook the
- * filter from anywhere else. A pack is data: slug, label, group, and a list of
- * prompts, with no behaviour to keep in step.
+ * Free ships ten briefs for simple single-page sites. Pro will add its own
+ * through the `wppilot_industry_briefs` filter; this file never learns Pro
+ * exists and keeps working unchanged when it is absent.
  */
 
 if (!defined('ABSPATH')) {
@@ -35,337 +37,257 @@ if (!defined('ABSPATH')) {
 
 const PAGE = 'wppilot-prompts';
 
-/**
- * Pack groups, in display order.
- *
- * People enter the library from three directions: the editor/theme they use,
- * the industry they serve, or the job they need done. Industry prompts still
- * require the target builder as an explicit field, so choosing an industry can
- * never silently produce foreign editor data.
- *
- * @return array<string, string>
- */
-function groups(): array
-{
-    return [
-        'builder' => __('By editor', domain: 'wppilot'),
-        'industry' => __('By industry', domain: 'wppilot'),
-        'workflow' => __('By task', domain: 'wppilot'),
-    ];
-}
+const BRIEFS_DIR = __DIR__ . '/prompts';
+
+const BUILDER_LINE_PREFIX = '**Page builder:** ';
 
 /**
- * Every prompt pack available on this site.
+ * The builders a brief can be written for, in display order.
  *
- * @return list<array{slug: string, label: string, group: string, description: string, pro: bool, prompts: list<array{title: string, description: string, prompt: string}>}>
+ * Keyed by slug. Only the two the free plugin can actually drive are listed
+ * here; Pro adds the rest through the filter, so a person is never offered a
+ * builder whose abilities are not on this site.
+ *
+ * @return array<string, string> slug => label
  */
-function packs(): array
+function builders(): array
 {
-    $packs = [gutenberg_pack(), content_pack()];
+    $builders = [
+        'elementor' => 'Elementor',
+        'gutenberg' => 'Gutenberg (block editor)',
+    ];
 
     /**
-     * Filter the prompt library.
+     * Filter the builders offered on the Prompts screen.
      *
-     * Add a pack: slug, label, group (see groups()), description, pro flag, and
-     * a list of prompts with title, description and prompt text.
-     *
-     * @param list<array<string, mixed>> $packs
+     * @param array<string, string> $builders slug => label
      */
     /** @var mixed $filtered */
-    $filtered = apply_filters('wppilot_prompt_packs', $packs);
+    $filtered = apply_filters('wppilot_prompt_builders', $builders);
     if (!is_array($filtered)) {
-        return $packs;
+        return $builders;
     }
 
     $safe = [];
-    /** @var mixed $pack */
-    foreach ($filtered as $pack) {
-        $clean = normalize_pack($pack);
-        if ($clean !== null) {
-            $safe[] = $clean;
+    /** @var mixed $label */
+    foreach ($filtered as $slug => $label) {
+        if (is_string($slug) && $slug !== '' && is_string($label) && $label !== '') {
+            $safe[$slug] = $label;
         }
+    }
+
+    return $safe === [] ? $builders : $safe;
+}
+
+/**
+ * The builder to preselect: the one that is installed, else the block editor.
+ */
+function default_builder(): string
+{
+    $builders = builders();
+    if (defined('ELEMENTOR_VERSION') && array_key_exists('elementor', $builders)) {
+        return 'elementor';
+    }
+
+    return array_key_exists('gutenberg', $builders) ? 'gutenberg' : (string) array_key_first($builders);
+}
+
+/**
+ * Every brief available on this site, free first, then whatever the filter adds.
+ *
+ * @return list<array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}>
+ */
+function briefs(): array
+{
+    $briefs = bundled_briefs();
+
+    /**
+     * Filter the industry briefs.
+     *
+     * Add a brief: slug, industry, sector, business, title, description,
+     * signature, pro flag, and the Markdown body without the builder line
+     * or the standards block, both of which are added at compose time.
+     *
+     * @param list<array<string, mixed>> $briefs
+     */
+    /** @var mixed $filtered */
+    $filtered = apply_filters('wppilot_industry_briefs', $briefs);
+    if (!is_array($filtered)) {
+        return $briefs;
+    }
+
+    $safe = [];
+    $seen = [];
+    /** @var mixed $brief */
+    foreach ($filtered as $brief) {
+        $clean = normalize_brief($brief);
+        if ($clean === null || isset($seen[$clean['slug']])) {
+            continue;
+        }
+        $seen[$clean['slug']] = true;
+        $safe[] = $clean;
     }
 
     return $safe;
 }
 
 /**
- * Coerce a filtered pack into the documented shape, or reject it.
+ * The briefs shipped in prompts/, in file order.
+ *
+ * @return list<array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}>
+ */
+function bundled_briefs(): array
+{
+    $files = glob(BRIEFS_DIR . '/*.md');
+    if (!is_array($files)) {
+        return [];
+    }
+    sort($files);
+
+    $briefs = [];
+    foreach ($files as $file) {
+        if (str_starts_with(basename($file), '_')) {
+            continue;
+        }
+        $brief = read_brief_file($file);
+        if ($brief !== null) {
+            $briefs[] = $brief;
+        }
+    }
+
+    return $briefs;
+}
+
+/**
+ * Parse one brief file: a `---` front-matter block of `key: value` lines,
+ * then the Markdown body.
+ *
+ * @return array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}|null
+ */
+function read_brief_file(string $file): ?array
+{
+    $raw = is_readable($file) ? file_get_contents($file) : false;
+    if (!is_string($raw)) {
+        return null;
+    }
+    $raw = str_replace("\r\n", "\n", $raw);
+
+    if (!preg_match('/\A---\n(.*?)\n---\n(.*)\z/s', $raw, $m)) {
+        return null;
+    }
+
+    $meta = [];
+    foreach (explode("\n", $m[1]) as $line) {
+        $colon = strpos($line, ':');
+        if ($colon === false) {
+            continue;
+        }
+        $meta[trim(substr($line, 0, $colon))] = trim(substr($line, $colon + 1));
+    }
+
+    $meta['body'] = trim($m[2]);
+    if (($meta['slug'] ?? '') === '') {
+        $meta['slug'] = basename($file, '.md');
+    }
+
+    return normalize_brief($meta);
+}
+
+/**
+ * Coerce a brief into the documented shape, or reject it.
  *
  * Anything can hook the filter, so nothing downstream should have to guess
- * whether a key is present or a prompt is a string. A malformed pack is dropped
- * rather than half-rendered.
+ * whether a key is present or the body is a string. A malformed brief is
+ * dropped rather than half-rendered.
  *
- * @param mixed $pack
- * @return array{slug: string, label: string, group: string, description: string, pro: bool, prompts: list<array{title: string, description: string, prompt: string}>}|null
+ * @return array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}|null
  */
-function normalize_pack(mixed $pack): ?array
+function normalize_brief(mixed $brief): ?array
 {
-    if (!is_array($pack)) {
+    if (!is_array($brief)) {
         return null;
     }
 
-    $slug = is_string($pack['slug'] ?? null) ? $pack['slug'] : '';
-    $label = is_string($pack['label'] ?? null) ? $pack['label'] : '';
-    if ($slug === '' || $label === '') {
-        return null;
-    }
-
-    $group = is_string($pack['group'] ?? null) ? $pack['group'] : 'workflow';
-    if (!array_key_exists($group, groups())) {
-        $group = 'workflow';
-    }
-
-    $prompts = normalize_prompts($pack['prompts'] ?? null);
-    if ($prompts === []) {
+    $slug = sanitize_key(field($brief, 'slug'));
+    $industry = field($brief, 'industry');
+    $body = field($brief, 'body');
+    if ($slug === '' || $industry === '' || $body === '') {
         return null;
     }
 
     return [
         'slug' => $slug,
-        'label' => $label,
-        'group' => $group,
-        'description' => is_string($pack['description'] ?? null) ? $pack['description'] : '',
-        'pro' => ($pack['pro'] ?? false) === true,
-        'prompts' => $prompts,
+        'industry' => $industry,
+        'sector' => field($brief, 'sector', __('Other', domain: 'wppilot')),
+        'business' => field($brief, 'business'),
+        'title' => field($brief, 'title', $industry),
+        'description' => field($brief, 'description'),
+        'signature' => field($brief, 'signature'),
+        'pro' => in_array($brief['pro'] ?? false, [true, 'true'], strict: true),
+        'body' => $body,
     ];
 }
 
 /**
- * Coerce a pack's prompt list, dropping anything unusable.
+ * A trimmed string field, or the fallback when it is missing, blank, or not a string.
  *
- * A prompt with no text is not a prompt, and one with no title cannot be shown
- * or copied, so both are dropped rather than rendered as an empty card.
- *
- * @param mixed $raw_prompts
- * @return list<array{title: string, description: string, prompt: string}>
+ * @param array<array-key, mixed> $brief
  */
-function normalize_prompts(mixed $raw_prompts): array
+function field(array $brief, string $key, string $fallback = ''): string
 {
-    $prompts = [];
+    $value = is_string($brief[$key] ?? null) ? trim($brief[$key]) : '';
 
-    /** @var mixed $raw */
-    foreach (is_array($raw_prompts) ? $raw_prompts : [] as $raw) {
-        if (!is_array($raw)) {
-            continue;
-        }
+    return $value !== '' ? $value : $fallback;
+}
 
-        $text = is_string($raw['prompt'] ?? null) ? trim($raw['prompt']) : '';
-        $title = is_string($raw['title'] ?? null) ? $raw['title'] : '';
-        if ($text === '' || $title === '') {
-            continue;
-        }
+/**
+ * The closing standards every brief carries.
+ */
+function standards(): string
+{
+    $raw = file_get_contents(BRIEFS_DIR . '/_standards.md');
 
-        $prompts[] = [
-            'title' => $title,
-            'description' => is_string($raw['description'] ?? null) ? $raw['description'] : '',
-            'prompt' => $text,
-        ];
+    return is_string($raw) ? trim(str_replace("\r\n", "\n", $raw)) : '';
+}
+
+/**
+ * The builder line that opens every composed brief.
+ */
+function builder_line(string $builder): string
+{
+    $label = builders()[$builder] ?? $builder;
+
+    return BUILDER_LINE_PREFIX . $label;
+}
+
+/**
+ * The full text a person copies: builder line, the brief, the standards.
+ *
+ * @param array<string, mixed> $brief
+ */
+function compose(array $brief, string $builder): string
+{
+    $parts = [builder_line($builder), (string) ($brief['body'] ?? '')];
+    $standards = standards();
+    if ($standards !== '') {
+        $parts[] = $standards;
     }
 
-    return $prompts;
+    return implode("\n\n", $parts);
 }
 
 /**
- * The whole-site brief, for whichever editor the caller names.
+ * Briefs grouped by sector, sectors in first-seen order.
  *
- * The hardest prompt to write is the first one on an empty site: "build me an
- * accounting firm's website" is too vague to act on, and the result is a
- * five-page site of adjectives. This spells out the pages, the sections in
- * each, the tone, and the approval points, which is the difference between a
- * demo and something a client could look at.
- *
- * One prompt covers every kind of business rather than one prompt per industry.
- * The site type is a variable the person fills in, and the per-industry page
- * plans travel with it, so adding "law firm" later is one line here instead of
- * a new pack in every builder.
- *
- * $builder_line is the editor-specific instruction, the single sentence that
- * decides whether the output is editable in the tool the customer actually
- * uses, or a pile of blocks they cannot touch.
+ * @param list<array<string, mixed>> $briefs
+ * @return array<string, list<array<string, mixed>>>
  */
-function full_site_brief(string $builder_line): string
+function by_sector(array $briefs): array
 {
-    $intro = __(
-        'Build a complete website for [BUSINESS NAME], a [SITE TYPE] in [CITY/REGION] serving [WHO THEY SERVE].',
-        domain: 'wppilot',
-    );
+    $grouped = [];
+    foreach ($briefs as $brief) {
+        $grouped[(string) ($brief['sector'] ?? '')][] = $brief;
+    }
 
-    $plans = __(
-        'Page plan: use the one matching the site type, and adapt it:
-
-ACCOUNTING / PROFESSIONAL SERVICES
-Home · Services (bookkeeping, tax, payroll, advisory) · About + team credentials · Pricing (three tiers, "from" prices) · Contact · Privacy Policy
-Tone: precise, calm, trustworthy. No hype. Never invent tax figures, rates, deadlines or regulatory claims, write [CONFIRM: …] instead.
-
-RESTAURANT / HOSPITALITY
-Home (hours prominent) · Menu (sections, prices, dietary markers) · About + chef · Book a table · Contact (hours per day, parking, accessibility)
-Tone: warm but concrete, describe food by ingredient and preparation, not adjectives. Hours, menu and booking must be one click from anywhere.
-
-AGENCY / STUDIO
-Home · Services (what is included, process, timeline) · Work (three case studies: problem, approach, result) · About · Contact with budget and timeline fields
-Tone: confident, specific, outcome-led. Write [CONFIRM: metric] rather than inventing results.
-
-CLINIC / HEALTH PRACTICE
-Home · Services (what each treatment involves, duration, aftercare) · Team with qualifications · New patients (what to bring, fees) · Contact + emergency info
-Tone: reassuring and plain; assume the reader is anxious. Make no claims about outcomes and never imply a treatment cures anything. Registration numbers and regulatory text stay as placeholders.
-
-PORTFOLIO / INDIVIDUAL
-Home · Work (four projects: brief, approach, outcome) · About · Contact
-Tone: first person, direct, short sentences. Keep it small. The job is to show work.
-
-E-COMMERCE
-Home · Shop landing · About · Shipping & returns · FAQ · Contact
-Tone: plain and specific. Do not invent shipping times, prices or return windows, use [CONFIRM: …].',
-        domain: 'wppilot',
-    );
-
-    $rules = __('Rules for the whole build:
-- Create everything as drafts. Publish nothing without asking me.
-- Real, specific copy for this business, never filler text.
-- Use the site\'s existing theme, colours and fonts.
-- Add each page to the main navigation in the order listed.
-- Anything you are not certain of goes in as [CONFIRM: …] rather than a plausible guess.
-- When you are done, list every page you created with its edit link.', domain: 'wppilot');
-
-    return $intro . "\n\n" . $builder_line . "\n\n" . $plans . "\n\n" . $rules;
-}
-
-/**
- * The free pack: the block editor, which every WordPress site has.
- *
- * @return array{slug: string, label: string, group: string, description: string, pro: bool, prompts: list<array{title: string, description: string, prompt: string}>}
- */
-function gutenberg_pack(): array
-{
-    return [
-        'slug' => 'gutenberg',
-        'label' => __('Gutenberg', domain: 'wppilot'),
-        'group' => 'builder',
-        'description' => __(
-            'Block editor work. These use core blocks only, so they run on any theme.',
-            domain: 'wppilot',
-        ),
-        'pro' => false,
-        'prompts' => [
-            [
-                'title' => __('Build a complete website', domain: 'wppilot'),
-                'description' => __(
-                    'Multi-page brief. Name the kind of business; page plans for six common types are included.',
-                    domain: 'wppilot',
-                ),
-                'prompt' => full_site_brief(__(
-                    'Build it with core Gutenberg blocks only, so it works on any theme and stays editable in the block editor.',
-                    domain: 'wppilot',
-                )),
-            ],
-            [
-                'title' => __('Build a landing page', domain: 'wppilot'),
-                'description' => __('The real chain, including the browser step core blocks require.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Create a new draft page titled \"[PAGE TITLE]\" using core Gutenberg blocks only.\n\nHow the write works, so you do not get halfway and stall:\n1. wppilot/create-post, create the draft first. It defaults to draft; leave it there.\n2. wppilot/gutenberg-create-pending-batch: core blocks cannot be written straight from the server, because the block editor's own JavaScript is what validates and serialises them.\n3. wppilot/gutenberg-add-pending-change, queue the block tree against the new post.\n4. wppilot/gutenberg-enable-batch-finalization, then wppilot/gutenberg-get-finalization-url, send me that link. I open it in a browser and the batch commits.\n\nBlocks to use, and nothing else:\ncore/group, core/columns, core/column, core/heading, core/paragraph, core/buttons, core/button, core/image, core/list, core/separator, core/spacer, core/quote, core/cover.\n\nStructure:\n- Hero: core/cover or core/group with an H1, one supporting sentence, one core/buttons\n- Three core/columns, each a core/heading H3 plus two sentences\n- A core/quote with a real, attributed quotation, or omit the section entirely\n- Closing core/group with the same call to action as the hero\n\nRules:\n- Real, specific copy about [WHAT THE PAGE IS FOR]. No filler text, no invented statistics, no fake testimonials.\n- Anything I have not told you, prices, credentials, client names, numbers, goes in as [CONFIRM: what is missing].\n- Set the H1 once. Every other heading is H2 or lower, in order.\n- Do not publish, and do not touch the theme, the menu or any other page.\n\nWhen the batch is queued, give me the finalization link and tell me exactly what is in it.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Inventory a page before editing it', domain: 'wppilot'),
-                'description' => __('Read-only. Safe on a live site, and it prevents most bad edits.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Inventory the page [PAGE TITLE] before anything is changed. Read only, make no writes in this run.\n\nCall in this order:\n1. wppilot/get-content, the stored post and its metadata\n2. wppilot/gutenberg-get-content, the parsed block tree\n3. wppilot/get-page-snapshot, what the page actually renders\n4. wppilot/list-revisions, how recently it was edited and by whom\n\nReport back:\n- The block tree, summarised section by section, naming the actual block types used\n- Any block that is not a core block, and which plugin registers it\n- Any block holding content that should be shared instead of duplicated\n- Broken or empty blocks, missing image alt text, heading levels out of order\n- Anything that would break if this page were rebuilt from scratch\n\nDo not propose fixes yet. I want the picture first.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Check what is waiting in the Block Editor Queue', domain: 'wppilot'),
-                'description' => __('When a queued change never landed, this is how you find out why.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Tell me the state of the Block Editor Queue on this site.\n\nCall:\n1. wppilot/gutenberg-list-pending-batches, every batch and its status\n2. wppilot/gutenberg-get-pending-batch, the contents of any batch that is not finalised\n3. wppilot/gutenberg-get-finalizer-runtime, whether the finalizer can actually run here\n\nFor each unfinalised batch, tell me:\n- Which post or template it targets, and whether that target still exists\n- What the change would do, in plain language\n- Which agent or session created it, and when\n- Whether it is safe to discard\n\nDo not finalise, delete or modify anything. Queued changes are not live until the whole batch commits, so an old batch is a decision waiting for me, not a fault.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Rewrite a page for clarity', domain: 'wppilot'),
-                'description' => __('Improves the words, leaves the layout alone.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Read the page \"[PAGE TITLE]\" on this site and rewrite its text for clarity.\n\nKeep:\n- The existing block structure and layout exactly as it is\n- All links, images and buttons\n\nChange:\n- Shorten sentences, cut filler, use plain language\n- Keep the same meaning and any factual claims\n- Match the tone of the rest of the site\n\nShow me a before/after of each block you would change, and wait for my approval before saving anything.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Audit content quality', domain: 'wppilot'),
-                'description' => __('Read-only review across published posts.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Review the 20 most recent published posts on this site and report on:\n\n- Posts with no excerpt\n- Posts with no featured image\n- Titles longer than 60 characters\n- Posts that have not been updated in over a year\n- Any obviously broken or placeholder content\n\nDo not change anything. Give me a table sorted by how much each post needs attention.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Turn a draft into a publishable post', domain: 'wppilot'),
-                'description' => __('Structure, headings, excerpt, and internal links.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Take my draft post \"[DRAFT TITLE]\" and make it publishable:\n\n- Add clear H2 and H3 headings so it can be skimmed\n- Write a 25-word excerpt\n- Suggest a focus keyword and check the title supports it\n- Add two or three internal links to relevant existing posts on this site\n- Flag anything that reads as unfinished\n\nKeep it a draft. List every change you made.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Create a reusable block pattern', domain: 'wppilot'),
-                'description' => __('Once, then reuse everywhere.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Create a reusable Gutenberg pattern called \"[PATTERN NAME]\" for [WHAT IT IS FOR, e.g. a testimonial card].\n\n- Core blocks only\n- Sensible placeholder text that shows how it should be filled in\n- Works at mobile and desktop widths\n\nAfter creating it, tell me how to insert it in the editor.",
-                    domain: 'wppilot',
-                ),
-            ],
-        ],
-    ];
-}
-
-/**
- * Free, editor-agnostic: the jobs people ask for regardless of how the site is
- * built.
- *
- * @return array{slug: string, label: string, group: string, description: string, pro: bool, prompts: list<array{title: string, description: string, prompt: string}>}
- */
-function content_pack(): array
-{
-    return [
-        'slug' => 'site-care',
-        'label' => __('Site care', domain: 'wppilot'),
-        'group' => 'workflow',
-        'description' => __('Housekeeping an agent can do faster than you can.', domain: 'wppilot'),
-        'pro' => false,
-        'prompts' => [
-            [
-                'title' => __('Weekly site report', domain: 'wppilot'),
-                'description' => __('What changed, what needs attention.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Give me a short report on this WordPress site:\n\n- Content published or updated in the last 7 days\n- Drafts that have sat untouched for more than 30 days\n- Pending comments\n- Plugins and themes with updates available\n- Anything that looks broken or misconfigured\n\nRead only, change nothing. Keep it under 300 words.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Find and fix broken links', domain: 'wppilot'),
-                'description' => __('Reports first, fixes only what you approve.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Check the published pages and posts on this site for links that point to:\n\n- Pages that no longer exist on this site\n- Old URLs that now redirect\n- http:// where https:// is available\n\nShow me the list first, grouped by page, with the suggested replacement for each. Fix only the ones I confirm.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Clean up the media library', domain: 'wppilot'),
-                'description' => __('Find unused and oversized uploads.', domain: 'wppilot'),
-                'prompt' => __(
-                    "Audit the media library:\n\n- Images not attached to any post or page\n- Files over 1 MB that could be resized\n- Images with no alt text that are used on published pages\n\nDo not delete anything. Give me the list with file sizes, and for the missing alt text suggest wording based on where each image is used.",
-                    domain: 'wppilot',
-                ),
-            ],
-            [
-                'title' => __('Prepare a site for handover', domain: 'wppilot'),
-                'description' => __('The checklist before you give a client the keys.', domain: 'wppilot'),
-                'prompt' => __(
-                    "I am handing this site over to a client. Check and report on:\n\n- Filler text still live, plus the default \"Sample Page\" and the untouched site tagline\n- Pages with no SEO title or description\n- Missing favicon or site icon\n- Default \"Hello world\" post or default comment still present\n- Admin accounts that should be removed\n- Whether search engine visibility is switched on\n\nReport only. I will decide what to change.",
-                    domain: 'wppilot',
-                ),
-            ],
-        ],
-    ];
+    return $grouped;
 }
