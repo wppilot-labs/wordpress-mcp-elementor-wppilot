@@ -10,7 +10,7 @@ declare(strict_types=1);
 /**
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
- * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
+ * Description: WordPress MCP server with free Elementor MCP editing. Connects Claude, Codex, Cursor and other AI clients to typed WordPress abilities over MCP, with OAuth 2.1, safety profiles, change evidence and rollback.
  * Version: 1.11.0
  * Requires at least: 6.9
  * Requires PHP: 8.0

@@ -1,0 +1,72 @@
+name: AI client will not connect
+description: An MCP client cannot reach or authenticate against the server
+labels: ["connection"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run **WPPilot → Diagnostics** first — it runs the same checks a client
+        does and usually names the problem outright.
+
+        **Never paste an application password, access token, OAuth client
+        secret or licence key here.** Issues are public and permanent. If you
+        already have, revoke the credential rather than editing the comment.
+  - type: input
+    id: client
+    attributes:
+      label: AI client and version
+      placeholder: "Claude Code 2.x, Cursor, Codex CLI, ChatGPT developer mode…"
+    validations:
+      required: true
+  - type: dropdown
+    id: method
+    attributes:
+      label: Authentication route
+      options:
+        - "OAuth 2.1"
+        - "Application password"
+        - "Access token (wpp_…)"
+        - "Not sure"
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where it fails
+      options:
+        - "Client cannot reach the URL at all"
+        - "Authorization screen never opens"
+        - "Authorization completes, then the client reports it is unauthenticated"
+        - "Connects, but no tools are listed"
+        - "Tools are listed, but every call is refused"
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint the client is configured with
+      placeholder: "https://example.com/wp-json/mcp/wppilot"
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Exact error text
+      description: The literal message from the client and, if you have it, the HTTP status. Redact hostnames if you need to, but keep the shape.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: "WPPilot 1.11.0, WordPress 6.9, PHP 8.3, Pro 1.6.1 (or none)"
+    validations:
+      required: true
+  - type: checkboxes
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - label: The site is reachable over public HTTPS (required for hosted web clients)
+        - label: The site is local only (localhost, .test, a tunnel)
+        - label: A reverse proxy, firewall or WAF sits in front of WordPress
+        - label: Diagnostics reports no failing check

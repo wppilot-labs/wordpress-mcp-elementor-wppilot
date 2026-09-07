@@ -1,6 +1,6 @@
 # WPPilot — WordPress MCP Server, Elementor MCP and WooCommerce MCP
 
-**Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build, pages, Elementor layouts, block content, menus, taxonomies, media, SEO metadata, through typed abilities your permissions still govern.**
+**Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build pages, Elementor layouts, block content, menus, taxonomies, media and SEO metadata through typed abilities your permissions still govern.**
 
 [![Version](https://img.shields.io/github/v/release/wppilot-labs/wordpress-mcp-elementor-wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
@@ -17,13 +17,13 @@ The free plugin is the **WordPress MCP server**, and since 1.10.0 it is also a w
 
 ### Looking for an Elementor, Divi or Beaver Builder MCP server?
 
-This is it, with one server instead of one per plugin. **Elementor editing is free**, in this repository, and needs nothing else installed — see [Elementor MCP in the free plugin](#elementor-mcp-in-the-free-plugin). [WPPilot Pro](https://wppilot.co/pro) adds the builder-aware layer on top of the same endpoint, so an agent that connects once can work in whichever editor the site actually uses:
+This is it, with one server instead of one per plugin. **Elementor editing is free**, in this repository, and needs nothing else installed — see [Elementor MCP in the free plugin](#elementor-mcp). [WPPilot Pro](https://wppilot.co/pro) adds the builder-aware layer on top of the same endpoint, so an agent that connects once can work in whichever editor the site actually uses:
 
 [Elementor MCP](https://wppilot.co/mcp-for-elementor) · [Bricks MCP](https://wppilot.co/mcp-for-bricks) · [Divi MCP](https://wppilot.co/mcp-for-divi) · [Beaver Builder MCP](https://wppilot.co/mcp-for-beaver-builder) · [Oxygen MCP](https://wppilot.co/mcp-for-oxygen) · [Breakdance MCP](https://wppilot.co/mcp-for-breakdance) · [WPBakery MCP](https://wppilot.co/mcp-for-wpbakery) · [Etch MCP](https://wppilot.co/mcp-for-etch) · [Mosaic MCP](https://wppilot.co/mcp-for-mosaic)
 
-Beyond page builders, Pro also covers WooCommerce, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Yoast SEO, Rank Math, AIOSEO, SEOPress, WPML, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [51 integrations](#wppilot-pro-1042-plugin-aware-abilities).
+Beyond page builders, Pro also covers WooCommerce, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Yoast SEO, Rank Math, AIOSEO, SEOPress, WPML, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [51 integrations](#wppilot-pro-plugin-aware-abilities-across-51-integrations).
 
-## MCP protocol support
+## WordPress MCP server and protocol support
 
 WPPilot serves both protocol revisions during the migration window:
 
@@ -37,6 +37,8 @@ A request is served under the modern revision **only** when it carries modern pe
 `server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. Subscriptions, the tasks extension and logging are deliberately not advertised, WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented.
 
 For OAuth, **Client ID Metadata Documents are the preferred registration mechanism**; RFC 7591 Dynamic Client Registration remains available as a compatibility fallback. Application Passwords and access tokens stay independent fallbacks for clients that run no OAuth flow.
+
+Full detail: [`docs/wordpress-mcp.md`](docs/wordpress-mcp.md).
 
 It is a control layer, not an AI wrapper. **No AI model is bundled**: external MCP clients bring their own model access, and policy is enforced server-side on your install.
 
@@ -78,9 +80,11 @@ OAuth-authenticated clients use `/wp-json/mcp/wppilot-oauth`. Application passwo
 
 ## Supported AI clients
 
-Claude Code · Claude Desktop · Claude on the web · Codex CLI · Codex desktop app · Cursor · VS Code · GitHub Copilot · Devin Desktop (formerly Windsurf) · Factory Droid · Antigravity CLI · Antigravity IDE · Zed · Cline · Roo Code · Kilo Code · Amazon Q · OpenCode · OpenClaw · Manus
+Claude Code · Claude Desktop · Claude on the web · ChatGPT · Codex CLI · Codex desktop app · Cursor · VS Code · GitHub Copilot · Gemini CLI · Devin Desktop (formerly Windsurf) · Factory Droid · Antigravity CLI · Antigravity IDE · Zed · Cline · Roo Code · Kilo Code · Amazon Q · OpenCode · OpenClaw · Qwen Code · Kimi Code CLI · ZCode (GLM) · Mistral Le Chat · Perplexity · Manus
 
-Per-client setup guides: <https://wppilot.co/wordpress-mcp>
+Plus programmatic callers with no browser: the Claude Messages API MCP connector, the OpenAI Responses API `mcp` tool, cron jobs and `curl`, using an access token.
+
+Which route each client takes: [`docs/ai-client-compatibility.md`](docs/ai-client-compatibility.md). Per-client setup guides: <https://wppilot.co/wordpress-mcp>
 
 ## Authentication
 
@@ -122,7 +126,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Site** | `2` | Site information and an explicit settings allowlist. |
 | **Plugins and themes** | `12` | Search the WordPress.org directory and read one extension in detail. Activate, deactivate, update and switch themes with explicit confirmation. Install and delete are Developer Full Access only: they write executable code to the server. |
 | **Gutenberg** | `11` | Block-editor content, staged pending changes and browser finalization for native blocks. |
-| **Elementor** | `16` | Read a document, inspect the widgets and style properties this install offers, and edit the element tree: add, edit, move, duplicate, reorder and delete. Page settings included. [Detail below.](#elementor-mcp-in-the-free-plugin) |
+| **Elementor** | `16` | Read a document, inspect the widgets and style properties this install offers, and edit the element tree: add, edit, move, duplicate, reorder and delete. Page settings included. [Detail below.](#elementor-mcp) |
 | **Design system** | `19` | Typed design tokens, saved designs and activation, plus the checks that grade a built page against them: contrast, composition, layout grammars and a rendered-page verification pass. |
 | **Preview** | `2` | Compute what a write would change without performing it, then apply the reviewed result. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
@@ -132,7 +136,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 Content creation is draft-first: an absent, blank or malformed status resolves to `draft` before any capability check, so nothing is published by accident. Capabilities are read from each post type's and taxonomy's own capability object, so a custom type declaring its own set is enforced on its own terms.
 
-## Elementor MCP in the free plugin
+## Elementor MCP
 
 **Since 1.10.0, editing an Elementor page is free.** The Elementor abilities load automatically when Elementor 3.6 or newer is active and stay unregistered otherwise, so an agent is never offered a tool that cannot work on this site.
 
@@ -156,6 +160,8 @@ Writing generated HTML into `post_content` does not change an Elementor page. Th
 | `wppilot/elementor-get-page-settings` · `set-page-settings` | Read and write document-level settings: page layout, title visibility, background, and the rest. |
 | `wppilot/elementor-clear-document-cache` | Regenerate Elementor's CSS for a document after a write. |
 
+Full detail, including the read-before-write sequence: [`docs/elementor-mcp.md`](docs/elementor-mcp.md).
+
 Both element models are supported: Elementor v4 atomic elements (`e-div-block`, `e-heading`, `e-paragraph`, `e-button`, `e-image` and the rest, with the atomic style schema) and classic v3 widgets and containers, with the settings keys each one actually uses.
 
 ### What Pro adds on top
@@ -166,7 +172,7 @@ The free abilities are the primitives, and they compose. What Pro adds is the au
 
 The dividing line is simple: free can **edit** an Elementor page, Pro can **compose** one.
 
-## WPPilot Pro, 1,042 plugin-aware abilities
+## WPPilot Pro: plugin-aware abilities across 51 integrations
 
 The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **133 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
@@ -192,6 +198,8 @@ A page builder does not store a page as HTML. It stores an element tree, referen
 
 Pro gives the agent that builder's own vocabulary: `bricks-patch-elements`, `elementor-create-atomic-widget`, `divi-apply-global-preset`, `etch-get-query-preview`, so it can read a schema before it proposes a change.
 
+Where each builder keeps its layout, and what that means for an agent: [`docs/page-builder-mcp.md`](docs/page-builder-mcp.md).
+
 ### Page builder MCP servers
 
 One endpoint covers every builder below. The agent gets that builder's own
@@ -210,14 +218,13 @@ vocabulary rather than being handed raw HTML to guess at.
 | WPBakery | 18 | Pro | [MCP for WPBakery](https://wppilot.co/mcp-for-wpbakery) |
 | Flatsome UX Builder | 11 | Pro | [All integrations](https://wppilot.co/integrations) |
 
-#### Elementor MCP
+#### Elementor MCP server
 
 **Elementor is the one builder whose editing surface is free.** The 16 abilities
 in this repository read the document, report the widgets and the 73 style
 properties your install actually offers, and add, edit, move, duplicate, reorder
 and delete elements in the tree — v4 atomic elements and classic v3 widgets
-alike. See [Elementor MCP in the free plugin](#elementor-mcp-in-the-free-plugin)
-for the full list.
+alike. See [Elementor MCP](#elementor-mcp) above for the full list.
 
 Pro's 51 add the authoring layer on the same endpoint: whole-page composition
 from a description or a reproduction spec, templates and theme parts, display
@@ -258,15 +265,15 @@ markup around them.
 
 #### Breakdance, Etch and Mosaic MCP
 
-Breakdance (33 abilities), Etch (60) and Mosaic (36) each expose their own
+Breakdance (33 abilities), Etch (60) and Mosaic (41) each expose their own
 element model. Etch has the largest surface of any builder in Pro.
 
-#### Gutenberg MCP
+### Gutenberg MCP
 
 Block editing is in the **free** plugin, not Pro: parse, insert, move and
 replace blocks in the core block tree, with reusable blocks and patterns.
 
-#### WooCommerce MCP
+### WooCommerce MCP
 
 Products, variations, orders, coupons and stock as typed abilities rather than
 raw REST calls. An agent can query the catalogue, create a variable product with
@@ -277,6 +284,8 @@ connected as a shop manager cannot do what that account could not do by hand.
 Order status changes and anything touching money are classed destructive, so
 they require explicit confirmation and are recorded in the change ledger with
 rollback, the same as every other write.
+
+Full detail: [`docs/woocommerce-mcp.md`](docs/woocommerce-mcp.md).
 
 ### Beyond integrations
 
@@ -349,7 +358,20 @@ The MCP endpoint is self-hosted; there is no WPPilot relay. When WPPilot Chat is
 | Change ledger and rollback | <https://wppilot.co/docs/change-ledger-and-rollback> |
 | Troubleshooting | <https://wppilot.co/docs/troubleshooting> |
 
-In-repo: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/SAFETY.md`](docs/SAFETY.md) · [`SECURITY.md`](SECURITY.md)
+### In this repository
+
+| Document | What it covers |
+| --- | --- |
+| [`docs/wordpress-mcp.md`](docs/wordpress-mcp.md) | The WordPress MCP server itself: endpoints, protocol revisions, discovery, the three-tool interface. |
+| [`docs/elementor-mcp.md`](docs/elementor-mcp.md) | The free Elementor MCP surface: the 16 abilities, the v3 and v4 element models, a read-before-write sequence. |
+| [`docs/page-builder-mcp.md`](docs/page-builder-mcp.md) | Where each builder stores a layout, and why an MCP server has to speak that store: Bricks, Divi, Oxygen, Beaver Builder, Breakdance, Etch, WPBakery, Mosaic. |
+| [`docs/woocommerce-mcp.md`](docs/woocommerce-mcp.md) | WooCommerce over MCP: capability checks, destructive classification, order and money handling. |
+| [`docs/ai-client-compatibility.md`](docs/ai-client-compatibility.md) | Which AI clients connect how — OAuth, application password or access token — and what each one needs. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Request lifecycle, ability registration, where the code lives. |
+| [`docs/SAFETY.md`](docs/SAFETY.md) | Safety profiles, confirmation gates, rate limits, the change ledger. |
+| [`SECURITY.md`](SECURITY.md) | Reporting a vulnerability, and hardening guidance. |
+
+Index: [`docs/README.md`](docs/README.md)
 
 ## Security
 

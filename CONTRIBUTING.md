@@ -1,10 +1,13 @@
 # Contributing to WPPilot
 
-WPPilot is the free WordPress MCP server in this repository. WPPilot Pro, which
-adds the Elementor MCP, WooCommerce MCP and other builder-aware layers, is a
-commercial plugin and is not developed here — but bug reports about how Pro
-behaves against this plugin are welcome, because the seam between them is where
-most real problems live.
+WPPilot is the free WordPress MCP server in this repository, and that includes
+the Elementor MCP surface: the 16 abilities that read and edit an Elementor
+document are developed here, not in Pro. WPPilot Pro, which adds WooCommerce MCP
+and the builder-aware layers for Bricks, Divi, Oxygen, Beaver Builder,
+Breakdance, Etch, WPBakery and Mosaic — plus Elementor authoring on top of the
+free editing abilities — is a commercial plugin and is not developed here. Bug
+reports about how Pro behaves against this plugin are still welcome, because the
+seam between them is where most real problems live.
 
 ## Before opening an issue
 
@@ -57,4 +60,4 @@ which one to use instead.
 ## What is unlikely
 
 Abilities that bypass the safety profile, anything that stores a credential,
-and new page-builder integrations, which belong in Pro.
+and new page-builder integrations other than Elementor, which belong in Pro.

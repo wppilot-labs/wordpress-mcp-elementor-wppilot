@@ -1,0 +1,52 @@
+name: Integration request
+description: Ask for a plugin, theme or page builder to be understood natively
+labels: ["integration"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when an agent can reach a plugin's data through generic
+        WordPress abilities but gets it wrong, or cannot reach it at all —
+        a layout stored in postmeta, a field group, a form definition, a
+        product model.
+
+        Elementor and Gutenberg editing are in this free plugin. Other
+        builder- and plugin-aware modules ship in WPPilot Pro, so a request
+        here may be answered with a Pro roadmap item rather than a change to
+        this repository. Saying so up front is more useful than routing you
+        somewhere else later.
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin, theme or builder
+      placeholder: "Bricks 2.1, Meta Box 5.x, Fluent Forms 6.x…"
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: What should an agent be able to do
+      description: The task, not the implementation.
+      placeholder: |
+        Read a Bricks page's element tree and change one section's heading
+        without rewriting the sections around it.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What happens today
+      description: Which ability you tried, and what it did instead. A call that reports success and changes nothing is the most useful case to report.
+      render: text
+  - type: input
+    id: storage
+    attributes:
+      label: Where the data lives, if you know
+      placeholder: "postmeta key, custom table, option name, REST route…"
+  - type: checkboxes
+    id: licence
+    attributes:
+      label: Availability
+      options:
+        - label: This plugin is free or has a free tier that exposes the data
+        - label: I hold a licence and can test against it

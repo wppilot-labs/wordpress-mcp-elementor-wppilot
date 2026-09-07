@@ -1,0 +1,34 @@
+{
+	"_comment": "Source of truth for the product facts that appear in more than one document. scripts/check-doc-consistency.php fails the build when a document contradicts this file, so a number that changes gets changed once here and then everywhere the checker points at. Pro totals that cannot be derived from this repository are deliberately absent: an aggregate nobody can verify from source is how the last set of contradictions got in.",
+	"version": "1.11.0",
+	"requires_wordpress": "6.9",
+	"requires_php": "8.0",
+	"free_abilities": 133,
+	"free_elementor_abilities": 16,
+	"elementor_minimum": "3.6",
+	"elementor_atomic_style_properties": 73,
+	"pro_integrations": 51,
+	"builder_abilities": {
+		"Etch": 60,
+		"Bricks": 49,
+		"Divi": 47,
+		"Mosaic": 41,
+		"Oxygen": 37,
+		"Breakdance": 33,
+		"Beaver Builder": 21,
+		"WPBakery": 18,
+		"Flatsome UX Builder": 11
+	},
+	"stale_claims": [
+		"103 abilities",
+		"103 registered abilities",
+		"1,042 plugin-aware abilities",
+		"Mosaic (36)",
+		"Mosaic | 36",
+		"Pro adds the Elementor MCP",
+		"adds the Elementor MCP",
+		"Elementor MCP is Pro",
+		"Elementor editing is Pro",
+		"WordPress.org directory listing"
+	]
+}
