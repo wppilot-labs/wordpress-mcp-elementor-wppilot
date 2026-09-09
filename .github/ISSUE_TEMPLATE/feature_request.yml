@@ -17,6 +17,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Page-builder and plugin-aware integrations (Elementor, Bricks, Divi,
-        WooCommerce, ACF and the rest) live in WPPilot Pro rather than here.
-        Suggest those at <https://wppilot.co/support/contact>.
+        Elementor editing is part of this free plugin, so Elementor ability
+        requests belong here. The other page-builder and plugin-aware
+        integrations (Bricks, Divi, Oxygen, Beaver Builder, Breakdance, Etch,
+        WPBakery, WooCommerce, ACF and the rest) live in WPPilot Pro rather than
+        here - suggest those at <https://wppilot.co/support/contact>, or use the
+        integration request template.

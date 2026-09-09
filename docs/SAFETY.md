@@ -4,7 +4,7 @@
 
 This is the installation default. It permits ordinary content, design, SEO, form, and commerce operations while blocking critical primitives such as raw PHP, code-snippet and privileged dynamic-shortcode engines, raw database access, WP-CLI, filesystem access, plugin and theme installation and deletion, and temporary administrator access.
 
-Activating, deactivating, and updating already-installed plugins and themes is permitted here, with explicit confirmation — see [Plugin and theme lifecycle](#plugin-and-theme-lifecycle).
+Activating, deactivating, and updating already-installed plugins and themes is permitted here, with explicit confirmation - see [Plugin and theme lifecycle](#plugin-and-theme-lifecycle).
 
 Destructive operations that are otherwise allowed require explicit confirmation. Examples include permanent deletion and refunds.
 
@@ -40,7 +40,7 @@ The typed WordPress abilities in `includes/abilities/wordpress/` are subject to 
 
 - **Draft-first.** Content creation defaults to `draft`. An absent, blank, mistyped, or unrecognised status resolves to `draft` before any capability is evaluated, so content is never published by omission or by a malformed value. Publication requires `status: "publish"` explicitly.
 - **The post type's own capability object.** `edit_posts` is never assumed. `create_posts`, `publish_posts`, `edit_others_posts`, `edit_post`, and `delete_post` are read from the registered post type, so a custom type declaring a separate capability set is enforced on its own terms. Publishing is a distinct grant from editing: moving a draft to `publish`, `future`, or `private` is checked separately.
-- **Taxonomy capabilities** come from the taxonomy — `manage_terms`, `edit_terms`, `delete_terms`, `assign_terms` — never from `manage_categories`.
+- **Taxonomy capabilities** come from the taxonomy - `manage_terms`, `edit_terms`, `delete_terms`, `assign_terms` - never from `manage_categories`.
 - **Closed surfaces.** Internal and plugin-private post types and taxonomies are refused: `attachment`, `revision`, `nav_menu_item`, `wp_block`, `wp_template*`, `wp_navigation`, `wp_global_styles`, changesets, `nav_menu`, and anything registered neither `public` nor `show_in_rest`.
 - **Commenter privacy.** Email and IP are withheld unless the connected account holds `moderate_comments`, which is also required to list comments that are not approved.
 - **URL schemes.** Menu item URLs are validated against `wp_allowed_protocols()`; `javascript:`, `data:`, and `vbscript:` are refused before storage.
@@ -57,7 +57,7 @@ The split across profiles follows what an operation actually does to the server,
 | `install-plugin`, `install-theme` | critical | no | no |
 | `delete-plugin`, `delete-theme` | critical | no | no |
 
-Installing and deleting fetch and write executable code, which is the same class of operation as `execute-php`, so they are Developer Full Access only. Activating an already-installed plugin fetches nothing and writes no files — but it runs that plugin's activation hooks and can fatal the site, so it stays confirmation-gated on every profile that allows it.
+Installing and deleting fetch and write executable code, which is the same class of operation as `execute-php`, so they are Developer Full Access only. Activating an already-installed plugin fetches nothing and writes no files - but it runs that plugin's activation hooks and can fatal the site, so it stays confirmation-gated on every profile that allows it.
 
 Additional rules specific to these abilities:
 
@@ -73,7 +73,7 @@ Terms, menus, and comments have no WordPress trash. Deleting any of them is perm
 
 ## Protocol parity
 
-Safety is enforced identically under both MCP revisions. The modern dispatcher runs the same guards in the same order as the legacy path — safety profile, then rate limit, then the ability's permission callback, then execution — so a client on `2026-07-28` cannot reach a weaker code path than one on `2025-11-25`. Read Only blocks every mutation in both eras, including rollback.
+Safety is enforced identically under both MCP revisions. The modern dispatcher runs the same guards in the same order as the legacy path - safety profile, then rate limit, then the ability's permission callback, then execution - so a client on `2026-07-28` cannot reach a weaker code path than one on `2025-11-25`. Read Only blocks every mutation in both eras, including rollback.
 
 ## Change ledger
 
@@ -81,4 +81,4 @@ The ledger retains at most 500 records and is also capped by total serialized si
 
 Permanent deletion, payment refunds, and other irreversible external side effects are recorded as non-reversible.
 
-Each record names the agent behind the write as well as the WordPress user. The user is not an agent identity — several AI clients usually connect as the same administrator — so the credential is what distinguishes them: an OAuth client id, stored hashed, or an application-password UUID. The client name and version the agent introduced itself with are recorded alongside it. Writes that arrive outside an authenticated MCP request, from wp-admin, WP-CLI or another plugin, are recorded as `direct` rather than attributed to the last agent seen.
+Each record names the agent behind the write as well as the WordPress user. The user is not an agent identity - several AI clients usually connect as the same administrator - so the credential is what distinguishes them: an OAuth client id, stored hashed, or an application-password UUID. The client name and version the agent introduced itself with are recorded alongside it. Writes that arrive outside an authenticated MCP request, from wp-admin, WP-CLI or another plugin, are recorded as `direct` rather than attributed to the last agent seen.

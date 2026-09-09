@@ -1,10 +1,13 @@
 # Contributing to WPPilot
 
-WPPilot is the free WordPress MCP server in this repository. WPPilot Pro, which
-adds the Elementor MCP, WooCommerce MCP and other builder-aware layers, is a
-commercial plugin and is not developed here — but bug reports about how Pro
-behaves against this plugin are welcome, because the seam between them is where
-most real problems live.
+WPPilot is the free WordPress MCP server in this repository, and that includes
+the Elementor MCP surface: the 16 abilities that read and edit an Elementor
+document are developed here, not in Pro. WPPilot Pro, which adds WooCommerce MCP
+and the builder-aware layers for Bricks, Divi, Oxygen, Beaver Builder,
+Breakdance, Etch, WPBakery and Mosaic - plus Elementor authoring on top of the
+free editing abilities - is a commercial plugin and is not developed here. Bug
+reports about how Pro behaves against this plugin are still welcome, because the
+seam between them is where most real problems live.
 
 ## Before opening an issue
 
@@ -17,7 +20,7 @@ reproducible; the literal message almost always is.
 
 **Never paste a password, an application password, an API key, a licence key or
 an unredacted database export into an issue.** They are public and permanent. If
-you have already done it, rotate the credential — deleting the comment does not
+you have already done it, rotate the credential - deleting the comment does not
 remove it from the history.
 
 ## Security
@@ -51,10 +54,10 @@ php vendor/bin/phpunit --no-coverage
 ## What is likely to be accepted
 
 Bug fixes with a failing test. Compatibility work for a WordPress or PHP
-release. Better refusal messages — an ability that declines a call should say
+release. Better refusal messages - an ability that declines a call should say
 which one to use instead.
 
 ## What is unlikely
 
 Abilities that bypass the safety profile, anything that stores a credential,
-and new page-builder integrations, which belong in Pro.
+and new page-builder integrations other than Elementor, which belong in Pro.

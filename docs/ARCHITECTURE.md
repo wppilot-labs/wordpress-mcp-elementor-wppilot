@@ -5,7 +5,7 @@
 WPPilot is a dual-era MCP server.
 
 - **Legacy (`2025-11-25`)** is served by the bundled MCP Adapter: `initialize`, `notifications/initialized`, and `Mcp-Session-Id` sessions, unchanged.
-- **Modern (`2026-07-28`)** is served by `includes/mcp/`. It is stateless — no handshake, no session — and every request carries its protocol version and client capabilities in `_meta`.
+- **Modern (`2026-07-28`)** is served by `includes/mcp/`. It is stateless - no handshake, no session - and every request carries its protocol version and client capabilities in `_meta`.
 
 `includes/mcp/transport.php` hooks `rest_pre_dispatch` and claims a request **only** when it carries modern per-request `_meta`. Everything else reaches the adapter untouched. Era selection never keys off the `MCP-Protocol-Version` header, because legacy `2025-06-18`+ clients send that header too and routing them into the stateless path would break existing connections.
 
@@ -13,7 +13,7 @@ The adapter is a third-party Composer package. It is never patched: a `composer 
 
 Abilities are protocol-independent. Authentication, safety profiles, capability checks, rate limits, and the change ledger run identically in both eras; only the serializer differs, so a modern client cannot reach a weaker code path than a legacy one.
 
-`server/discover` advertises only what is actually registered. Subscriptions, logging, and the tasks extension are never advertised — WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented. Cacheable results carry `cacheScope: "private"`, because the ability list is filtered per user, per safety profile, and per site.
+`server/discover` advertises only what is actually registered. Subscriptions, logging, and the tasks extension are never advertised - WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented. Cacheable results carry `cacheScope: "private"`, because the ability list is filtered per user, per safety profile, and per site.
 
 ## Request path
 
@@ -29,7 +29,7 @@ The compact adapter surface keeps client context small while retaining typed sch
 ## Base plugin boundaries
 
 - `includes/abilities/`: built-in developer abilities.
-- `includes/abilities/wordpress/`: the typed WordPress-core surface — content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings, and the plugin and theme lifecycle. Ships in Free and never calls into Pro.
+- `includes/abilities/wordpress/`: the typed WordPress-core surface - content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings, and the plugin and theme lifecycle. Ships in Free and never calls into Pro.
 - `includes/mcp/`: protocol-era classification, the modern dispatcher, the shared error catalog, result decoration, and `server/discover`.
 - `includes/oauth/client-id-metadata.php`: Client ID Metadata Documents, with the SSRF controls that fetching a caller-supplied URL requires.
 - `includes/safety.php`: profiles, risk classification, and explicit-confirmation enforcement.
@@ -37,7 +37,7 @@ The compact adapter surface keeps client context small while retaining typed sch
 - `includes/connections.php`: per-credential connection records, and the agent identity the ledger attributes writes to. Resolved once at the MCP entry point, because the credential and the client name are only reachable while the request is.
 - `includes/rest/transport-hardening.php`: MCP/REST host validation and response security headers.
 - `includes/oauth/`: OAuth authorization server, token repositories, discovery, and connected-app management. `middleware.php` also routes the Bearer path: a credential carrying the `wpp_` prefix is validated as an access token, anything else as an OAuth JWT.
-- `includes/tokens.php`: long-lived access tokens — minting, SHA-256 digest storage, expiry, and revocation. The third connection method, for callers that can run neither a browser sign-in nor HTTP Basic.
+- `includes/tokens.php`: long-lived access tokens - minting, SHA-256 digest storage, expiry, and revocation. The third connection method, for callers that can run neither a browser sign-in nor HTTP Basic.
 - `includes/abilities/diagnostics.php`: scoped health, performance, and configuration-security checks.
 - `includes/abilities/bootstrap.php`: ability categories and loaders.
 

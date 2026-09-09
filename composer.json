@@ -1,7 +1,27 @@
 {
 	"name": "wppilot/wppilot",
-	"description": "WPPilot",
+	"description": "WordPress MCP server with free Elementor MCP editing. 133 typed abilities for posts, pages, Gutenberg, Elementor, media, menus and themes, served over MCP with OAuth 2.1, safety profiles, change evidence and rollback.",
 	"type": "wordpress-plugin",
+	"keywords": [
+		"wordpress",
+		"wordpress-plugin",
+		"mcp",
+		"mcp-server",
+		"model-context-protocol",
+		"wordpress-mcp",
+		"elementor",
+		"elementor-mcp",
+		"gutenberg",
+		"ai",
+		"oauth2"
+	],
+	"homepage": "https://wppilot.co",
+	"support": {
+		"issues": "https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/issues",
+		"source": "https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot",
+		"docs": "https://wppilot.co/docs",
+		"security": "https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/blob/main/SECURITY.md"
+	},
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.0",

@@ -1,0 +1,121 @@
+name: Quality
+
+# Three gates, all of which used to be things a person had to remember.
+#
+# `lint` parses every source file under each PHP version the plugin claims to
+# support. The header says 8.0, but development happens on 8.3, so syntax that
+# only parses on a newer runtime is the failure this catches — and it fatals on
+# activation rather than reporting an error anyone can read.
+#
+# `docs` runs the consistency checker against .github/product-facts.json, so a
+# number that changes in one table cannot stay wrong in the next one.
+#
+# `package` runs the real release script. The script already refuses to seal an
+# archive containing a file that does not parse; this makes that gate run on
+# every push instead of only on the machine that happens to cut the release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: PHP ${{ matrix.php }} syntax
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.1', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      # The shipped tree is what the header's PHP requirement is a promise
+      # about. tests/ and scripts/ never reach a user's server — package.sh
+      # excludes both — and the test suite already needs 8.2 for PHPUnit 11, so
+      # holding them to 8.0 would fail on syntax nobody will ever run there.
+      - name: Parse the shipped tree
+        run: |
+          failed=0
+          while IFS= read -r file; do
+            if ! php -l "$file" > /dev/null 2>&1; then
+              php -l "$file" || true
+              failed=1
+            fi
+          done < <(find . -name '*.php' \
+            -not -path './vendor/*' \
+            -not -path './build/*' \
+            -not -path './tests/*' \
+            -not -path './scripts/*' \
+            -not -path './src/*')
+          exit "$failed"
+
+      - name: Parse the development-only tree
+        if: matrix.php == '8.3'
+        run: |
+          failed=0
+          while IFS= read -r file; do
+            if ! php -l "$file" > /dev/null 2>&1; then
+              php -l "$file" || true
+              failed=1
+            fi
+          done < <(find ./tests ./scripts -name '*.php')
+          exit "$failed"
+
+      - name: Validate composer.json
+        run: composer validate --no-check-lock --no-check-publish
+
+  docs:
+    name: Documentation consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - run: php scripts/check-doc-consistency.php
+
+  package:
+    name: Release archive builds
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Build wppilot.zip
+        run: ./scripts/package.sh
+
+      - name: Check the archive root is wppilot/
+        run: |
+          set -euo pipefail
+          root="$(unzip -Z1 build/wppilot.zip | head -1 | cut -d/ -f1)"
+          test "$root" = "wppilot" || { echo "Archive root is '$root', expected 'wppilot'"; exit 1; }
+          unzip -Z1 build/wppilot.zip | grep -q '^wppilot/wppilot.php$'
+          unzip -Z1 build/wppilot.zip | grep -q '^wppilot/vendor/'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wppilot-zip
+          path: build/wppilot.zip
+          if-no-files-found: error

@@ -5,7 +5,7 @@ contact_links:
     about: Report privately. Never open a public issue for a vulnerability.
   - name: WPPilot Pro support
     url: https://wppilot.co/account
-    about: Licence, billing and Pro questions — sign in and open a request.
+    about: Licence, billing and Pro questions - sign in and open a request.
   - name: Setup and connection guides
     url: https://wppilot.co/wordpress-mcp
     about: Connecting Claude, Cursor, Codex, Copilot and others.

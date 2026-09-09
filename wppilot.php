@@ -10,7 +10,7 @@ declare(strict_types=1);
 /**
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
- * Description: Production-aware WordPress MCP server with safe AI automation, typed abilities, skills, OAuth, and optional developer-level PHP and filesystem access.
+ * Description: WordPress MCP server with free Elementor MCP editing. Connects Claude, Codex, Cursor and other AI clients to typed WordPress abilities over MCP, with OAuth 2.1, safety profiles, change evidence and rollback.
  * Version: 1.11.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
@@ -263,7 +263,7 @@ require_once __DIR__ . '/includes/abilities/bootstrap.php';
 //
 // Conditional because the WordPress.org build must not contain this file at all:
 // the directory forbids a plugin serving its own updates from anywhere else, and
-// this checker deliberately reports "no update" to stop .org overriding it —
+// this checker deliberately reports "no update" to stop .org overriding it -
 // exactly the behaviour that gets a plugin pulled. The packaging script drops the
 // file for the .org build, and this guard is what makes that safe.
 if (file_exists(__DIR__ . '/includes/updater.php')) {
@@ -653,7 +653,7 @@ add_action(
     priority: 10,
 );
 
-// Abilities Hub — priority 25 places it after Troubleshoot (20) rather than in the priority-10
+// Abilities Hub - priority 25 places it after Troubleshoot (20) rather than in the priority-10
 // Configuration group, so the connection diagnostics sit directly below Connect. (30 is taken by
 // Context, so 25 keeps it between Troubleshoot and Context without renumbering the rest.)
 add_action(
@@ -671,7 +671,7 @@ add_action(
     priority: 25,
 );
 
-// Sandbox sub-page — priority 50 places it after Context (30) and Skills (40).
+// Sandbox sub-page - priority 50 places it after Context (30) and Skills (40).
 add_action(
     'admin_menu',
     static function () {
@@ -732,7 +732,7 @@ if ($is_enabled && $wppilot_abilities_supported) {
         $config['server_route'] = 'wppilot';
         $config['server_name'] = 'WPPilot';
         // Without this the adapter's own default is used, and legacy clients
-        // read that from initialize's serverInfo — it reported v1.0.0 for the
+        // read that from initialize's serverInfo - it reported v1.0.0 for the
         // whole 1.1.0 cycle because only the mirror servers set a version.
         $config['server_version'] = 'v' . WPPILOT_VERSION;
         return $config;
@@ -757,7 +757,7 @@ if ($is_enabled && $wppilot_abilities_supported) {
  * Register a legacy alias of the canonical WPPilot MCP server at the pre-rename slug.
  *
  * The canonical server is registered under `/mcp/wppilot`. Older client configs may still
- * point at `/mcp/mcp-adapter-default-server` from before the rename — this alias keeps them
+ * point at `/mcp/mcp-adapter-default-server` from before the rename - this alias keeps them
  * working with identical behavior (same tools, same auto-discovered resources and prompts).
  */
 function wppilot_register_legacy_mcp_server(mixed $adapter): void
@@ -782,8 +782,8 @@ function wppilot_register_legacy_mcp_server(mixed $adapter): void
 /**
  * Register the OAuth-authenticated WPPilot MCP server at `/mcp/wppilot-oauth`.
  *
- * The OAuth Bearer flow lives on this dedicated route so the canonical `/mcp/wppilot` endpoint —
- * used by the existing Application Password installs — is never seen by the OAuth challenge
+ * The OAuth Bearer flow lives on this dedicated route so the canonical `/mcp/wppilot` endpoint -
+ * used by the existing Application Password installs - is never seen by the OAuth challenge
  * middleware (see includes/oauth/middleware.php::is_mcp_route). Registered only when the OAuth
  * transport is permitted, mirroring includes/oauth/bootstrap.php so the endpoint never exists
  * without the token/authorize endpoints that make it usable.
@@ -812,8 +812,8 @@ function wppilot_register_oauth_mcp_server(mixed $adapter): void
 }
 
 /**
- * Create an MCP server that mirrors the canonical WPPilot server — same tools, resources, and
- * prompts — under a different id and route. Shared by the legacy alias and the OAuth endpoint so
+ * Create an MCP server that mirrors the canonical WPPilot server - same tools, resources, and
+ * prompts - under a different id and route. Shared by the legacy alias and the OAuth endpoint so
  * neither drifts from the default server's exposed abilities.
  */
 function wppilot_create_mirror_mcp_server(
@@ -878,25 +878,25 @@ if ($wppilot_adapter_initialized) {
     // The `mcp-adapter/execute-ability` dispatcher wraps every ability return in
     // `{ success: true, data: <inner> }`. When the inner value is itself
     // `{ success: false, error: "..." }` the outer `success: true` masks a real
-    // logical failure, and agents that check the top-level flag — a very
-    // reasonable default — silently march past the error. Unwrap that shape
+    // logical failure, and agents that check the top-level flag - a very
+    // reasonable default - silently march past the error. Unwrap that shape
     // here so the adapter's backward-compat path (ToolsHandler) turns it into a
     // proper `isError: true` CallToolResult.
     //
     // ToolsHandler::create_error_result flattens the response to a bare
-    // `content: [text(error)], structuredContent: null, isError: true` — every
+    // `content: [text(error)], structuredContent: null, isError: true` - every
     // sibling field on the ability's return is discarded. Validators attach
     // structured repair hints (`invalid_values`, `unknown_properties`,
     // `collision_paths`, `suggested_name`, `failed_paths`, `overwritten_paths`,
     // `errors`, `schemas`, `style_errors`, `dynamic_tag_errors`, `dropped_keys`,
     // `schema`, …) that the agent needs to self-correct without a
-    // round-trip — so embed whatever else the ability returned as a JSON
+    // round-trip - so embed whatever else the ability returned as a JSON
     // suffix on the error message. The suffix rides inside the string and
     // survives the downstream flatten.
     add_filter(
         'mcp_adapter_tool_call_result',
         static function (mixed $result, array $args, string $tool_name): mixed {
-            // Tool names are MCP-sanitized from ability slugs — `/` becomes `-`.
+            // Tool names are MCP-sanitized from ability slugs - `/` becomes `-`.
             if ($tool_name !== 'mcp-adapter-execute-ability') {
                 return $result;
             }
@@ -988,7 +988,7 @@ add_filter(
 
 // Load sandbox plugins. The directory itself is created on activation and
 // lazily by wppilot_get_sandbox_dir(ensure_exists: true) at the moment an
-// ability first writes to it — never on every request, which would stat (and
+// ability first writes to it - never on every request, which would stat (and
 // on read-only filesystems, fail to create) wp-content on every page load.
 if (!wppilot_is_wordpress_org_edition()) {
     require_once __DIR__ . '/includes/sandbox/loader.php';
