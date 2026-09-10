@@ -169,7 +169,7 @@ Both element models are supported: Elementor v4 atomic elements (`e-div-block`, 
 
 The free abilities are the primitives, and they compose. What Pro adds is the authoring layer above them, plus everything Elementor keeps outside a single document:
 
-**Composition** - `elementor-build-page` builds a whole page from one compact description instead of a dozen round trips; `elementor-compile-spec` and `elementor-build-from-spec` turn a reproduction spec into global classes and a matching tree. **Reuse** - templates, theme parts and display conditions, popups, global classes, v4 variables and v3 global colours and typography. **Content** - Elementor Pro forms and submissions, dynamic tags, interactions, SVG upload, stock-image placement, and site-wide custom code.
+**Composition**: `elementor-build-page` builds a whole page from one compact description instead of a dozen round trips; `elementor-compile-spec` and `elementor-build-from-spec` turn a reproduction spec into global classes and a matching tree. **Reuse**: templates, theme parts and display conditions, popups, global classes, v4 variables and v3 global colours and typography. **Content**: Elementor Pro forms and submissions, dynamic tags, interactions, SVG upload, stock-image placement, and site-wide custom code.
 
 The dividing line is simple: free can **edit** an Elementor page, Pro can **compose** one.
 
