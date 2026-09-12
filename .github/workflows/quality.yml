@@ -91,6 +91,11 @@ jobs:
 
       - run: php scripts/check-doc-consistency.php
 
+      # A duplicate function declaration is a fatal on activation and nothing
+      # else here can see it: php -l parses one file at a time, and the unit
+      # suite loads only the modules it exercises.
+      - run: php scripts/check-duplicate-declarations.php
+
   package:
     name: Release archive builds
     runs-on: ubuntu-latest

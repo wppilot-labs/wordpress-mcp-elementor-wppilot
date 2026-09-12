@@ -71,6 +71,12 @@ final class WordPress71Test extends TestCase
     {
         return [
             'declared prompt' => [['mcp' => ['type' => 'prompt']], 'prompt'],
+            'declared resource' => [['mcp' => ['type' => 'resource']], 'resource'],
+            // A fourth primitive is a registration mistake. Answering with it
+            // would drop the ability out of every list rather than put it in
+            // the wrong one, so it reads as a tool, which is what the adapter,
+            // the transport and the Abilities screen each already assumed.
+            'unknown primitive' => [['mcp' => ['type' => 'widget']], 'tool'],
             'declared tool' => [['mcp' => ['type' => 'tool']], 'tool'],
             'undeclared' => [['mcp' => ['public' => true]], 'tool'],
             'empty string' => [['mcp' => ['type' => '']], 'tool'],

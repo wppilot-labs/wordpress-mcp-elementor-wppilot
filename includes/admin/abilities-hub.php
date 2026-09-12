@@ -211,24 +211,6 @@ function wppilot_format_ability_mcp_meta(array $meta): string
     return (string) ($mcp['type'] ?? 'tool');
 }
 
-/**
- * Raw MCP exposure type ('tool', 'resource' or 'prompt') for pill logic, kept
- * separate from the translated display label.
- *
- * @param array<string, mixed> $meta
- */
-function wppilot_ability_mcp_type(array $meta): string
-{
-    /** @var mixed $mcp */
-    $mcp = $meta['mcp'] ?? null;
-    if (!is_array($mcp)) {
-        return 'tool';
-    }
-    /** @var mixed $type */
-    $type = $mcp['type'] ?? '';
-    return $type === 'resource' || $type === 'prompt' ? $type : 'tool';
-}
-
 function wppilot_handle_ability_hub_actions(): void
 {
     if (($_POST['wppilot_ability_hub_action'] ?? null) === null) {

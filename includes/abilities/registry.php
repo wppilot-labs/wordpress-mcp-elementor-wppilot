@@ -88,7 +88,12 @@ function wppilot_ability_is_exposed(array $meta): bool
 }
 
 /**
- * Which MCP primitive an ability is served as: `tool` (the default) or `prompt`.
+ * Which MCP primitive an ability is served as: `tool`, `resource` or `prompt`.
+ *
+ * Anything else is a tool, which is what the adapter, the transport and the Abilities screen
+ * each already assumed separately. A malformed `type` is a registration mistake, and answering
+ * it with a fourth primitive nothing serves would drop the ability out of every list rather
+ * than show it in the wrong one.
  *
  * @param array<string, mixed> $meta
  */
@@ -96,10 +101,12 @@ function wppilot_ability_mcp_type(array $meta): string
 {
     /** @var mixed $mcp */
     $mcp = $meta['mcp'] ?? null;
-    $mcp = is_array($mcp) ? $mcp : [];
+    if (!is_array($mcp)) {
+        return 'tool';
+    }
 
     /** @var mixed $type */
-    $type = $mcp['type'] ?? null;
+    $type = $mcp['type'] ?? '';
 
-    return is_string($type) && $type !== '' ? $type : 'tool';
+    return $type === 'resource' || $type === 'prompt' ? $type : 'tool';
 }

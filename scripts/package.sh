@@ -81,6 +81,16 @@ verify_tree() {
     exit 1
   fi
   echo "  $label: PHP syntax OK"
+
+  # Parsing every file separately cannot see two of them declaring the same
+  # function, which is equally fatal on activation and equally invisible once
+  # the archive is sealed.
+  php "$ROOT/scripts/check-duplicate-declarations.php" >/dev/null || {
+    php "$ROOT/scripts/check-duplicate-declarations.php" >&2
+    echo "Refusing to package $label with duplicate declarations." >&2
+    exit 1
+  }
+  echo "  $label: no duplicate declarations"
 }
 
 BUILD="$ROOT/build"
