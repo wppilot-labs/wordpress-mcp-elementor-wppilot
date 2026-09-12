@@ -21,15 +21,15 @@ if (!defined('ABSPATH')) {
  */
 function wppilot_collect_ability_hub_rows(): array
 {
-    if (!function_exists('wp_get_abilities')) {
-        return [];
-    }
-
     $rules = wppilot_get_ability_rules();
     $groups = [];
     $seen = [];
 
-    foreach (wp_get_abilities() as $ability) {
+    // The Hub is the screen that manages the registry, so it reads the registry
+    // rather than the filtered discovery list: an ability hidden from discovery
+    // is still registered, and an administrator has to be able to see and
+    // switch off what is actually there.
+    foreach (wppilot_registered_abilities() as $ability) {
         $row = wppilot_build_registered_ability_row($ability, $rules);
         if ($row === null) {
             continue;
@@ -195,18 +195,6 @@ function wppilot_ability_is_hub_hidden(string $ability_name): bool
         str_starts_with($ability_name, 'mcp-adapter/')
         || in_array($ability_name, wppilot_always_on_ability_names(), strict: true)
     );
-}
-
-/**
- * An ability is exposed when its MCP metadata marks it public.
- *
- * @param array<string, mixed> $meta
- */
-function wppilot_ability_is_exposed(array $meta): bool
-{
-    /** @var mixed $mcp */
-    $mcp = $meta['mcp'] ?? null;
-    return is_array($mcp) && ($mcp['public'] ?? false) === true;
 }
 
 /**

@@ -774,6 +774,86 @@ if (!class_exists('WP_Ability')) {
 }
 
 
+/**
+ * The WordPress 7.1 ability registry, reduced to the one method WPPilot reads.
+ *
+ * The point of the real class here is that it answers with everything registered, ahead of the
+ * discovery filters `wp_get_abilities()` runs, so the double is seeded by hand: a test that
+ * cares about the difference wants to say what the registry holds and what discovery reports
+ * without the two being the same list by construction.
+ */
+if (!class_exists('WP_Abilities_Registry')) {
+    final class WP_Abilities_Registry
+    {
+        /** @var array<string, WP_Ability> */
+        private array $abilities = [];
+
+        private static ?self $instance = null;
+
+        public static function get_instance(): self
+        {
+            return self::$instance ??= new self();
+        }
+
+        /** @param array<string, WP_Ability> $abilities */
+        public static function seed_for_tests(array $abilities): void
+        {
+            self::get_instance()->abilities = $abilities;
+        }
+
+        /** @return array<string, WP_Ability> */
+        public function get_all_registered(): array
+        {
+            return $this->abilities;
+        }
+    }
+}
+
+/**
+ * WordPress 7.1's client-facing schema translation, in the two transformations WPPilot relies
+ * on it for: a property-level `required: true` is hoisted into the parent's `required` array,
+ * and the PHP-only keys that no JSON Schema validator understands are dropped.
+ */
+if (!function_exists('wp_prepare_json_schema_for_client')) {
+    /**
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    function wp_prepare_json_schema_for_client(array $schema, string $schema_profile = 'draft-04'): array
+    {
+        unset($schema['sanitize_callback'], $schema['validate_callback'], $schema['arg_options']);
+
+        /** @var mixed $properties */
+        $properties = $schema['properties'] ?? null;
+        if (is_array($properties)) {
+            $required = is_array($schema['required'] ?? null) ? $schema['required'] : [];
+            /** @var mixed $child */
+            foreach ($properties as $name => $child) {
+                if (!is_array($child)) {
+                    continue;
+                }
+                if (($child['required'] ?? null) === true) {
+                    unset($child['required']);
+                    if (!in_array($name, $required, true)) {
+                        $required[] = $name;
+                    }
+                }
+                $properties[$name] = wp_prepare_json_schema_for_client($child, $schema_profile);
+            }
+            $schema['properties'] = $properties;
+            if ($required !== []) {
+                $schema['required'] = $required;
+            }
+        }
+
+        if (is_array($schema['items'] ?? null)) {
+            $schema['items'] = wp_prepare_json_schema_for_client($schema['items'], $schema_profile);
+        }
+
+        return $schema;
+    }
+}
+
 if (!function_exists('get_option')) {
     /** @return mixed */
     function get_option(string $option, mixed $default_value = false): mixed

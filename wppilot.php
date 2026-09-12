@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: WordPress MCP server with free Elementor MCP editing. Connects Claude, Codex, Cursor and other AI clients to typed WordPress abilities over MCP, with OAuth 2.1, safety profiles, change evidence and rollback.
- * Version: 1.11.0
+ * Version: 1.12.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -235,6 +235,7 @@ require_once __DIR__ . '/includes/environment.php';
 require_once __DIR__ . '/includes/agent-context.php';
 require_once __DIR__ . '/includes/admin/nav.php';
 require_once __DIR__ . '/includes/admin/ui.php';
+require_once __DIR__ . '/includes/abilities/registry.php';
 require_once __DIR__ . '/includes/abilities/policy.php';
 require_once __DIR__ . '/includes/safety.php';
 require_once __DIR__ . '/includes/rate-limit.php';
@@ -306,8 +307,18 @@ wppilot_register_lifecycle_hooks();
 
 add_action('plugins_loaded', callback: 'wppilot_safety_maybe_install', priority: 4);
 add_filter('mcp_adapter_pre_tool_call', callback: 'wppilot_safety_pre_mcp_tool_call', priority: 5, accepted_args: 2);
-add_action('wp_before_execute_ability', callback: 'wppilot_change_before', priority: 10, accepted_args: 2);
-add_action('wp_after_execute_ability', callback: 'wppilot_change_after', priority: 10, accepted_args: 3);
+// WordPress 7.1 and newer. Inert on 6.9 and 7.0, where the filter never fires
+// and the ability policy's unregistration remains the only enforcement.
+add_filter(
+    'wp_ability_permission_result',
+    callback: 'wppilot_safety_filter_ability_permission',
+    priority: 10,
+    accepted_args: 4,
+);
+// WordPress 7.1 appends the WP_Ability instance to both hooks; on 6.9 and 7.0
+// the extra argument simply never arrives and both callbacks default it.
+add_action('wp_before_execute_ability', callback: 'wppilot_change_before', priority: 10, accepted_args: 3);
+add_action('wp_after_execute_ability', callback: 'wppilot_change_after', priority: 10, accepted_args: 4);
 
 \WPPilot\Context\boot_context_admin();
 wppilot_register_wordpress_compatibility_notice();
@@ -860,12 +871,8 @@ function wppilot_discover_public_abilities(string $type): array
     $abilities = wp_get_abilities();
     $filtered = [];
     foreach ($abilities as $ability) {
-        $meta = $ability->get_meta();
-        if (!($meta['mcp']['public'] ?? false)) {
-            continue;
-        }
-        $ability_type = (string) ($meta['mcp']['type'] ?? 'tool');
-        if ($ability_type !== $type) {
+        $meta = wppilot_ability_meta($ability);
+        if (!wppilot_ability_is_exposed($meta) || wppilot_ability_mcp_type($meta) !== $type) {
             continue;
         }
         $filtered[] = $ability->get_name();

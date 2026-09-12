@@ -82,6 +82,33 @@ if (preg_match('/^Stable tag:\s*(.+)$/m', $pluginReadme, $m) === 1) {
     $fail('readme.txt has no Stable tag line');
 }
 
+// The WordPress this release was actually exercised against. It is a claim made
+// in four places — readme.txt, the README badge, the requirements list and the
+// constant the compatibility block publishes to clients — and a stale one is
+// worse than none, because a client reads it as a statement of testing.
+$compatibility = $read($root . '/includes/compatibility.php');
+$tested = (string) $facts['tested_wordpress'];
+
+if (preg_match('/^Tested up to:\s*(.+)$/m', $pluginReadme, $m) === 1) {
+    if (trim($m[1]) !== $tested) {
+        $fail("readme.txt Tested up to is {$m[1]}, product-facts.json says {$tested}");
+    }
+} else {
+    $fail('readme.txt has no Tested up to line');
+}
+
+if (!str_contains($compatibility, "'WPPILOT_TESTED_WORDPRESS_VERSION', value: '{$tested}'")) {
+    $fail("includes/compatibility.php does not define WPPILOT_TESTED_WORDPRESS_VERSION as {$tested}");
+}
+
+if (!str_contains($readme, "tested%20up%20to-WordPress%20{$tested}")) {
+    $fail("README tested-up-to badge does not say WordPress {$tested}");
+}
+
+if (!str_contains($readme, "tested up to WordPress {$tested}")) {
+    $fail("README requirements do not state 'tested up to WordPress {$tested}'");
+}
+
 // ---------------------------------------------------------------------------
 // 2. The free ability table has to add up to the number the prose claims.
 // ---------------------------------------------------------------------------

@@ -28,11 +28,11 @@ function wppilot_chat_discover_tools(): array
 
     $tools = [];
     foreach (wp_get_abilities() as $ability) {
-        $meta = $ability->get_meta();
+        $meta = wppilot_ability_meta($ability);
         if (!wppilot_ability_is_exposed($meta)) {
             continue;
         }
-        if (($meta['mcp']['type'] ?? 'tool') !== 'tool') {
+        if (wppilot_ability_mcp_type($meta) !== 'tool') {
             continue;
         }
         if (wppilot_ability_is_hub_hidden($ability->get_name())) {

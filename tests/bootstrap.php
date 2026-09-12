@@ -28,6 +28,11 @@ define('WPPILOT_PRO_FILE', ABSPATH . 'wp-content/plugins/wppilot-pro/wppilot-pro
 
 require_once __DIR__ . '/doubles/wordpress.php';
 
+// The compatibility contract: the version constants, the probe of what the host
+// WordPress offers, and the block published to clients. It registers nothing and
+// reaches WordPress only from inside its functions.
+require_once dirname(__DIR__) . '/includes/compatibility.php';
+
 // Load the whole WordPress-core module, not just its helpers: registration
 // happens at file scope, so requiring every file is what proves the surface
 // comes up with Free alone — no Pro class, licence check, or entitlement call.
@@ -42,6 +47,12 @@ wppilot_load_wordpress_abilities();
 require_once dirname(__DIR__) . '/includes/telemetry/settings.php';
 require_once dirname(__DIR__) . '/includes/telemetry/send.php';
 require_once dirname(__DIR__) . '/includes/lifecycle.php';
+
+// Registry reads and the MCP exposure rules. Pure decisions over an ability's
+// metadata plus one registry read, so they load here and are exercised
+// directly; policy.php, which is the caller that matters, reaches the options
+// table and belongs to an integration suite.
+require_once dirname(__DIR__) . '/includes/abilities/registry.php';
 
 // The safety layer registers nothing at file scope and reaches WordPress only
 // from inside its functions, so it loads here for its risk classification: the

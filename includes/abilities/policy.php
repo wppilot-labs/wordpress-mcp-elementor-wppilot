@@ -129,7 +129,7 @@ function wppilot_is_ability_hub_screen(): bool
  */
 function wppilot_apply_ability_policy(): void
 {
-    if (!function_exists('wp_get_abilities') || !function_exists('wp_unregister_ability')) {
+    if (!function_exists('wp_unregister_ability')) {
         return;
     }
 
@@ -142,7 +142,16 @@ function wppilot_apply_ability_policy(): void
 
     $rules = wppilot_get_ability_rules();
 
-    foreach (wp_get_abilities() as $ability) {
+    // Read the registry, not the filtered discovery list. Since WordPress 7.1
+    // every wp_get_abilities() call runs the wp_get_abilities_item_include and
+    // wp_get_abilities_result filters, so a third-party filter that hides an
+    // ability from discovery would also hide it from this loop — and a
+    // disabled or profile-blocked ability would then stay registered and stay
+    // executable through every path that does not go through discovery.
+    foreach (wppilot_registered_abilities() as $ability) {
+        if (!$ability instanceof WP_Ability) {
+            continue;
+        }
         wppilot_apply_ability_policy_rule($ability, $rules);
     }
 }

@@ -198,17 +198,15 @@ function list_tools(): array
             continue;
         }
 
-        $meta = $ability->get_meta();
-        $meta = is_array($meta) ? $meta : [];
-        $mcp = is_array($meta['mcp'] ?? null) ? $meta['mcp'] : [];
-        if (($mcp['public'] ?? false) !== true) {
+        $meta = \wppilot_ability_meta($ability);
+        if (!\wppilot_ability_is_exposed($meta)) {
             continue;
         }
 
         // Prompt-type abilities belong to prompts/list. Listing one as a tool
         // would let a client call it through tools/call and receive prompt
         // messages where it expected a tool result.
-        if (($mcp['type'] ?? 'tool') === 'prompt') {
+        if (\wppilot_ability_mcp_type($meta) === 'prompt') {
             continue;
         }
 
@@ -274,11 +272,9 @@ function prompt_abilities(): array
         if (!$ability instanceof WP_Ability) {
             continue;
         }
-        $meta = $ability->get_meta();
-        $meta = is_array($meta) ? $meta : [];
-        $mcp = is_array($meta['mcp'] ?? null) ? $meta['mcp'] : [];
+        $meta = \wppilot_ability_meta($ability);
 
-        if (($mcp['public'] ?? false) !== true || ($mcp['type'] ?? 'tool') !== 'prompt') {
+        if (!\wppilot_ability_is_exposed($meta) || \wppilot_ability_mcp_type($meta) !== 'prompt') {
             continue;
         }
         if (function_exists('wppilot_safety_profile_allows_ability') && !\wppilot_safety_profile_allows_ability(
@@ -371,12 +367,35 @@ function ability_for_tool(string $tool): ?WP_Ability
  * schema is passed through as authored. Only the outer shape is guaranteed,
  * because a tool whose schema is not an object breaks client-side validation.
  *
+ * WPPilot's own abilities author client-ready schemas, but the surface is not
+ * only WPPilot's: every ability on the site is advertised, and a schema written
+ * for WordPress rather than for a client carries things no JSON Schema
+ * validator understands — a property-level `'required' => true` instead of the
+ * parent's `required` array, and the PHP-only `sanitize_callback`,
+ * `validate_callback` and `arg_options` keys. A client that validates arguments
+ * against the advertised schema then either rejects the schema or drops the
+ * field. WordPress 7.1 ships the canonical translation as
+ * `wp_prepare_json_schema_for_client()`, so use it where it exists; older
+ * installs keep the shape guarantee alone, which is what they had before.
+ *
+ * The preparation is on the advertised copy only. `WP_Ability::validate_input()`
+ * still asks the ability's own schema, so nothing about what a call is allowed
+ * to send changes here.
+ *
  * @return array<string, mixed>
  */
 function normalize_schema(mixed $schema): array
 {
     if (!is_array($schema) || $schema === []) {
         return ['type' => 'object'];
+    }
+
+    if (function_exists('wp_prepare_json_schema_for_client')) {
+        /** @var mixed $prepared */
+        $prepared = \wp_prepare_json_schema_for_client($schema);
+        if (is_array($prepared) && $prepared !== []) {
+            $schema = $prepared;
+        }
     }
 
     return force_schema_objects($schema);

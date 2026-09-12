@@ -123,19 +123,12 @@ function runtime_capabilities(): array
 
     /** @var mixed $ability */
     foreach (wp_get_abilities() as $ability) {
-        if (!is_object($ability) || !method_exists($ability, 'get_meta')) {
-            continue;
-        }
-        /** @var mixed $meta */
-        $meta = $ability->get_meta();
-        $meta = is_array($meta) ? $meta : [];
-
-        $mcp = is_array($meta['mcp'] ?? null) ? $meta['mcp'] : [];
-        if (($mcp['public'] ?? false) !== true) {
+        $meta = \wppilot_ability_meta($ability);
+        if ($meta === [] || !\wppilot_ability_is_exposed($meta)) {
             continue;
         }
 
-        if (($mcp['type'] ?? 'tool') === 'prompt') {
+        if (\wppilot_ability_mcp_type($meta) === 'prompt') {
             ++$prompts;
             continue;
         }

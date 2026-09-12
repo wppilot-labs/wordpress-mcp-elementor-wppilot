@@ -12,9 +12,13 @@ if (!defined('ABSPATH')) {
 /**
  * Internal compatibility contract shared by metadata, startup gates, and agent context.
  */
-define(constant_name: 'WPPILOT_VERSION', value: '1.11.0');
+define(constant_name: 'WPPILOT_VERSION', value: '1.12.0');
 define(constant_name: 'WPPILOT_REST_API_VERSION', value: 1);
 define(constant_name: 'WPPILOT_MINIMUM_WORDPRESS_VERSION', value: '6.9');
+// The newest WordPress this release was exercised against. Advertised rather
+// than enforced: a newer WordPress is served exactly as an older one is, and
+// the number exists so a client can tell "tested here" from "assumed to work".
+define(constant_name: 'WPPILOT_TESTED_WORDPRESS_VERSION', value: '7.1');
 
 /**
  * Return the feature signals implemented by this build.
@@ -79,6 +83,49 @@ function wppilot_wordpress_abilities_supported(?string $wordpress_version = null
 }
 
 /**
+ * What the host WordPress offers, detected rather than inferred from its version.
+ *
+ * Each entry is a capability WPPilot changes its behaviour for. They are probed by asking for
+ * the function or class that implements them, not by comparing version strings, because a
+ * feature plugin, a backport, or a site running a release candidate can all put a capability
+ * on a WordPress whose reported version says otherwise — and the version is the one thing here
+ * that is allowed to lie.
+ *
+ * - `abilities_registry`: the ability registry can be read directly, so policy enforcement can
+ *   see abilities that discovery filters hide (WordPress 6.9+).
+ * - `abilities_query_args`: `wp_get_abilities()` accepts filtering arguments (WordPress 7.1+).
+ * - `abilities_lifecycle_filters`: the execution lifecycle can be mediated, so the safety
+ *   profile applies to every caller and not only to WPPilot's own transports (WordPress 7.1+).
+ * - `json_schema_client_prep`: core can translate a WordPress schema into a client-facing one
+ *   (WordPress 7.1+).
+ * - `ai_client`: the AI Client is present, which is what WPPilot Chat runs on (WordPress 7.0+).
+ *
+ * @return array<string, bool>
+ */
+function wppilot_wordpress_capabilities(): array
+{
+    $registry_readable = false;
+    if (class_exists('WP_Abilities_Registry')) {
+        $registry_readable = method_exists('WP_Abilities_Registry', 'get_all_registered');
+    }
+
+    $query_args = false;
+    if (function_exists('wp_get_abilities')) {
+        $query_args = (new ReflectionFunction('wp_get_abilities'))->getNumberOfParameters() > 0;
+    }
+
+    return [
+        'abilities_registry' => $registry_readable,
+        'abilities_query_args' => $query_args,
+        // The four lifecycle filters landed together, and the input normalizer
+        // is the one with a name nothing else could plausibly claim.
+        'abilities_lifecycle_filters' => $query_args,
+        'json_schema_client_prep' => function_exists('wp_prepare_json_schema_for_client'),
+        'ai_client' => function_exists('wp_ai_client_prompt'),
+    ];
+}
+
+/**
  * Stable compatibility block published before and after authentication.
  *
  * @return array{
@@ -86,7 +133,9 @@ function wppilot_wordpress_abilities_supported(?string $wordpress_version = null
  *     rest_api_version: int,
  *     wordpress_version: string,
  *     minimum_wordpress_version: string,
- *     features: array<string, bool>
+ *     tested_wordpress_version: string,
+ *     features: array<string, bool>,
+ *     wordpress_capabilities: array<string, bool>
  * }
  */
 function wppilot_server_compatibility(): array
@@ -96,7 +145,9 @@ function wppilot_server_compatibility(): array
         'rest_api_version' => WPPILOT_REST_API_VERSION,
         'wordpress_version' => wppilot_wordpress_version(),
         'minimum_wordpress_version' => WPPILOT_MINIMUM_WORDPRESS_VERSION,
+        'tested_wordpress_version' => WPPILOT_TESTED_WORDPRESS_VERSION,
         'features' => wppilot_rest_api_features(),
+        'wordpress_capabilities' => wppilot_wordpress_capabilities(),
         // Guarded: this block is published from startup gates that can run
         // before the MCP modules are loaded.
         'mcp_protocol_versions' => defined('WPPilot\\Mcp\\VERSION_MODERN')

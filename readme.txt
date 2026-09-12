@@ -2,9 +2,9 @@
 Contributors: wppilot
 Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.11.0
+Stable tag: 1.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,7 +114,7 @@ No. WPPilot is the server. Your AI client, Claude, Cursor, Codex or another, con
 
 = Which WordPress and PHP versions are required? =
 
-The MCP server requires WordPress 6.9 or newer and PHP 8.0 or newer. WPPilot Chat additionally requires WordPress 7.0 or newer and a configured AI provider; on WordPress 6.9 the MCP server continues to work while Chat reports that it is unavailable.
+The MCP server requires WordPress 6.9 or newer and PHP 8.0 or newer, and is tested against WordPress 7.1. WPPilot Chat additionally requires WordPress 7.0 or newer and a configured AI provider; on WordPress 6.9 the MCP server continues to work while Chat reports that it is unavailable.
 
 = Can I control which abilities are exposed? =
 
@@ -166,6 +166,15 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.12.0 =
+* WordPress 7.1 support. The release changed what `wp_get_abilities()` answers: every call now runs the `wp_get_abilities_item_include` and `wp_get_abilities_result` filters, the bare no-argument one included, so the function reports what a site publishes rather than what is registered. WPPilot read it in both senses. Discovery still calls it, because a site that filters its registry means the filtered list; the ability policy and the Abilities screen now read the registry itself, because a rule that enforces something across the registry cannot be applied to a list another plugin has already narrowed - an ability hidden from discovery would have stayed registered and stayed executable while the screen reported it as switched off.
+* The safety profile now applies to every caller, not only to WPPilot's own transports. WordPress 7.1 added `wp_ability_permission_result`, which runs inside `WP_Ability::execute()` and in the standalone permission checks the REST API and WP-CLI perform, so core REST, WP-CLI, the AI Client, another MCP adapter and WPPilot Chat all get the same refusal that MCP has always given. Until now the profile was enforced by unregistering what it refuses, which had to stand down on the Abilities screen so that screen could list disabled abilities - a request to it that also executed an ability ran under no profile at all. The filter only ever denies: a call something upstream already refused keeps that refusal.
+* An ability registered with WordPress 7.1's channel-independent `public` flag is now reachable over MCP. WPPilot's own `mcp.public` stays authoritative and an ability setting it to false stays hidden, but the fallback follows core's own precedence - the channel's flag, then `public`, then false - so an ability written by someone who never heard of this plugin is served rather than ignored.
+* Tool schemas are prepared for clients before they are advertised. Every ability on the site is exposed, not only WPPilot's, and a schema authored for WordPress carries things a JSON Schema validator does not accept: a property-level `required: true` where the parent needs a `required` array, and the PHP-only `sanitize_callback`, `validate_callback` and `arg_options` keys. A client validating arguments against the advertised schema then dropped the field or refused the tool. WordPress 7.1's `wp_prepare_json_schema_for_client()` does the translation where it exists. What a call is allowed to send is unchanged - the ability's own schema still validates input.
+* The change ledger records the risk of the ability that actually ran. Both execution hooks now hand the `WP_Ability` instance to their callbacks, so the ledger stops looking the name up again after the write - a lookup that came back empty, and recorded a plain "write", when the ability being recorded had switched the safety profile or disabled something and the policy had unregistered rows mid-request.
+* The compatibility block published to clients now carries `tested_wordpress_version` and a `wordpress_capabilities` map. The capabilities are probed by asking for the function or class that implements them rather than by comparing version strings, because a feature plugin, a backport or a release candidate can all put a capability on a WordPress whose reported version says otherwise.
+* Everything here is inert on WordPress 6.9 and 7.0. The minimum is still 6.9, no ability was added, removed or renamed, and existing connections keep working.
 
 = 1.11.0 =
 * The prompt library is now one complete landing-page brief per industry. The earlier packs were organised by editor and by task and named ability chains, which taught the agent which calls to make and nothing about what to build, so every business got the same centred hero with three cards under it. Ten briefs ship - a bakery, a yoga studio, a dental clinic, a landscaper, a bookshop, a wedding photographer, a plumber, a family law firm, a pet groomer and a brewery taproom - and each carries a flat palette, a type pairing, a design signature that makes its page unlike the others, the sections it must communicate, verbatim content facts, and one shared standards block covering WCAG 2.1 AA, real photography, one icon set, builder-native construction and completeness. The Prompts screen gains a builder picker that writes the chosen editor into the first line of every brief.

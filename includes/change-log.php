@@ -105,12 +105,22 @@ function wppilot_change_ability_is_meta(string $ability_name): bool
     return false;
 }
 
-function wppilot_change_before(string $ability_name, mixed $input): void
+/**
+ * Open a pending change record for a mutation that is about to run.
+ *
+ * WordPress 7.1 passes the `WP_Ability` being executed as a third argument. Taking it means the
+ * ledger reads the instance that is actually running rather than looking the name up again, and
+ * that matters at the other end of the pair: an ability that changes the safety profile or
+ * switches another ability off causes the policy to unregister rows mid-request, and a lookup by
+ * name after the write can come back empty for an ability that plainly exists. Older WordPress
+ * passes two arguments and the lookup still happens.
+ */
+function wppilot_change_before(string $ability_name, mixed $input, mixed $ability = null): void
 {
     if (wppilot_change_is_suppressed() || wppilot_change_ability_is_meta($ability_name)) {
         return;
     }
-    $ability = function_exists('wp_get_ability') ? wp_get_ability($ability_name) : null;
+    $ability = wppilot_change_resolve_ability($ability_name, $ability);
     if ($ability instanceof WP_Ability && wppilot_ability_is_readonly($ability)) {
         return;
     }
@@ -124,9 +134,26 @@ function wppilot_change_before(string $ability_name, mixed $input): void
 }
 
 /**
+ * Resolve the ability an execution hook is reporting on.
+ *
+ * `$passed` is the instance WordPress 7.1 hands the hook; on 6.9 and 7.0 it is null and the
+ * registry is asked for the name instead.
+ */
+function wppilot_change_resolve_ability(string $ability_name, mixed $passed): ?WP_Ability
+{
+    if ($passed instanceof WP_Ability) {
+        return $passed;
+    }
+
+    $ability = function_exists('wp_get_ability') ? wp_get_ability($ability_name) : null;
+
+    return $ability instanceof WP_Ability ? $ability : null;
+}
+
+/**
  * Record a completed mutation. WordPress fires this only after output validation succeeds.
  */
-function wppilot_change_after(string $ability_name, mixed $input, mixed $result): void
+function wppilot_change_after(string $ability_name, mixed $input, mixed $result, mixed $ability = null): void
 {
     if (wppilot_change_is_suppressed()) {
         return;
@@ -140,7 +167,7 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result)
     $before_value = $pending['before'] ?? null;
     $before = is_array($before_value) ? wppilot_string_keyed_array($before_value) : null;
     $rollback = wppilot_build_rollback_payload($ability_name, $before, $result);
-    $ability = function_exists('wp_get_ability') ? wp_get_ability($ability_name) : null;
+    $ability = wppilot_change_resolve_ability($ability_name, $ability);
     $risk = $ability instanceof WP_Ability ? wppilot_ability_risk($ability) : 'write';
     $user = wp_get_current_user();
 

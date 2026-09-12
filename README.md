@@ -5,6 +5,7 @@
 [![Version](https://img.shields.io/github/v/release/wppilot-labs/wordpress-mcp-elementor-wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases)
 [![Quality](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/actions/workflows/quality.yml)
 [![WordPress](https://img.shields.io/badge/WordPress-6.9%2B-142017)](https://wordpress.org/)
+[![Tested up to](https://img.shields.io/badge/tested%20up%20to-WordPress%207.1-142017)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-142017)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-D9FF63)](LICENSE)
 
@@ -336,7 +337,7 @@ No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. 
 
 ## Requirements
 
-- WordPress 6.9 or newer
+- WordPress 6.9 or newer, tested up to WordPress 7.1
 - PHP 8.0 or newer
 - HTTPS for any remotely reachable connection
 - The Elementor abilities require Elementor 3.6 or newer, and register only when it is active. Elementor 4.0 or newer additionally unlocks the atomic style schema and global classes. Elementor Pro is not required for anything in the free plugin.

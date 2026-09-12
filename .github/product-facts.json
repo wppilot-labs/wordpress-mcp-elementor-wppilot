@@ -1,7 +1,8 @@
 {
 	"_comment": "Source of truth for the product facts that appear in more than one document. scripts/check-doc-consistency.php fails the build when a document contradicts this file, so a number that changes gets changed once here and then everywhere the checker points at. Pro totals that cannot be derived from this repository are deliberately absent: an aggregate nobody can verify from source is how the last set of contradictions got in.",
-	"version": "1.11.0",
+	"version": "1.12.0",
 	"requires_wordpress": "6.9",
+	"tested_wordpress": "7.1",
 	"requires_php": "8.0",
 	"free_abilities": 133,
 	"free_elementor_abilities": 16,

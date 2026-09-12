@@ -256,6 +256,72 @@ function wppilot_safety_profile_allows_ability(WP_Ability $ability): bool
     };
 }
 
+/**
+ * Refuse an ability the safety profile or the Abilities Hub does not allow, whoever is asking.
+ *
+ * Until WordPress 7.1 the profile could only be enforced where WPPilot owned the call path: its
+ * own MCP transports check it before dispatch, and the ability policy unregisters what the
+ * profile refuses so nothing else can reach it either. Unregistration is a blunt instrument
+ * with one real gap — the Abilities Hub screen has to see disabled abilities to list them, so
+ * the policy stands down there, and a request to that screen that also executes an ability runs
+ * it under no profile at all. It also means a site's Production Safe setting silently stops
+ * applying to a caller that arrives before `wp_abilities_api_init` has finished.
+ *
+ * `wp_ability_permission_result` closes both. It runs inside `WP_Ability::execute()` and during
+ * the standalone permission checks the REST API and WP-CLI perform, so core REST, WP-CLI, the AI
+ * Client, another MCP adapter and WPPilot's own Chat all get the same answer.
+ *
+ * This filter only ever denies. A profile is a ceiling, not a grant: when something upstream has
+ * already refused the call, that refusal is what gets returned.
+ *
+ * @param bool|WP_Error $permission
+ */
+function wppilot_safety_filter_ability_permission(
+    mixed $permission,
+    mixed $ability_name,
+    mixed $input,
+    mixed $ability,
+): mixed {
+    if ($permission === false || is_wp_error($permission)) {
+        return $permission;
+    }
+    if (!$ability instanceof WP_Ability || !is_string($ability_name)) {
+        return $permission;
+    }
+
+    if (wppilot_ability_is_hub_protected($ability_name)) {
+        return $permission;
+    }
+
+    $rules = function_exists('wppilot_get_ability_rules') ? wppilot_get_ability_rules() : [];
+    if (($rules[$ability_name]['disabled'] ?? false) === true) {
+        return new WP_Error(
+            'wppilot_ability_disabled',
+            sprintf(
+                /* translators: %s: ability name */
+                __('The ability "%s" is switched off in the WPPilot Abilities screen.', domain: 'wppilot'),
+                $ability_name,
+            ),
+            ['status' => 403],
+        );
+    }
+
+    if (!wppilot_safety_profile_allows_ability($ability)) {
+        return new WP_Error(
+            'wppilot_safety_profile_blocked',
+            sprintf(
+                /* translators: 1: ability name, 2: active safety profile */
+                __('The ability "%1$s" is not allowed by the active WPPilot safety profile (%2$s).', domain: 'wppilot'),
+                $ability_name,
+                wppilot_get_safety_profile(),
+            ),
+            ['status' => 403],
+        );
+    }
+
+    return $permission;
+}
+
 function wppilot_ability_requires_confirmation(WP_Ability $ability): bool
 {
     $risk = wppilot_ability_risk($ability);
