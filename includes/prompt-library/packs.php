@@ -95,7 +95,7 @@ function default_builder(): string
 /**
  * Every brief available on this site, free first, then whatever the filter adds.
  *
- * @return list<array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}>
+ * @return list<array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, scope: string, pro: bool, body: string}>
  */
 function briefs(): array
 {
@@ -134,7 +134,7 @@ function briefs(): array
 /**
  * The briefs shipped in prompts/, in file order.
  *
- * @return list<array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}>
+ * @return list<array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, scope: string, pro: bool, body: string}>
  */
 function bundled_briefs(): array
 {
@@ -162,7 +162,7 @@ function bundled_briefs(): array
  * Parse one brief file: a `---` front-matter block of `key: value` lines,
  * then the Markdown body.
  *
- * @return array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}|null
+ * @return array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, scope: string, pro: bool, body: string}|null
  */
 function read_brief_file(string $file): ?array
 {
@@ -200,7 +200,7 @@ function read_brief_file(string $file): ?array
  * whether a key is present or the body is a string. A malformed brief is
  * dropped rather than half-rendered.
  *
- * @return array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, pro: bool, body: string}|null
+ * @return array{slug: string, industry: string, sector: string, business: string, title: string, description: string, signature: string, scope: string, pro: bool, body: string}|null
  */
 function normalize_brief(mixed $brief): ?array
 {
@@ -223,6 +223,11 @@ function normalize_brief(mixed $brief): ?array
         'title' => field($brief, 'title', $industry),
         'description' => field($brief, 'description'),
         'signature' => field($brief, 'signature'),
+        // What the brief builds: a landing page, a whole site, a store, a
+        // course. Free's own briefs are all landing pages and leave it empty;
+        // Pro's mostly are not, which is the point of them, and a field the
+        // normaliser drops is a field that cannot be shown or filtered on.
+        'scope' => field($brief, 'scope'),
         'pro' => in_array($brief['pro'] ?? false, [true, 'true'], strict: true),
         'body' => $body,
     ];

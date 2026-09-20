@@ -72,7 +72,7 @@ function wppilot_mcp_adapter_origin(): array
     }
 
     $file = wp_normalize_path($file);
-    $ours = str_starts_with($file, wp_normalize_path(__DIR__ . '/../../vendor/'));
+    $ours = str_starts_with($file, wppilot_mcp_vendor_dir());
 
     $origin = [
         'loaded' => true,
@@ -83,6 +83,25 @@ function wppilot_mcp_adapter_origin(): array
     ];
 
     return $origin;
+}
+
+/**
+ * This plugin's own vendor directory, resolved.
+ *
+ * Built from the plugin file rather than from `__DIR__ . '/../../vendor/'`,
+ * because `wp_normalize_path()` converts separators and does not resolve `..` -
+ * so the literal path never matches a resolved one and the check quietly
+ * answers "not ours" on every site, including the ones where it is.
+ */
+function wppilot_mcp_vendor_dir(): string
+{
+    $base = defined('WPPILOT_PLUGIN_FILE')
+        ? dirname((string) WPPILOT_PLUGIN_FILE)
+        : dirname(__DIR__, 2);
+
+    $resolved = realpath($base);
+
+    return wp_normalize_path(($resolved === false ? $base : $resolved) . '/vendor/');
 }
 
 /**
