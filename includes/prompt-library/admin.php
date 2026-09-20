@@ -108,6 +108,22 @@ function render(): void
         } ?>
 
         <div class="wppilot-prompt-toolbar">
+            <?php
+            /*
+             * A filter rather than a long scroll. Grouping by sector was enough
+             * at ten briefs; past a hundred, somebody looking for "dentist" is
+             * not going to find it by reading eighteen sector headings.
+             */
+            ?>
+            <label for="wppilot-prompt-filter"><?php esc_html_e('Find', domain: 'wppilot'); ?></label>
+            <input
+                type="search"
+                id="wppilot-prompt-filter"
+                class="regular-text"
+                placeholder="<?php esc_attr_e('dentist, bakery, booking…', domain: 'wppilot'); ?>"
+                autocomplete="off"
+            >
+            <span class="description" id="wppilot-prompt-count" aria-live="polite"></span>
             <label for="wppilot-prompt-builder"><?php esc_html_e('Build with', domain: 'wppilot'); ?></label>
             <select id="wppilot-prompt-builder">
                 <?php foreach ($builders as $slug => $label) { ?>
@@ -240,6 +256,44 @@ function render(): void
             applyBuilder();
         }
 
+        // Filtering is over the card's own visible text - industry, title,
+        // description, signature - rather than the whole brief, so typing
+        // "booking" finds the booking sites instead of every brief that happens
+        // to mention a booking form somewhere in its body.
+        var filterInput = document.getElementById('wppilot-prompt-filter');
+        var filterCount = document.getElementById('wppilot-prompt-count');
+        var cards = Array.prototype.slice.call(document.querySelectorAll('.wppilot-prompt'));
+        var haystacks = cards.map(function (card) {
+            var head = card.querySelector('.wppilot-prompt__head');
+            return (head ? head.innerText : card.innerText).toLowerCase();
+        });
+
+        function applyFilter() {
+            var term = (filterInput.value || '').trim().toLowerCase();
+            var shown = 0;
+
+            cards.forEach(function (card, index) {
+                var match = term === '' || haystacks[index].indexOf(term) !== -1;
+                card.hidden = !match;
+                if (match) { shown++; }
+            });
+
+            // A sector heading with nothing under it reads as an empty category
+            // rather than as a filtered one.
+            document.querySelectorAll('.wppilot-prompt-sector').forEach(function (section) {
+                var visible = section.querySelectorAll('.wppilot-prompt:not([hidden])').length;
+                section.hidden = visible === 0;
+            });
+
+            filterCount.textContent = term === ''
+                ? ''
+                : shown + ' of ' + cards.length;
+        }
+
+        if (filterInput) {
+            filterInput.addEventListener('input', applyFilter);
+        }
+
         document.querySelectorAll('.wppilot-prompt-copy').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var body = document.getElementById(btn.getAttribute('data-target'));
@@ -319,8 +373,21 @@ function render_brief(array $brief, string $builder, bool $licensed): void
                 domain: 'wppilot',
             ); ?></p>
         <?php } else { ?>
-            <pre class="wppilot-prompt__body" id="<?php echo esc_attr($id); ?>"><span class="wppilot-prompt__builder"><?php
-                echo esc_html($builder_line); ?></span><?php echo esc_html($rest); ?></pre>
+            <?php
+            /*
+             * Collapsed, not hidden. Ten briefs could all be printed open; three
+             * hundred cannot - every body is several kilobytes, so the screen
+             * came to 2.7MB of markup and a browser had to lay out all of it
+             * before anybody saw the first one. <details> keeps the text in the
+             * page, so Copy and the browser's own find-in-page still reach it,
+             * and lets the reader open the one they want.
+             */
+            ?>
+            <details class="wppilot-prompt__details">
+                <summary class="wppilot-prompt__summary"><?php esc_html_e('Read the brief', domain: 'wppilot'); ?></summary>
+                <pre class="wppilot-prompt__body" id="<?php echo esc_attr($id); ?>"><span class="wppilot-prompt__builder"><?php
+                    echo esc_html($builder_line); ?></span><?php echo esc_html($rest); ?></pre>
+            </details>
         <?php } ?>
     </div>
     <?php

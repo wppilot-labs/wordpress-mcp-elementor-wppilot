@@ -1387,6 +1387,36 @@ function claim_next_item(int $batch_id, string $lease_owner): array|WP_Error
         return typed_string_map($failed);
     }
 
+    // The target can be deleted between queueing and finalizing - somebody
+    // trashes the page, or a conversion draft is thrown away. commit_prepared_items()
+    // already refuses that, but the item never reaches commit: it is handed to a
+    // browser tab which cannot open a post that is not there, and the tab has
+    // nothing useful to report back. The item then sits running with a valid
+    // lease until it expires, and the batch never finishes. Checked here so the
+    // item fails once, with a reason, and the rest of the batch continues.
+    $target = get_target(meta_int($claimed_item->ID, META_TARGET_ID));
+    if (!$target instanceof WP_Post) {
+        $failed = fail_item(
+            $claimed_item->ID,
+            $lease_owner,
+            [
+                [
+                    'message' => 'The target post no longer exists.',
+                    'category' => 'target-missing',
+                    'code' => 'gutenberg_target_not_found',
+                ],
+            ],
+            message: 'The target post was deleted after this change was queued, so there is nothing to write it to.',
+        );
+
+        if (is_wp_error($failed)) {
+            return $failed;
+        }
+
+        /** @var array<string, mixed> $failed */
+        return typed_string_map($failed);
+    }
+
     return [
         'done' => false,
         'item' => shape_item($claimed_item),
