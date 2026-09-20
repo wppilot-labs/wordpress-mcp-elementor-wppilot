@@ -18,6 +18,13 @@ class PaginatedResult extends Result
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'nextCursor'];
+
+    /**
      * An opaque token representing the pagination position after the last returned result.
      * If present, there may be more results available.
      *
@@ -30,12 +37,14 @@ class PaginatedResult extends Result
     /**
      * @param array<string, mixed>|null $_meta @since 2024-11-05
      * @param string|null $nextCursor @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         ?array $_meta = null,
-        ?string $nextCursor = null
+        ?string $nextCursor = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->nextCursor = $nextCursor;
     }
 
@@ -53,7 +62,8 @@ class PaginatedResult extends Result
     {
         return new self(
             self::asArrayOrNull($data['_meta'] ?? null),
-            self::asStringOrNull($data['nextCursor'] ?? null)
+            self::asStringOrNull($data['nextCursor'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

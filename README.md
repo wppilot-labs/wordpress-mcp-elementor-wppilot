@@ -15,7 +15,7 @@ Installs straight into **Plugins - Add New - Upload Plugin**. That link always r
 
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
 
-The free plugin is the **WordPress MCP server**, and since 1.10.0 it is also a working **Elementor MCP server**: 16 abilities that read an Elementor document, report the widgets and style properties your install actually offers, and add, edit, move, duplicate, reorder and delete elements in the tree. No licence, no key, no Pro install. [WPPilot Pro](https://wppilot.co/pro) then extends that same endpoint into a **WooCommerce MCP server** and a Bricks, Divi, Oxygen, Etch or WPBakery MCP server, and adds Elementor's authoring layer on top: whole-page composition, templates and theme parts, popups, forms, dynamic tags, global classes and variables.
+The free plugin is the **WordPress MCP server**, and since 1.10.0 it is also a working **Elementor MCP server**: 17 abilities that read an Elementor document, report the widgets and style properties your install actually offers, and add, edit, move, duplicate, reorder and delete elements in the tree. No licence, no key, no Pro install. [WPPilot Pro](https://wppilot.co/pro) then extends that same endpoint into a **WooCommerce MCP server** and a Bricks, Divi, Oxygen, Etch or WPBakery MCP server, and adds Elementor's authoring layer on top: whole-page composition, templates and theme parts, popups, forms, dynamic tags, global classes and variables.
 
 ### Looking for an Elementor, Divi or Beaver Builder MCP server?
 
@@ -114,7 +114,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 ## What the free plugin can do
 
-133 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+141 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -128,11 +128,11 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Site** | `2` | Site information and an explicit settings allowlist. |
 | **Plugins and themes** | `12` | Search the WordPress.org directory and read one extension in detail. Activate, deactivate, update and switch themes with explicit confirmation. Install and delete are Developer Full Access only: they write executable code to the server. |
 | **Gutenberg** | `11` | Block-editor content, staged pending changes and browser finalization for native blocks. |
-| **Elementor** | `16` | Read a document, inspect the widgets and style properties this install offers, and edit the element tree: add, edit, move, duplicate, reorder and delete. Page settings included. [Detail below.](#elementor-mcp) |
+| **Elementor** | `17` | Read a document, inspect the widgets and style properties this install offers, and edit the element tree: add, edit, move, duplicate, reorder and delete. Page settings included. [Detail below.](#elementor-mcp) |
 | **Design system** | `19` | Typed design tokens, saved designs and activation, plus the checks that grade a built page against them: contrast, composition, layout grammars and a rendered-page verification pass. |
-| **Preview** | `2` | Compute what a write would change without performing it, then apply the reviewed result. |
+| **Preview** | `8` | Compute what a write would change without performing it, then apply the reviewed result. Plus a view link, so an agent with a browser can look at the page it built - including one still in draft - and a capture store that compares two screenshots of a page and reports which regions moved. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
-| **Changes** | `3` | Read the redacted change ledger, attributed to the agent credential that made each write, and roll a change back. |
+| **Changes** | `4` | Read the redacted change ledger, attributed to the agent credential that made each write, and roll a change back. |
 | **Diagnostics** | `3` | Scoped health, performance and configuration-security checks. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 
@@ -176,7 +176,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 51 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **133 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **141 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 51 integrations**, typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -209,7 +209,7 @@ vocabulary rather than being handed raw HTML to guess at.
 
 | Builder | Abilities | Free / Pro | Guide |
 | --- | --- | --- | --- |
-| **Elementor** | **67** | **16 free** · 51 Pro | [MCP for Elementor](https://wppilot.co/mcp-for-elementor) |
+| **Elementor** | **68** | **17 free** · 51 Pro | [MCP for Elementor](https://wppilot.co/mcp-for-elementor) |
 | Etch | 60 | Pro | [MCP for Etch](https://wppilot.co/mcp-for-etch) |
 | Bricks | 49 | Pro | [MCP for Bricks](https://wppilot.co/mcp-for-bricks) |
 | Divi | 47 | Pro | [MCP for Divi](https://wppilot.co/mcp-for-divi) |
@@ -222,7 +222,7 @@ vocabulary rather than being handed raw HTML to guess at.
 
 #### Elementor MCP server
 
-**Elementor is the one builder whose editing surface is free.** The 16 abilities
+**Elementor is the one builder whose editing surface is free.** The 17 abilities
 in this repository read the document, report the widgets and the 73 style
 properties your install actually offers, and add, edit, move, duplicate, reorder
 and delete elements in the tree - v4 atomic elements and classic v3 widgets
@@ -315,7 +315,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 133 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 141 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.
@@ -365,7 +365,7 @@ The MCP endpoint is self-hosted; there is no WPPilot relay. When WPPilot Chat is
 | Document | What it covers |
 | --- | --- |
 | [`docs/wordpress-mcp.md`](docs/wordpress-mcp.md) | The WordPress MCP server itself: endpoints, protocol revisions, discovery, the three-tool interface. |
-| [`docs/elementor-mcp.md`](docs/elementor-mcp.md) | The free Elementor MCP surface: the 16 abilities, the v3 and v4 element models, a read-before-write sequence. |
+| [`docs/elementor-mcp.md`](docs/elementor-mcp.md) | The free Elementor MCP surface: the 17 abilities, the v3 and v4 element models, a read-before-write sequence. |
 | [`docs/page-builder-mcp.md`](docs/page-builder-mcp.md) | Where each builder stores a layout, and why an MCP server has to speak that store: Bricks, Divi, Oxygen, Beaver Builder, Breakdance, Etch, WPBakery, Mosaic. |
 | [`docs/woocommerce-mcp.md`](docs/woocommerce-mcp.md) | WooCommerce over MCP: capability checks, destructive classification, order and money handling. |
 | [`docs/ai-client-compatibility.md`](docs/ai-client-compatibility.md) | Which AI clients connect how - OAuth, application password or access token - and what each one needs. |

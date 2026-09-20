@@ -23,6 +23,13 @@ class ListPromptsResult extends PaginatedResult implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['nextCursor', '_meta', 'prompts'];
+
+    /**
      * @since 2024-11-05
      *
      * @var array<\WP\McpSchema\Server\Prompts\DTO\Prompt>
@@ -33,13 +40,15 @@ class ListPromptsResult extends PaginatedResult implements ServerResultInterface
      * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts @since 2024-11-05
      * @param string|null $nextCursor @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $prompts,
         ?string $nextCursor = null,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta, $nextCursor);
+        parent::__construct($_meta, $nextCursor, $additionalProperties);
         $this->prompts = $prompts;
     }
 
@@ -69,7 +78,8 @@ class ListPromptsResult extends PaginatedResult implements ServerResultInterface
         return new self(
             $prompts,
             self::asStringOrNull($data['nextCursor'] ?? null),
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

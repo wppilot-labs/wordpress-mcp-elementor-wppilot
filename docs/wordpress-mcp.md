@@ -62,9 +62,46 @@ safety profiles, confirmation gates, rate limiting, and a change ledger with
 rollback. An ability registered by another plugin through the same Abilities API
 is discoverable through this endpoint too.
 
+## Coexisting with another plugin that bundles the MCP Adapter
+
+WPPilot is not the only plugin that ships the WordPress MCP Adapter. Elementor
+4.3 bundles it too, inside `elementor/elementor-mcp-composer`, and so do several
+community MCP plugins. The adapter's classes are global and unprefixed
+(`WP\MCP\…`), so **only one copy is ever loaded on a site**, and which one wins is
+decided by the Jetpack autoloader: the highest version tag in the merged classmap
+is served to every plugin that asks. WPPilot can therefore find itself running
+Elementor's adapter, or Elementor running WPPilot's.
+
+That is supported, and nothing about the endpoint changes:
+
+| | WPPilot's adapter loaded | Another plugin's adapter loaded |
+| --- | --- | --- |
+| `/wp-json/mcp/wppilot` | The adapter's default server, renamed | Registered explicitly by WPPilot, beside their default server |
+| `/wp-json/mcp/wppilot-oauth` | Registered | Registered |
+| `/wp-json/mcp/mcp-adapter-default-server` | WPPilot's legacy alias | **Theirs.** WPPilot does not claim it |
+| Abilities served | WPPilot's, plus every ability any plugin registers | Identical |
+
+The Abilities API registry is site-wide, so Elementor's abilities are discoverable
+through WPPilot's endpoint and WPPilot's through Elementor's. That is the design
+of the Abilities API, not an accident of the shared adapter.
+
+`wppilot/system-status` reports which copy is loaded under `mcp_adapter`:
+`ours`, the file path, the version, and the plugin directory that owns it. Read
+that field first on any site where MCP behaves unexpectedly and another MCP
+plugin is installed.
+
+**Namespace collisions.** Composer derives the Jetpack autoloader's namespace
+from the dependency set, so two plugins with similar `composer.json` files can
+generate the *same* namespace and fatal on activation with `Cannot declare class
+Automattic\Jetpack\Autoloader\jp…\al…\Autoloader`. WPPilot pins an explicit
+`autoloader-suffix`, so its namespace is `…\jpwppilot\…` and cannot collide with
+a suffix another project generated. On `WP_DEBUG` sites WPPilot also enables the
+autoloader's own conflict diagnostic, so a future collision is logged by name
+rather than appearing as a white screen.
+
 ## What is registered on a fresh install
 
-133 abilities, plus one MCP prompt per saved skill. They are grouped into a
+141 abilities, plus one MCP prompt per saved skill. They are grouped into a
 single **WordPress** category on the Abilities screen and can be switched off
 individually: content, taxonomies, media, comments, menus, revisions, user
 reads, allowlisted site settings, the plugin and theme lifecycle, Gutenberg

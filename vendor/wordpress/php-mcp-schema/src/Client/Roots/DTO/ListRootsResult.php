@@ -25,6 +25,13 @@ class ListRootsResult extends Result implements ClientResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'roots'];
+
+    /**
      * @since 2024-11-05
      *
      * @var array<\WP\McpSchema\Client\Roots\DTO\Root>
@@ -34,12 +41,14 @@ class ListRootsResult extends Result implements ClientResultInterface
     /**
      * @param array<\WP\McpSchema\Client\Roots\DTO\Root> $roots @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $roots,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->roots = $roots;
     }
 
@@ -67,7 +76,8 @@ class ListRootsResult extends Result implements ClientResultInterface
 
         return new self(
             $roots,
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

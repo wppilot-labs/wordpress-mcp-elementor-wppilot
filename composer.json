@@ -46,6 +46,7 @@
 		"allow-plugins": {
 			"automattic/jetpack-autoloader": true
 		},
+		"autoloader-suffix": "wppilot",
 		"sort-packages": true
 	}
 }

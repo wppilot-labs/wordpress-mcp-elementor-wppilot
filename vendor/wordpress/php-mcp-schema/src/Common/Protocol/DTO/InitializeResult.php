@@ -24,6 +24,13 @@ class InitializeResult extends Result implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'protocolVersion', 'capabilities', 'serverInfo', 'instructions'];
+
+    /**
      * The version of the Model Context Protocol that the server wants to use. This may not match the version that the client requested. If the client cannot support this version, it MUST disconnect.
      *
      * @since 2024-11-05
@@ -63,15 +70,17 @@ class InitializeResult extends Result implements ServerResultInterface
      * @param \WP\McpSchema\Common\Lifecycle\DTO\Implementation $serverInfo @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
      * @param string|null $instructions @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         string $protocolVersion,
         ServerCapabilities $capabilities,
         Implementation $serverInfo,
         ?array $_meta = null,
-        ?string $instructions = null
+        ?string $instructions = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->protocolVersion = $protocolVersion;
         $this->capabilities = $capabilities;
         $this->serverInfo = $serverInfo;
@@ -110,7 +119,8 @@ class InitializeResult extends Result implements ServerResultInterface
             $capabilities,
             $serverInfo,
             self::asArrayOrNull($data['_meta'] ?? null),
-            self::asStringOrNull($data['instructions'] ?? null)
+            self::asStringOrNull($data['instructions'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

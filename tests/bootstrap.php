@@ -26,7 +26,16 @@ define('ABSPATH', __DIR__ . '/');
 define('WPPILOT_PLUGIN_FILE', ABSPATH . 'wp-content/plugins/wppilot/wppilot.php');
 define('WPPILOT_PRO_FILE', ABSPATH . 'wp-content/plugins/wppilot-pro/wppilot-pro.php');
 
+// The fully qualified MCP Adapter class name, defined by the plugin file at load.
+// adapter-origin.php reflects on it to work out whose copy of the adapter is
+// serving MCP on this site.
+define('WPPILOT_MCP_ADAPTER_CLASS', 'WP\\MCP\\Core\\McpAdapter');
+
 require_once __DIR__ . '/doubles/wordpress.php';
+
+// Which copy of the adapter won. Pure path and classmap reading; it registers
+// nothing and touches WordPress only through wp_normalize_path().
+require_once dirname(__DIR__) . '/includes/mcp/adapter-origin.php';
 
 // The compatibility contract: the version constants, the probe of what the host
 // WordPress offers, and the block published to clients. It registers nothing and

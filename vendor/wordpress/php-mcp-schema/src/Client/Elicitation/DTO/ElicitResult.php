@@ -22,6 +22,13 @@ class ElicitResult extends Result implements ClientResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'action', 'content'];
+
+    /**
      * The user action in response to the elicitation.
      * - "accept": User submitted the form/confirmed the action
      * - "decline": User explicitly decline the action
@@ -48,13 +55,15 @@ class ElicitResult extends Result implements ClientResultInterface
      * @param 'accept'|'decline'|'cancel' $action @since 2025-06-18
      * @param array<string, mixed>|null $_meta @since 2025-06-18
      * @param array<string, string>|null $content @since 2025-06-18
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         string $action,
         ?array $_meta = null,
-        ?array $content = null
+        ?array $content = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->action = $action;
         $this->content = $content;
     }
@@ -80,7 +89,8 @@ class ElicitResult extends Result implements ClientResultInterface
         return new self(
             $action,
             self::asArrayOrNull($data['_meta'] ?? null),
-            self::asStringMapOrNull($data['content'] ?? null)
+            self::asStringMapOrNull($data['content'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

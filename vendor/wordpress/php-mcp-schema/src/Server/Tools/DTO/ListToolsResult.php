@@ -23,6 +23,13 @@ class ListToolsResult extends PaginatedResult implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['nextCursor', '_meta', 'tools'];
+
+    /**
      * @since 2024-11-05
      *
      * @var array<\WP\McpSchema\Server\Tools\DTO\Tool>
@@ -33,13 +40,15 @@ class ListToolsResult extends PaginatedResult implements ServerResultInterface
      * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools @since 2024-11-05
      * @param string|null $nextCursor @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $tools,
         ?string $nextCursor = null,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta, $nextCursor);
+        parent::__construct($_meta, $nextCursor, $additionalProperties);
         $this->tools = $tools;
     }
 
@@ -69,7 +78,8 @@ class ListToolsResult extends PaginatedResult implements ServerResultInterface
         return new self(
             $tools,
             self::asStringOrNull($data['nextCursor'] ?? null),
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

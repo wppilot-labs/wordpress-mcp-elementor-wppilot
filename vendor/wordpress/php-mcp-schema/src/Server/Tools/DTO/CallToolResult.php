@@ -25,6 +25,13 @@ class CallToolResult extends Result implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'content', 'structuredContent', 'isError'];
+
+    /**
      * A list of content objects that represent the unstructured result of the tool call.
      *
      * @since 2024-11-05
@@ -67,14 +74,16 @@ class CallToolResult extends Result implements ServerResultInterface
      * @param array<string, mixed>|null $_meta @since 2024-11-05
      * @param array<string, mixed>|null $structuredContent @since 2025-06-18
      * @param bool|null $isError @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $content,
         ?array $_meta = null,
         ?array $structuredContent = null,
-        ?bool $isError = null
+        ?bool $isError = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->content = $content;
         $this->structuredContent = $structuredContent;
         $this->isError = $isError;
@@ -108,7 +117,8 @@ class CallToolResult extends Result implements ServerResultInterface
             $content,
             self::asArrayOrNull($data['_meta'] ?? null),
             self::asArrayOrNull($data['structuredContent'] ?? null),
-            self::asBoolOrNull($data['isError'] ?? null)
+            self::asBoolOrNull($data['isError'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

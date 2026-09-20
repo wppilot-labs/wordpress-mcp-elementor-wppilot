@@ -26,6 +26,13 @@ class CreateMessageResult extends Result implements ClientResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'model', 'stopReason', 'role', 'content'];
+
+    /**
      * The name of the model that generated the message.
      *
      * @since 2024-11-05
@@ -71,15 +78,17 @@ class CreateMessageResult extends Result implements ClientResultInterface
      * @param array<\WP\McpSchema\Common\Protocol\Union\SamplingMessageContentBlockInterface|\WP\McpSchema\Common\Protocol\Union\SamplingMessageContentBlockInterface> $content @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
      * @param "endTurn"|"stopSequence"|"maxTokens"|"toolUse"|string|null $stopReason @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         string $model,
         string $role,
         array $content,
         ?array $_meta = null,
-        $stopReason = null
+        $stopReason = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->model = $model;
         $this->role = $role;
         $this->content = $content;
@@ -124,7 +133,8 @@ class CreateMessageResult extends Result implements ClientResultInterface
             $role,
             $content,
             self::asArrayOrNull($data['_meta'] ?? null),
-            $stopReason
+            $stopReason,
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

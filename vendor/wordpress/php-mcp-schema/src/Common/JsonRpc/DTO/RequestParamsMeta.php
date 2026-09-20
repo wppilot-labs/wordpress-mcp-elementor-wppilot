@@ -19,6 +19,13 @@ class RequestParamsMeta extends AbstractDataTransferObject
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['progressToken'];
+
+    /**
      * If specified, the caller is requesting out-of-band progress notifications for this request (as represented by notifications/progress). The value of this parameter is an opaque token that will be attached to any subsequent notifications. The receiver is not obligated to provide these notifications.
      *
      * @var string|number|null
@@ -26,12 +33,22 @@ class RequestParamsMeta extends AbstractDataTransferObject
     protected $progressToken;
 
     /**
+     * Keys carried on the wire that this type does not model. Preserved verbatim so unrecognized fields survive a round trip.
+     *
+     * @var array<string, mixed>|null
+     */
+    protected ?array $additionalProperties;
+
+    /**
      * @param string|number|null $progressToken
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
-        $progressToken = null
+        $progressToken = null,
+        ?array $additionalProperties = null
     ) {
         $this->progressToken = $progressToken;
+        $this->additionalProperties = $additionalProperties;
     }
 
     /**
@@ -51,7 +68,8 @@ class RequestParamsMeta extends AbstractDataTransferObject
             : null;
 
         return new self(
-            $progressToken
+            $progressToken,
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 
@@ -68,7 +86,7 @@ class RequestParamsMeta extends AbstractDataTransferObject
             $result['progressToken'] = $this->progressToken;
         }
 
-        return $result;
+        return $result + ($this->additionalProperties ?? []);
     }
 
     /**
@@ -77,5 +95,13 @@ class RequestParamsMeta extends AbstractDataTransferObject
     public function getProgressToken()
     {
         return $this->progressToken;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getAdditionalProperties(): ?array
+    {
+        return $this->additionalProperties;
     }
 }

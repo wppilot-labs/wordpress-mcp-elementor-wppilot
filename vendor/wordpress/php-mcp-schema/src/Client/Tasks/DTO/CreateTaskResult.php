@@ -21,6 +21,13 @@ class CreateTaskResult extends Result
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'task'];
+
+    /**
      * @since 2025-11-25
      *
      * @var \WP\McpSchema\Client\Tasks\DTO\Task
@@ -30,12 +37,14 @@ class CreateTaskResult extends Result
     /**
      * @param \WP\McpSchema\Client\Tasks\DTO\Task $task @since 2025-11-25
      * @param array<string, mixed>|null $_meta @since 2025-11-25
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         Task $task,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->task = $task;
     }
 
@@ -60,7 +69,8 @@ class CreateTaskResult extends Result
 
         return new self(
             $task,
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

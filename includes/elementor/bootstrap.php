@@ -99,6 +99,7 @@ function load(): void
             'helpers/wppilot-styles-map.php',
             'helpers/wppilot-page-io.php',
             'helpers/wppilot-tree.php',
+            'helpers/wppilot-atomic-equivalents.php',
             'wppilot-runtime.php',
             'wppilot-schema-extractor.php',
             'wppilot-validate-widget.php',
@@ -114,6 +115,7 @@ function load(): void
 
             // The abilities themselves.
             'wppilot-check-setup.php',
+            'wppilot-audit-atomic-readiness.php',
             'wppilot-get-content.php',
             'wppilot-get-widget-schema.php',
             'wppilot-get-style-schema.php',

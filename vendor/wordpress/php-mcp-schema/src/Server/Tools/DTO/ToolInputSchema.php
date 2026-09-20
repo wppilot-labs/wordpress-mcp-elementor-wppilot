@@ -21,6 +21,13 @@ class ToolInputSchema extends AbstractDataTransferObject
     public const TYPE = 'object';
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['$schema', 'type', 'properties', 'required'];
+
+    /**
      * @var string|null
      */
     protected ?string $schema;
@@ -41,19 +48,29 @@ class ToolInputSchema extends AbstractDataTransferObject
     protected ?array $required;
 
     /**
+     * Keys carried on the wire that this type does not model. Preserved verbatim so unrecognized fields survive a round trip.
+     *
+     * @var array<string, mixed>|null
+     */
+    protected ?array $additionalProperties;
+
+    /**
      * @param string|null $schema
      * @param array<string, object>|null $properties
      * @param array<string>|null $required
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         ?string $schema = null,
         ?array $properties = null,
-        ?array $required = null
+        ?array $required = null,
+        ?array $additionalProperties = null
     ) {
         $this->type = self::TYPE;
         $this->schema = $schema;
         $this->properties = $properties;
         $this->required = $required;
+        $this->additionalProperties = $additionalProperties;
     }
 
     /**
@@ -73,7 +90,8 @@ class ToolInputSchema extends AbstractDataTransferObject
         return new self(
             self::asStringOrNull($data['$schema'] ?? null),
             self::asObjectMapOrNull($data['properties'] ?? null),
-            self::asStringArrayOrNull($data['required'] ?? null)
+            self::asStringArrayOrNull($data['required'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 
@@ -97,7 +115,7 @@ class ToolInputSchema extends AbstractDataTransferObject
             $result['required'] = $this->required;
         }
 
-        return $result;
+        return $result + ($this->additionalProperties ?? []);
     }
 
     /**
@@ -130,5 +148,13 @@ class ToolInputSchema extends AbstractDataTransferObject
     public function getRequired(): ?array
     {
         return $this->required;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getAdditionalProperties(): ?array
+    {
+        return $this->additionalProperties;
     }
 }

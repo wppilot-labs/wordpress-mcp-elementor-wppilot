@@ -34,7 +34,7 @@ actually uses.
 
 | Builder | Abilities | Free / Pro |
 | --- | --- | --- |
-| Elementor | 67 | **16 free** · 51 Pro |
+| Elementor | 68 | **17 free** · 51 Pro |
 | Etch | 60 | Pro |
 | Bricks | 49 | Pro |
 | Divi | 47 | Pro |

@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: WordPress MCP server with free Elementor MCP editing. Connects Claude, Codex, Cursor and other AI clients to typed WordPress abilities over MCP, with OAuth 2.1, safety profiles, change evidence and rollback.
- * Version: 1.12.0
+ * Version: 1.13.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -61,6 +61,15 @@ function wppilot_load_bundled_dependencies()
             'WPPilot is installed without its bundled vendor directory. This usually means the GitHub/source ZIP was installed instead of the WPPilot release build ZIP. The MCP Adapter cannot load, so WPPilot will not register an MCP endpoint. Install the WPPilot release build ZIP before using WPPilot.',
             domain: 'wppilot',
         ));
+    }
+
+    // On a debug site, let the Jetpack autoloader report a competing loader by
+    // name. Its conflict check is compiled in but inert without this constant, so
+    // the only symptom of a namespace collision is a fatal naming a hashed class -
+    // which reads as a WPPilot bug rather than as two plugins colliding. Defined
+    // before the autoloader is required, because it is read during its init.
+    if (defined('WP_DEBUG') && WP_DEBUG && !defined('JETPACK_AUTOLOAD_DEBUG_CONFLICTING_LOADERS')) {
+        define('JETPACK_AUTOLOAD_DEBUG_CONFLICTING_LOADERS', true);
     }
 
     try {
@@ -214,6 +223,11 @@ function wppilot_initialize_mcp_adapter(): bool
     }
 }
 
+// Which copy of the MCP Adapter won. Loaded before the dependency check so the
+// answer is available to every consumer below, including the server registration
+// that must not rename a default server another plugin owns.
+require_once __DIR__ . '/includes/mcp/adapter-origin.php';
+
 $wppilot_dependency_error = wppilot_load_bundled_dependencies();
 if ($wppilot_dependency_error !== null) {
     wppilot_set_mcp_dependency_error($wppilot_dependency_error);
@@ -280,6 +294,10 @@ if (file_exists(__DIR__ . '/includes/telemetry/bootstrap.php')) {
 require_once __DIR__ . '/includes/admin/abilities-hub.php';
 require_once __DIR__ . '/includes/admin/connect/connect.php';
 require_once __DIR__ . '/includes/admin/pro-upsell.php';
+// A minute-long session for the site's own loopback fetches, so a check can read
+// a draft the way its author sees it. Not edition-gated: it issues no link and
+// grants nobody anything, and the rendered check ships everywhere.
+require_once __DIR__ . '/includes/links/loopback.php';
 if (!wppilot_is_wordpress_org_edition()) {
     require_once __DIR__ . '/includes/links/upload.php';
     require_once __DIR__ . '/includes/links/admin-access.php';
@@ -733,25 +751,37 @@ if ($is_enabled && $wppilot_abilities_supported) {
     add_filter('mcp_adapter_session_max_per_user', static fn(): int => 128);
     add_filter('mcp_adapter_session_inactivity_timeout', static fn(): int => 4 * HOUR_IN_SECONDS);
 
-    // Brand the default MCP server. Usage instructions are returned from the
+    // Brand the default MCP server, but only when the loaded adapter is the copy
+    // WPPilot shipped. The adapter's default server belongs to whoever bundled
+    // the adapter, and since Elementor 4.3 that can be Elementor: renaming their
+    // default server to `wppilot` would take a route they own and leave their own
+    // clients pointing at nothing. Usage instructions are returned from the
     // discover-abilities tool instead of the initialize handshake.
-    add_filter('mcp_adapter_default_server_config', static function (mixed $config): mixed {
-        if (!is_array($config)) {
+    if (wppilot_owns_mcp_adapter()) {
+        add_filter('mcp_adapter_default_server_config', static function (mixed $config): mixed {
+            if (!is_array($config)) {
+                return $config;
+            }
+            $config['server_id'] = 'wppilot';
+            $config['server_route'] = 'wppilot';
+            $config['server_name'] = 'WPPilot';
+            // Without this the adapter's own default is used, and legacy clients
+            // read that from initialize's serverInfo - it reported v1.0.0 for the
+            // whole 1.1.0 cycle because only the mirror servers set a version.
+            $config['server_version'] = 'v' . WPPILOT_VERSION;
             return $config;
-        }
-        $config['server_id'] = 'wppilot';
-        $config['server_route'] = 'wppilot';
-        $config['server_name'] = 'WPPilot';
-        // Without this the adapter's own default is used, and legacy clients
-        // read that from initialize's serverInfo - it reported v1.0.0 for the
-        // whole 1.1.0 cycle because only the mirror servers set a version.
-        $config['server_version'] = 'v' . WPPILOT_VERSION;
-        return $config;
-    });
+        });
 
-    // Register a legacy alias server at the old slug so configs that still point at
-    // /wp-json/mcp/mcp-adapter-default-server keep working after the rename.
-    add_action('mcp_adapter_init', callback: 'wppilot_register_legacy_mcp_server', priority: 20);
+        // Register a legacy alias server at the old slug so configs that still point at
+        // /wp-json/mcp/mcp-adapter-default-server keep working after the rename. Skipped
+        // on a foreign adapter, where that slug is the real default server's own.
+        add_action('mcp_adapter_init', callback: 'wppilot_register_legacy_mcp_server', priority: 20);
+    } else {
+        // Someone else's adapter won the version arbitration. Their default server
+        // keeps its identity; WPPilot registers its canonical endpoint beside it so
+        // /wp-json/mcp/wppilot exists either way and no client configuration breaks.
+        add_action('mcp_adapter_init', callback: 'wppilot_register_canonical_mcp_server', priority: 20);
+    }
 
     // Register the OAuth-only server at /mcp/wppilot-oauth. Keeping the OAuth Bearer flow on a
     // route of its own means the OAuth middleware never touches the canonical /mcp/wppilot
@@ -787,6 +817,34 @@ function wppilot_register_legacy_mcp_server(mixed $adapter): void
         route: 'mcp-adapter-default-server',
         name: 'WPPilot (legacy alias)',
         description: 'Legacy alias for the WPPilot MCP server. New client configurations should use /wp-json/mcp/wppilot.',
+    );
+}
+
+/**
+ * Register WPPilot's canonical MCP server when the adapter belongs to someone else.
+ *
+ * When WPPilot's own copy of the adapter is loaded, the canonical server is the
+ * adapter's default server, renamed through `mcp_adapter_default_server_config`.
+ * When another plugin's copy won the Jetpack version arbitration, that default
+ * server is theirs and is left alone - so `/wp-json/mcp/wppilot` has to be
+ * created explicitly, or every existing WPPilot client configuration on the site
+ * would 404 the moment the other plugin was installed.
+ *
+ * The tools and auto-discovered resources are identical either way, because the
+ * Ability registry is site-wide; only the ownership of the default route differs.
+ */
+function wppilot_register_canonical_mcp_server(mixed $adapter): void
+{
+    if (!$adapter instanceof \WP\MCP\Core\McpAdapter) {
+        return;
+    }
+
+    wppilot_create_mirror_mcp_server(
+        $adapter,
+        server_id: 'wppilot',
+        route: 'wppilot',
+        name: 'WPPilot',
+        description: 'WPPilot MCP endpoint.',
     );
 }
 
@@ -834,6 +892,14 @@ function wppilot_create_mirror_mcp_server(
     string $name,
     string $description,
 ): void {
+    // Another plugin may already hold this id - two copies of WPPilot on disk, or
+    // a slug collision with a third-party server. The adapter throws on a
+    // duplicate, and a throw here happens during `mcp_adapter_init`, which would
+    // take down every server on the site rather than skip one registration.
+    if ($adapter->get_server($server_id) !== null) {
+        return;
+    }
+
     $adapter->create_server(
         $server_id,
         'mcp',

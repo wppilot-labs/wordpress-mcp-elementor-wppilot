@@ -16,11 +16,12 @@ WPPilot refuses that write by name instead of reporting a false success.
 
 The abilities below work on the tree itself.
 
-## The 16 free abilities
+## The 17 free abilities
 
 | Ability | What it does |
 | --- | --- |
 | `wppilot/elementor-check-setup` | Elementor and Elementor Pro versions, and whether the v4 atomic runtime, the style schema, global classes, variables and interactions exist on this install. The first call an agent should make. |
+| `wppilot/elementor-audit-atomic-readiness` | How much of the site is v4 atomic and how much is classic v3, across every Elementor document: a widget histogram, the share an atomic-only tool can work with, and the widget types blocking the rest. Read-only. |
 | `wppilot/elementor-get-schema` | Discover widgets, or describe named ones: which controls exist, their types, their allowed values. Filterable by category, by name, and by whether a widget is atomic. |
 | `wppilot/elementor-get-style-schema` | The 73 style properties Elementor's atomic engine accepts, with the value shape each one takes. |
 | `wppilot/elementor-get-widget-params` | One widget's parameters, without reading its whole schema. |

@@ -23,6 +23,13 @@ class ReadResourceResult extends Result implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'contents'];
+
+    /**
      * @since 2024-11-05
      *
      * @var array<\WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents>
@@ -32,12 +39,14 @@ class ReadResourceResult extends Result implements ServerResultInterface
     /**
      * @param array<\WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents> $contents @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $contents,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->contents = $contents;
     }
 
@@ -60,7 +69,8 @@ class ReadResourceResult extends Result implements ServerResultInterface
 
         return new self(
             $contents,
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

@@ -28,12 +28,21 @@ class GetTaskPayloadResult extends Result implements ClientResultInterface, Serv
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta'];
+
+    /**
      * @param array<string, mixed>|null $_meta @since 2025-11-25
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
     }
 
     /**
@@ -48,7 +57,8 @@ class GetTaskPayloadResult extends Result implements ClientResultInterface, Serv
     public static function fromArray(array $data): self
     {
         return new self(
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

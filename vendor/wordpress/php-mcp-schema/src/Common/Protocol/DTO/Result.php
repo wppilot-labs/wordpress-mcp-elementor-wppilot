@@ -19,6 +19,13 @@ class Result extends AbstractDataTransferObject
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta'];
+
+    /**
      * See [General fields: `_meta`](/specification/2025-11-25/basic/index#meta) for notes on `_meta` usage.
      *
      * @since 2024-11-05
@@ -28,12 +35,22 @@ class Result extends AbstractDataTransferObject
     protected ?array $_meta;
 
     /**
+     * Keys carried on the wire that this type does not model. Preserved verbatim so unrecognized fields survive a round trip.
+     *
+     * @var array<string, mixed>|null
+     */
+    protected ?array $additionalProperties;
+
+    /**
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
         $this->_meta = $_meta;
+        $this->additionalProperties = $additionalProperties;
     }
 
     /**
@@ -48,7 +65,8 @@ class Result extends AbstractDataTransferObject
     public static function fromArray(array $data): self
     {
         return new self(
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 
@@ -65,7 +83,7 @@ class Result extends AbstractDataTransferObject
             $result['_meta'] = $this->_meta;
         }
 
-        return $result;
+        return $result + ($this->additionalProperties ?? []);
     }
 
     /**
@@ -74,5 +92,13 @@ class Result extends AbstractDataTransferObject
     public function get_meta(): ?array
     {
         return $this->_meta;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getAdditionalProperties(): ?array
+    {
+        return $this->additionalProperties;
     }
 }

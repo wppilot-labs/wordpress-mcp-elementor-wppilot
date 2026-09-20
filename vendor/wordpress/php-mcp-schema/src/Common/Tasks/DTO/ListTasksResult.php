@@ -24,6 +24,13 @@ class ListTasksResult extends PaginatedResult implements ClientResultInterface, 
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['nextCursor', '_meta', 'tasks'];
+
+    /**
      * @since 2025-11-25
      *
      * @var array<\WP\McpSchema\Client\Tasks\DTO\Task>
@@ -34,13 +41,15 @@ class ListTasksResult extends PaginatedResult implements ClientResultInterface, 
      * @param array<\WP\McpSchema\Client\Tasks\DTO\Task> $tasks @since 2025-11-25
      * @param string|null $nextCursor @since 2025-11-25
      * @param array<string, mixed>|null $_meta @since 2025-11-25
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $tasks,
         ?string $nextCursor = null,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta, $nextCursor);
+        parent::__construct($_meta, $nextCursor, $additionalProperties);
         $this->tasks = $tasks;
     }
 
@@ -70,7 +79,8 @@ class ListTasksResult extends PaginatedResult implements ClientResultInterface, 
         return new self(
             $tasks,
             self::asStringOrNull($data['nextCursor'] ?? null),
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

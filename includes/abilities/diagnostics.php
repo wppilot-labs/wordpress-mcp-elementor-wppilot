@@ -108,6 +108,14 @@ function wppilot_system_status(): array
                 : 'unknown',
             'change_records' => function_exists('wppilot_get_change_log') ? count(wppilot_get_change_log()) : 0,
         ],
+        // Which copy of the MCP Adapter this site actually loaded. The classes are
+        // global and unprefixed, so one copy serves every plugin that bundles it,
+        // and a foreign copy is invisible to class_exists(). When a report says MCP
+        // behaves oddly on a site running Elementor 4.3 or another MCP plugin, this
+        // is the first line to read.
+        'mcp_adapter' => function_exists('wppilot_mcp_adapter_origin')
+            ? wppilot_mcp_adapter_origin()
+            : ['loaded' => false, 'ours' => false, 'file' => '', 'version' => null, 'owner' => null],
     ];
 }
 

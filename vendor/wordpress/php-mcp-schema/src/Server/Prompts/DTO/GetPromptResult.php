@@ -23,6 +23,13 @@ class GetPromptResult extends Result implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'description', 'messages'];
+
+    /**
      * An optional description for the prompt.
      *
      * @since 2024-11-05
@@ -42,13 +49,15 @@ class GetPromptResult extends Result implements ServerResultInterface
      * @param array<\WP\McpSchema\Server\Prompts\DTO\PromptMessage> $messages @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
      * @param string|null $description @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $messages,
         ?array $_meta = null,
-        ?string $description = null
+        ?string $description = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->messages = $messages;
         $this->description = $description;
     }
@@ -79,7 +88,8 @@ class GetPromptResult extends Result implements ServerResultInterface
         return new self(
             $messages,
             self::asArrayOrNull($data['_meta'] ?? null),
-            self::asStringOrNull($data['description'] ?? null)
+            self::asStringOrNull($data['description'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

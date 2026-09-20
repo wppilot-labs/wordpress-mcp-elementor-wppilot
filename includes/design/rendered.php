@@ -74,9 +74,15 @@ const NOT_CHECKED = [
 /**
  * Fetch and analyse one URL.
  *
+ * `$cookies` carries a caller's own short-lived session so an unpublished page
+ * can be read as its author sees it. It is attached to this fetch only - never
+ * to the stylesheet fetches, which need no session and whose URLs the page under
+ * inspection chooses.
+ *
+ * @param array<string, string> $cookies
  * @return array<string, mixed>|WP_Error
  */
-function inspect(string $url, int $timeout = 20): array|WP_Error
+function inspect(string $url, int $timeout = 20, array $cookies = []): array|WP_Error
 {
     $url = esc_url_raw($url);
     if ($url === '' || !wp_http_validate_url($url)) {
@@ -92,6 +98,7 @@ function inspect(string $url, int $timeout = 20): array|WP_Error
         'redirection' => 3,
         'sslverify' => !\wppilot_likely_self_signed_https(),
         'user-agent' => 'WPPilot/' . (defined('WPPILOT_VERSION') ? WPPILOT_VERSION : 'dev') . ' (rendered-check)',
+        'cookies' => $cookies,
     ]);
     $elapsed = (int) round((microtime(true) - $started) * 1000);
 

@@ -23,6 +23,13 @@ class ListResourcesResult extends PaginatedResult implements ServerResultInterfa
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['nextCursor', '_meta', 'resources'];
+
+    /**
      * @since 2024-11-05
      *
      * @var array<\WP\McpSchema\Server\Resources\DTO\Resource>
@@ -33,13 +40,15 @@ class ListResourcesResult extends PaginatedResult implements ServerResultInterfa
      * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources @since 2024-11-05
      * @param string|null $nextCursor @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         array $resources,
         ?string $nextCursor = null,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta, $nextCursor);
+        parent::__construct($_meta, $nextCursor, $additionalProperties);
         $this->resources = $resources;
     }
 
@@ -69,7 +78,8 @@ class ListResourcesResult extends PaginatedResult implements ServerResultInterfa
         return new self(
             $resources,
             self::asStringOrNull($data['nextCursor'] ?? null),
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

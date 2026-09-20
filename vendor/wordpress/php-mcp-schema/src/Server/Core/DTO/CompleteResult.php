@@ -22,6 +22,13 @@ class CompleteResult extends Result implements ServerResultInterface
     use ValidatesRequiredFields;
 
     /**
+     * Wire keys this class models. Anything else is kept in $additionalProperties.
+     *
+     * @var array<int, string>
+     */
+    private const KNOWN_KEYS = ['_meta', 'completion'];
+
+    /**
      * @since 2024-11-05
      *
      * @var \WP\McpSchema\Server\Core\DTO\CompleteResultCompletion
@@ -31,12 +38,14 @@ class CompleteResult extends Result implements ServerResultInterface
     /**
      * @param \WP\McpSchema\Server\Core\DTO\CompleteResultCompletion $completion @since 2024-11-05
      * @param array<string, mixed>|null $_meta @since 2024-11-05
+     * @param array<string, mixed>|null $additionalProperties
      */
     public function __construct(
         CompleteResultCompletion $completion,
-        ?array $_meta = null
+        ?array $_meta = null,
+        ?array $additionalProperties = null
     ) {
-        parent::__construct($_meta);
+        parent::__construct($_meta, $additionalProperties);
         $this->completion = $completion;
     }
 
@@ -61,7 +70,8 @@ class CompleteResult extends Result implements ServerResultInterface
 
         return new self(
             $completion,
-            self::asArrayOrNull($data['_meta'] ?? null)
+            self::asArrayOrNull($data['_meta'] ?? null),
+            self::additionalFields($data, self::KNOWN_KEYS)
         );
     }
 

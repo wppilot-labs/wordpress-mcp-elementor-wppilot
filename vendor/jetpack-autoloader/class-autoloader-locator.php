@@ -5,7 +5,7 @@
  * @package automattic/jetpack-autoloader
  */
 
-namespace Automattic\Jetpack\Autoloader\jp4022a2bcd8be2d6a8129426db2e190e6\al5_0_20;
+namespace Automattic\Jetpack\Autoloader\jpwppilot\al5_0_23;
 
  // phpcs:ignore
 
