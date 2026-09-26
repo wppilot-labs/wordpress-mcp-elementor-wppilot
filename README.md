@@ -23,7 +23,7 @@ This is it, with one server instead of one per plugin. **Elementor editing is fr
 
 [Elementor MCP](https://wppilot.co/mcp-for-elementor) · [Bricks MCP](https://wppilot.co/mcp-for-bricks) · [Divi MCP](https://wppilot.co/mcp-for-divi) · [Beaver Builder MCP](https://wppilot.co/mcp-for-beaver-builder) · [Oxygen MCP](https://wppilot.co/mcp-for-oxygen) · [Breakdance MCP](https://wppilot.co/mcp-for-breakdance) · [WPBakery MCP](https://wppilot.co/mcp-for-wpbakery) · [Etch MCP](https://wppilot.co/mcp-for-etch) · [Mosaic MCP](https://wppilot.co/mcp-for-mosaic)
 
-Beyond page builders, Pro also covers WooCommerce, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Yoast SEO, Rank Math, AIOSEO, SEOPress, WPML, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [51 integrations](#wppilot-pro-plugin-aware-abilities-across-51-integrations).
+Beyond page builders, Pro also covers WooCommerce, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Yoast SEO, Rank Math, AIOSEO, SEOPress, WPML, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [77 integrations](#wppilot-pro-plugin-aware-abilities-across-77-integrations).
 
 ## WordPress MCP server and protocol support
 
@@ -174,11 +174,11 @@ The free abilities are the primitives, and they compose. What Pro adds is the au
 
 The dividing line is simple: free can **edit** an Elementor page, Pro can **compose** one.
 
-## WPPilot Pro: plugin-aware abilities across 51 integrations
+## WPPilot Pro: plugin-aware abilities across 77 integrations
 
 The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **141 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
-[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 51 integrations**, typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
+[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 77 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
 | Category | Integrations · `ability count` |
 | --- | --- |
