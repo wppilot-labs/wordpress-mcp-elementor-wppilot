@@ -22,6 +22,8 @@ v1.13.0 - 2026/09/26
 * Rollback: restoring a post's meta stripped a level of backslashes, so Elementor, Bricks, Breakdance and Oxygen data came back as JSON that no longer decoded. Terms, comments and menus were restored and then reported as failed, because they never reported verification; they compare a fresh snapshot now.
 * wppilot/elementor-audit-atomic-readiness is listed over MCP and honours the master switch; it registered but was never served. Modern-transport writes count against the write rate limit.
 * PHP 8.0: seven more places unpacked string-keyed arrays, which PHP 8.0 refuses at run time - among them every successful elementor-set-content call and every preview apply.
+* Security: WordPress core's own ability runner (/wp-abilities/v1/abilities/{name}/run) reached abilities past WPPilot's confirmation gate, write rate limit, preview and design gates and Pro's approval queue. It now runs through the same controls as WPPilot's own REST route; a destructive call without confirm is refused there, and the refusal names the WPPilot route that accepts confirm.
+* The admin tab bar no longer cuts off its first group when the screen is narrower than the tabs; the groups wrap onto a second centred row.
 
 v1.8.1 - 2026/08/28
 * Fixed wppilot/reorder-menu-items destroying the menu it was asked to reorder. wp_update_nav_menu_item() merges its own defaults over whatever it is not given and rewrites the item, so a call carrying only a position blanked the label, cleared the link, reset the type to "custom" and flattened the nesting of every item it touched - and reported success. Reordering now seeds each write with the item's existing values first, the same way upsert-menu-item already did.

@@ -234,8 +234,15 @@ body[class*='wppilot'] .wrap .wrap-title h1 {
  * inside it are centred on the same measure as the content below, so the rail
  * and the page share one axis instead of drifting apart on wide displays.
  */
+/*
+ * The groups wrap onto a second centred row instead of overflowing. A centred
+ * flex row that does not wrap spills off the left edge, where overflow
+ * scrolling cannot reach it - at 1440px with the admin menu open, "Connection"
+ * was cut off.
+ */
 .wppilot-tabs {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: stretch;
 	justify-content: center;
 	gap: 0;

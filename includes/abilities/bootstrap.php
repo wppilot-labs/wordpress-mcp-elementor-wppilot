@@ -25,6 +25,8 @@ function wppilot_boot_ability_rest_surface(): bool
 
     require_once dirname(__DIR__) . '/rest/shim.php';
     add_action('rest_api_init', callback: 'wppilot_register_ability_run_rest_shim');
+    // Core's own runner gets the same controls as the shim; it needs the shim's helpers.
+    require_once dirname(__DIR__) . '/rest/core-run-gate.php';
 
     return true;
 }
