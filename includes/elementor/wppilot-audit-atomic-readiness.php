@@ -246,7 +246,7 @@ function el_audit_document_ids(array $post_types, int $limit, int $offset): arra
     ]);
 
     /** @var list<int> $ids */
-    $ids = array_map(intval(...), $query->posts);
+    $ids = array_map('intval', $query->posts);
 
     return $ids;
 }

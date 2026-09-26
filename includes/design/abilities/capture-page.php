@@ -107,7 +107,7 @@ function register(): void
 
             /** @var list<int> $viewports */
             $viewports = is_array($input['viewports'] ?? null) && $input['viewports'] !== []
-                ? array_map(intval(...), $input['viewports'])
+                ? array_map('intval', $input['viewports'])
                 : array_column(Capture\CAPTURE_VIEWPORTS, 'width');
 
             $job = VisualRuntime\enqueue_job($post_id, $url, $viewports, (string) ($input['label'] ?? ''));

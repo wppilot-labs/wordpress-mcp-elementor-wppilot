@@ -191,7 +191,7 @@ function jobs(): array
     /** @var mixed $stored */
     $stored = get_option(JOBS_OPTION, []);
 
-    return is_array($stored) ? array_values(array_filter($stored, is_array(...))) : [];
+    return is_array($stored) ? array_values(array_filter($stored, 'is_array')) : [];
 }
 
 /**
@@ -216,7 +216,7 @@ function enqueue_job(int $post_id, string $url, array $viewports, string $label)
         'id' => wp_generate_uuid4(),
         'post_id' => $post_id,
         'url' => $url,
-        'viewports' => array_values(array_unique(array_map(intval(...), $viewports))),
+        'viewports' => array_values(array_unique(array_map('intval', $viewports))),
         'label' => $label,
         'status' => 'queued',
         'claimed_at' => 0,
