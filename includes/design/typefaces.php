@@ -404,7 +404,7 @@ function get(string $family): ?array
     $needle = strtolower(trim($family));
     foreach (all() as $name => $face) {
         if (strtolower($name) === $needle) {
-            return ['family' => $name, ...$face];
+            return array_merge(['family' => $name], $face);
         }
     }
     return null;
@@ -556,7 +556,7 @@ function partners(string $family, string $role = 'body', bool $include_overused 
             continue;
         }
 
-        $out[] = ['family' => $name, ...$face];
+        $out[] = array_merge(['family' => $name], $face);
     }
 
     return $out;

@@ -80,7 +80,41 @@ function pre_dispatch(mixed $result, WP_REST_Server $server, WP_REST_Request $re
         return $result;
     }
 
+    // rest_pre_dispatch runs before route matching, so the route's permission
+    // callback and the OAuth route/scope checks have not run yet. Answer the
+    // modern protocol only for a caller who would pass them; anyone else falls
+    // through to normal routing, which denies with the same 401 challenge an
+    // OAuth client needs to discover how to sign in.
+    if (!caller_may_use_mcp($request)) {
+        return $result;
+    }
+
     return respond(handle_modern($request, $body));
+}
+
+/**
+ * Whether the current caller passes the checks the legacy route applies:
+ * the AI abilities master switch, WPPilot's manage capability, and - for an
+ * OAuth credential - the route and scope boundary.
+ */
+function caller_may_use_mcp(WP_REST_Request $request): bool
+{
+    if (!function_exists('wppilot_permission_callback') || !\wppilot_permission_callback()) {
+        return false;
+    }
+
+    if (
+        function_exists('WPPilot\OAuth\Middleware\request_oauth_identity')
+        && \WPPilot\OAuth\Middleware\request_oauth_identity() !== null
+        && function_exists('WPPilot\OAuth\Middleware\authorize_routed_request')
+    ) {
+        $verdict = \WPPilot\OAuth\Middleware\authorize_routed_request(null, null, $request);
+        if ($verdict instanceof WP_Error) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**

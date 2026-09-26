@@ -477,6 +477,11 @@ function wppilot_render_method_cards(
                 domain: 'wppilot',
             ); ?></span>
         </button>
+        <?php
+        // Tokens are authenticated by the OAuth middleware, which only loads
+        // over HTTPS (or on a local environment). Offering the card elsewhere
+        // minted tokens that every call then refused with a 401.
+        if (wppilot_oauth_transport_allowed()) : ?>
         <button
             type="button"
             class="wppilot-method-card<?php echo $token_active ? ' is-active' : ''; ?>"
@@ -490,6 +495,7 @@ function wppilot_render_method_cards(
                 domain: 'wppilot',
             ); ?></span>
         </button>
+        <?php endif; ?>
         <?php /*
          * Not a fourth credential — a fourth way of arriving. Someone whose AI is
          * a browser tab does not know yet whether they want OAuth or a token, and

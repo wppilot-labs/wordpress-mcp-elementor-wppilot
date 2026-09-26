@@ -124,7 +124,7 @@ function register(): void
                 if (($input['role'] ?? '') !== '' && !in_array($role, (array) $face['roles'], strict: true)) {
                     continue;
                 }
-                $faces[] = ['family' => $name, ...$face];
+                $faces[] = array_merge(['family' => $name], $face);
             }
 
             return [

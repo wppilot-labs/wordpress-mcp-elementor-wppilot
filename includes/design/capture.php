@@ -39,6 +39,20 @@ if (!defined('ABSPATH')) {
 const CAPTURE_META = '_wppilot_capture';
 
 /**
+ * The captured post's ID, on its own key so a post's captures are one indexed
+ * query. Filtering the site's newest captures in PHP lost a quiet page's
+ * captures as soon as busier pages had taken more.
+ */
+const CAPTURE_POST_META = '_wppilot_capture_post';
+
+/**
+ * Set only on files WPPilot created itself. Pruning deletes those; an existing
+ * media item somebody registered as a capture is unmarked, never deleted - it
+ * may be the site's logo.
+ */
+const CAPTURE_OWNED_META = '_wppilot_capture_owned';
+
+/**
  * How many captures to keep per post.
  *
  * Enough for a before, an after, and a few attempts in between. Captures are
@@ -80,8 +94,12 @@ const CAPTURE_DIFF_THRESHOLD = 0.06;
  *
  * @param array<string, mixed> $context
  */
-function record(int $attachment_id, array $context): void
+function record(int $attachment_id, array $context, bool $owned = false): void
 {
+    update_post_meta($attachment_id, CAPTURE_POST_META, (int) ($context['post_id'] ?? 0));
+    if ($owned) {
+        update_post_meta($attachment_id, CAPTURE_OWNED_META, 1);
+    }
     update_post_meta($attachment_id, CAPTURE_META, [
         'post_id' => (int) ($context['post_id'] ?? 0),
         'url' => (string) ($context['url'] ?? ''),
@@ -121,7 +139,9 @@ function listing(int $post_id, int $limit = 50): array
         'orderby' => 'ID',
         'order' => 'DESC',
         'fields' => 'ids',
-        'meta_query' => [['key' => CAPTURE_META, 'compare' => 'EXISTS']],
+        'meta_query' => $post_id > 0
+            ? [['key' => CAPTURE_POST_META, 'value' => $post_id, 'compare' => '=', 'type' => 'NUMERIC']]
+            : [['key' => CAPTURE_META, 'compare' => 'EXISTS']],
     ]);
 
     $captures = [];
@@ -131,7 +151,8 @@ function listing(int $post_id, int $limit = 50): array
         if ($context === null || ($post_id > 0 && (int) ($context['post_id'] ?? 0) !== $post_id)) {
             continue;
         }
-        $captures[] = [...$context, 'attachment_id' => $attachment_id, 'url' => wp_get_attachment_url($attachment_id)];
+        // array_merge, not a spread: unpacking string keys is a fatal on PHP 8.0.
+        $captures[] = array_merge($context, ['attachment_id' => $attachment_id, 'url' => wp_get_attachment_url($attachment_id)]);
     }
 
     return $captures;
@@ -146,9 +167,15 @@ function prune(int $post_id): void
         return;
     }
 
-    $captures = listing($post_id, limit: 200);
+    $captures = listing($post_id, limit: -1);
     foreach (array_slice($captures, CAPTURE_KEEP_PER_POST) as $capture) {
-        wp_delete_attachment((int) $capture['attachment_id'], force_delete: true);
+        $attachment_id = (int) $capture['attachment_id'];
+        if (get_post_meta($attachment_id, CAPTURE_OWNED_META, single: true)) {
+            wp_delete_attachment($attachment_id, force_delete: true);
+            continue;
+        }
+        delete_post_meta($attachment_id, CAPTURE_META);
+        delete_post_meta($attachment_id, CAPTURE_POST_META);
     }
 }
 
@@ -334,7 +361,7 @@ function merge_regions(array $cells): array
         }
 
         if (!$merged) {
-            $regions[] = [...$cell, 'cells' => 1];
+            $regions[] = array_merge($cell, ['cells' => 1]);
         }
     }
 

@@ -60,6 +60,14 @@ function register(): void
  */
 function resolve_bearer_identity(mixed $user): mixed
 {
+    // An MCP credential is for the REST API, as core scopes Application
+    // Passwords. Accepting it everywhere let a Read Only token post a comment
+    // through wp-comments-post.php, or drive admin-ajax, as the administrator -
+    // outside every check the REST boundary applies.
+    if (!is_rest_request()) {
+        return $user;
+    }
+
     $auth = get_authorization_header();
 
     // function_exists guards the load order rather than the feature: this file is
@@ -74,6 +82,31 @@ function resolve_bearer_identity(mixed $user): mixed
         $auth,
         static fn(string $authorization): array => validate_bearer_credential($authorization),
     );
+}
+
+/**
+ * Whether this request is for the REST API.
+ *
+ * REST_REQUEST is defined only once WordPress parses the request, and the
+ * current user can be resolved before that, so the REST URL prefix and the
+ * rest_route query form are recognised too.
+ */
+function is_rest_request(): bool
+{
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        return true;
+    }
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Routing test only; nothing is read into state.
+    if (isset($_GET['rest_route'])) {
+        return true;
+    }
+
+    $uri = isset($_SERVER['REQUEST_URI']) ? (string) wp_unslash($_SERVER['REQUEST_URI']) : '';
+    $path = (string) wp_parse_url($uri, PHP_URL_PATH);
+    $prefix = '/' . trim(rest_get_url_prefix(), '/') . '/';
+    $home_path = rtrim((string) wp_parse_url(home_url('/'), PHP_URL_PATH), '/');
+
+    return $path !== '' && str_starts_with($path, $home_path . $prefix);
 }
 
 /**

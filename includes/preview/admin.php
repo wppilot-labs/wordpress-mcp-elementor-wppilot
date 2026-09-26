@@ -161,7 +161,7 @@ function redirect_with_notice(string $type, string $message, array $args = []): 
         ['type' => $type, 'message' => $message],
         expiration: 30,
     );
-    wp_safe_redirect(add_query_arg([...['page' => PAGE_SLUG], ...$args], admin_url('admin.php')));
+    wp_safe_redirect(add_query_arg(array_merge(['page' => PAGE_SLUG], $args), admin_url('admin.php')));
     exit();
 }
 

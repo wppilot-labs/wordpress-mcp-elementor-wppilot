@@ -99,6 +99,10 @@ function wppilot_uninstall_options(): array
         'wppilot_instructions_content',
         // includes/design/cpt.php
         'wppilot_active_design',
+        // includes/design/gate.php
+        'wppilot_design_gate_mode',
+        // includes/design/visual-runtime.php
+        'wppilot_visual_jobs',
         // includes/admin/pro-upsell.php
         'wppilot_pro_upsell_installed_at',
         // includes/troubleshoot/bootstrap.php

@@ -22,8 +22,11 @@ use WP_Post;
  *
  * Most MCP clients already have a browser. This closes the loop with the one
  * they have rather than by building a second one: it returns the address to
- * open, the widths worth looking at, and - for a page nobody can see yet - the
- * sign-in exchange that makes the draft visible to that browser.
+ * open and the widths worth looking at. For a page nobody can see yet it says
+ * so, and names the ability that can sign a browser in - it never mints that
+ * session itself. A sign-in link is a wp-admin session: it is critical, needs
+ * confirmation, and Production Safe refuses it. An ability annotated read-only
+ * that handed one out would walk straight past all three.
  *
  * Deliberately not a screenshot ability. WPPilot has no renderer; when the
  * caller has no browser either, wppilot/capture-page asks the site's own
@@ -63,7 +66,7 @@ function register(): void
     wp_register_ability('wppilot/get-page-view-link', [
         'label' => __('Get Page View Link', domain: 'wppilot'),
         'description' => __(
-            'Returns a URL to open in your own browser tool so you can SEE a page you built, plus the viewport widths worth checking. Works on an unpublished page: when the page is not public it also returns a one-time sign-in exchange, so the browser can be given a session before the preview URL is opened. Use this after building or editing a page and before reporting it finished - wppilot/verify-rendered-page reads the markup, and this is how you look at the result. If you have no browser tool, wppilot/capture-page asks the site to take the screenshot instead.',
+            'Returns a URL to open in your own browser tool so you can SEE a page you built, plus the viewport widths worth checking. For an unpublished page it returns the preview URL and requires_sign_in=true: a browser that is not already signed in to this site needs a session first, which only wppilot/create-admin-access-link can issue - a critical ability that needs confirmation and that the active safety profile may refuse. Use this after building or editing a page and before reporting it finished - wppilot/verify-rendered-page reads the markup, and this is how you look at the result. If you have no browser tool, wppilot/capture-page asks the site to take the screenshot instead.',
             domain: 'wppilot',
         ),
         'category' => 'preview',
@@ -79,13 +82,6 @@ function register(): void
                     'type' => 'string',
                     'description' => 'A URL on this site to look at instead, such as an archive or the front page.',
                 ],
-                'session_expires_in' => [
-                    'type' => 'integer',
-                    'minimum' => 60,
-                    'maximum' => 3600,
-                    'default' => 900,
-                    'description' => 'How long the browser session lasts, when a sign-in exchange is needed.',
-                ],
             ],
             'additionalProperties' => false,
         ],
@@ -96,9 +92,7 @@ function register(): void
             'annotations' => [
                 'readonly' => true,
                 'destructive' => false,
-                // A sign-in exchange is minted per call, so two calls are not the
-                // same call - the previous token stops being the current one.
-                'idempotent' => false,
+                'idempotent' => true,
             ],
             'mcp' => ['public' => true, 'type' => 'tool'],
         ],
@@ -171,46 +165,12 @@ function get_page_view_link(array $input): array|WP_Error
     ];
 
     if ($needs_session) {
-        $sign_in = sign_in_exchange((int) ($input['session_expires_in'] ?? 900));
-        if ($sign_in instanceof WP_Error) {
-            return $sign_in;
-        }
-        $result['sign_in'] = $sign_in;
+        $result['sign_in_ability'] = 'wppilot/create-admin-access-link';
     }
 
     $result['user_instruction'] = view_instruction($needs_session);
 
     return $result;
-}
-
-/**
- * The one-time exchange that gives a browser a session on this site.
- *
- * Reuses the admin-access link rather than minting a second kind of credential:
- * one token shape, one expiry rule, one place where the security decisions live.
- * The redirect lands in wp-admin, and the browser opens the preview URL itself
- * once it holds the session.
- *
- * @return array<string, mixed>|WP_Error
- */
-function sign_in_exchange(int $session_expires_in): array|WP_Error
-{
-    if (!function_exists('wppilot_create_admin_access_link')) {
-        return new WP_Error(
-            'wppilot_view_link_no_sign_in',
-            __(
-                'This page is not published, and this build does not issue sign-in links. Publish the page, or open it yourself while signed in.',
-                domain: 'wppilot',
-            ),
-        );
-    }
-
-    /** @var array<string, mixed>|WP_Error $access */
-    $access = wppilot_create_admin_access_link([
-        'session_expires_in' => max(60, min(3_600, $session_expires_in)),
-    ]);
-
-    return $access;
 }
 
 /**
@@ -228,7 +188,7 @@ function view_instruction(bool $needs_session): string
     }
 
     return __(
-        'This page is not published, so the browser needs a session first: POST to sign_in.exchange_url with the token and nonce in the headers it names, then open the returned login_url immediately - its nonce expires within 60 seconds. That establishes the session; then open `url`. Never put the token in a query string or paste it anywhere a person could read it.',
+        'This page is not published, so only a browser signed in to this site can open `url`. If yours is not, do not work around it: ask the person to open the preview themselves, or - only if they agree - call wppilot/create-admin-access-link, which is critical, needs confirm=true, and may be refused by the active safety profile. Never put a sign-in token in a query string or paste it anywhere a person could read it.',
         domain: 'wppilot',
     ) . ' ' . $look;
 }

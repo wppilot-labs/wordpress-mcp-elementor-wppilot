@@ -177,7 +177,9 @@ function wppilot_rate_pre_mcp_tool_call(mixed $args, string $tool_name): mixed
  */
 function wppilot_rate_pre_ability_execute(mixed $input, WP_Ability $ability, string $transport): mixed
 {
-    if ($transport !== 'rest' || wppilot_ability_is_readonly($ability)) {
+    // 'mcp' is the modern transport, which calls this directly and passes no
+    // other rate filter; refusing it here left modern clients unthrottled.
+    if (!in_array($transport, ['rest', 'mcp'], strict: true) || wppilot_ability_is_readonly($ability)) {
         return $input;
     }
 

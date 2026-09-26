@@ -102,13 +102,18 @@ wp_register_ability('wppilot/elementor-audit-atomic-readiness', [
     'execute_callback' => static function (array $input): array|\WP_Error {
         return elementor_audit_atomic_readiness($input);
     },
-    'permission_callback' => static fn(): bool => current_user_can('edit_posts'),
+    // The shared callback, like every other ability: it honours the master
+    // switch, which a bare capability check skipped.
+    'permission_callback' => 'wppilot_permission_callback',
     'meta' => [
         'annotations' => [
             'readonly' => true,
             'destructive' => false,
             'idempotent' => true,
         ],
+        // Without these the ability registered but was never listed over MCP.
+        'show_in_rest' => true,
+        'mcp' => ['public' => true, 'type' => 'tool'],
     ],
 ]);
 

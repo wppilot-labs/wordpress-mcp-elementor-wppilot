@@ -72,6 +72,49 @@ const NOT_CHECKED = [
 ];
 
 /**
+ * Whether a signed-in fetch may go to this URL: same host, port and scheme as
+ * the site address, or https to the same host and port.
+ */
+function session_target_allowed(string $url): bool
+{
+    $target = wp_parse_url($url);
+    $home = wp_parse_url(home_url('/'));
+    if (!is_array($target) || !is_array($home) || !\wppilot_url_is_same_site($url)) {
+        return false;
+    }
+
+    $scheme = strtolower((string) ($target['scheme'] ?? ''));
+    $home_scheme = strtolower((string) ($home['scheme'] ?? ''));
+    $port = (int) ($target['port'] ?? ($scheme === 'https' ? 443 : 80));
+    $home_port = (int) ($home['port'] ?? ($home_scheme === 'https' ? 443 : 80));
+
+    return ($scheme === $home_scheme || $scheme === 'https') && $port === $home_port;
+}
+
+/**
+ * Session cookies bound to the site's host, so the transport can never offer
+ * them to another domain even if a redirect were followed.
+ *
+ * @param array<string, string> $cookies
+ * @return list<\WP_Http_Cookie>
+ */
+function session_cookies(array $cookies): array
+{
+    $host = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
+    $bound = [];
+    foreach ($cookies as $name => $value) {
+        $bound[] = new \WP_Http_Cookie([
+            'name' => (string) $name,
+            'value' => (string) $value,
+            'domain' => $host,
+            'path' => '/',
+        ]);
+    }
+
+    return $bound;
+}
+
+/**
  * Fetch and analyse one URL.
  *
  * `$cookies` carries a caller's own short-lived session so an unpublished page
@@ -92,13 +135,27 @@ function inspect(string $url, int $timeout = 20, array $cookies = []): array|WP_
         );
     }
 
+    // A session is only ever sent to this site, over the scheme it was issued
+    // for, and never across a redirect: WordPress re-sends domain-less cookies
+    // to every hop, so a preview that redirects off-site would hand the
+    // caller's session to whoever it redirects to.
+    $with_session = $cookies !== [];
+    if ($with_session && !session_target_allowed($url)) {
+        return new WP_Error(
+            'wppilot_rendered_session_off_site',
+            __('A signed-in check can only fetch a page on this site, over the same scheme and port as the site address.', domain: 'wppilot'),
+        );
+    }
+
     $started = microtime(true);
-    $response = wp_remote_get($url, [
+    // wp_safe_remote_get validates every redirect hop, not only the first URL,
+    // so a public page cannot bounce the fetch onto an internal address.
+    $response = wp_safe_remote_get($url, [
         'timeout' => max(5, min(30, $timeout)),
-        'redirection' => 3,
+        'redirection' => $with_session ? 0 : 3,
         'sslverify' => !\wppilot_likely_self_signed_https(),
         'user-agent' => 'WPPilot/' . (defined('WPPILOT_VERSION') ? WPPILOT_VERSION : 'dev') . ' (rendered-check)',
-        'cookies' => $cookies,
+        'cookies' => $with_session ? session_cookies($cookies) : [],
     ]);
     $elapsed = (int) round((microtime(true) - $started) * 1000);
 
@@ -111,6 +168,15 @@ function inspect(string $url, int $timeout = 20, array $cookies = []): array|WP_
     }
 
     $status = (int) wp_remote_retrieve_response_code($response);
+
+    if ($with_session && $status >= 300 && $status < 400) {
+        return new WP_Error('wppilot_rendered_session_redirect', sprintf(
+            /* translators: %s: redirect target. */
+            __('The preview redirected to %s. A signed-in check does not follow redirects, so the session cannot be carried to another address; check the redirect rule, or verify the published page instead.', domain: 'wppilot'),
+            esc_url_raw((string) wp_remote_retrieve_header($response, 'location')),
+        ));
+    }
+
     $body = (string) wp_remote_retrieve_body($response);
     $bytes = strlen($body);
 
@@ -634,7 +700,7 @@ function stylesheets(string $html, string $page_url, int $timeout): array
             continue;
         }
 
-        $response = wp_remote_get($resolved, [
+        $response = wp_safe_remote_get($resolved, [
             'timeout' => $timeout,
             'redirection' => 2,
             'user-agent' => 'WPPilot/rendered-check',

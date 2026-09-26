@@ -813,7 +813,7 @@ function wppilot_rollback_created_term(int $term_id, string $taxonomy): array|WP
     // @mago-expect analysis:mixed-assignment -- get_term returns WP_Term|WP_Error|null.
     $term = get_term($term_id, $taxonomy);
     if (!$term instanceof WP_Term) {
-        return ['result' => 'already-absent', 'term_id' => $term_id];
+        return ['result' => 'already-absent', 'term_id' => $term_id, 'verified' => true];
     }
 
     $deleted = wp_delete_term($term_id, $taxonomy);
@@ -824,7 +824,12 @@ function wppilot_rollback_created_term(int $term_id, string $taxonomy): array|WP
         return new WP_Error('wppilot_rollback_term_failed', __('The term could not be deleted.', domain: 'wppilot'));
     }
 
-    return ['result' => 'deleted', 'term_id' => $term_id, 'taxonomy' => $taxonomy];
+    return [
+        'result' => 'deleted',
+        'term_id' => $term_id,
+        'taxonomy' => $taxonomy,
+        'verified' => !get_term($term_id, $taxonomy) instanceof WP_Term,
+    ];
 }
 
 /**
@@ -842,10 +847,11 @@ function wppilot_restore_term_snapshot(array $snapshot): array|WP_Error
         return new WP_Error('wppilot_rollback_invalid_term', __('Term snapshot is incomplete.', domain: 'wppilot'));
     }
 
+    // wp_update_term() unslashes name and description; the snapshot is raw.
     $updated = wp_update_term($term_id, $taxonomy, [
-        'name' => (string) ($values['name'] ?? ''),
+        'name' => wp_slash((string) ($values['name'] ?? '')),
         'slug' => (string) ($values['slug'] ?? ''),
-        'description' => (string) ($values['description'] ?? ''),
+        'description' => wp_slash((string) ($values['description'] ?? '')),
         'parent' => (int) ($values['parent'] ?? 0),
     ]);
     if (is_wp_error($updated)) {
@@ -860,7 +866,15 @@ function wppilot_restore_term_snapshot(array $snapshot): array|WP_Error
         );
     }
 
-    return ['result' => 'restored', 'term_id' => $term_id, 'fingerprint' => $observed['fingerprint'] ?? ''];
+    // The caller refuses to mark a change rolled back without `verified`, so a
+    // restore that never reported it wrote the old state and then said it had
+    // failed.
+    return [
+        'result' => 'restored',
+        'term_id' => $term_id,
+        'fingerprint' => $observed['fingerprint'] ?? '',
+        'verified' => wppilot_snapshot_matches($snapshot, $observed),
+    ];
 }
 
 /**
@@ -880,16 +894,21 @@ function wppilot_restore_comment_snapshot(array $snapshot): array|WP_Error
         );
     }
 
+    // wp_update_comment() unslashes what it is given; the snapshot is raw.
     $updated = wp_update_comment([
         'comment_ID' => $comment_id,
-        'comment_content' => (string) ($values['content'] ?? ''),
-        'comment_author' => (string) ($values['author'] ?? ''),
+        'comment_content' => wp_slash((string) ($values['content'] ?? '')),
+        'comment_author' => wp_slash((string) ($values['author'] ?? '')),
     ], wp_error: true);
     if (is_wp_error($updated)) {
         return $updated;
     }
 
-    return ['result' => 'restored', 'comment_id' => $comment_id];
+    return [
+        'result' => 'restored',
+        'comment_id' => $comment_id,
+        'verified' => wppilot_snapshot_matches($snapshot, wppilot_snapshot_comment($comment_id)),
+    ];
 }
 
 /**
@@ -903,7 +922,11 @@ function wppilot_restore_menu_locations_snapshot(array $snapshot): array
     $values = array_map('intval', wppilot_string_keyed_array($snapshot['values'] ?? null));
     set_theme_mod('nav_menu_locations', $values);
 
-    return ['result' => 'restored', 'locations' => count($values)];
+    $observed = array_map('intval', wppilot_string_keyed_array(get_theme_mod('nav_menu_locations', [])));
+    ksort($values);
+    ksort($observed);
+
+    return ['result' => 'restored', 'locations' => count($values), 'verified' => $observed === $values];
 }
 
 /**
@@ -1029,7 +1052,26 @@ function wppilot_restore_menu_order_snapshot(array $snapshot): array|WP_Error
         ++$restored;
     }
 
-    return ['result' => 'restored', 'menu_id' => $menu_id, 'items' => $restored];
+    return [
+        'result' => 'restored',
+        'menu_id' => $menu_id,
+        'items' => $restored,
+        'verified' => wppilot_snapshot_matches($snapshot, wppilot_snapshot_menu_order($menu_id)),
+    ];
+}
+
+/**
+ * Whether a fresh snapshot of an object matches the one a rollback restored.
+ *
+ * @param array<string, mixed> $snapshot
+ * @param array<string, mixed>|null $observed
+ */
+function wppilot_snapshot_matches(array $snapshot, ?array $observed): bool
+{
+    $expected = (string) ($snapshot['fingerprint'] ?? '');
+    $actual = is_array($observed) ? (string) ($observed['fingerprint'] ?? '') : '';
+
+    return $expected !== '' && hash_equals($expected, $actual);
 }
 
 /**
@@ -1209,7 +1251,11 @@ function wppilot_restore_post_snapshot(array $snapshot): array|WP_Error
     foreach (wppilot_string_keyed_array($snapshot['meta'] ?? []) as $key => $values) {
         // @mago-expect analysis:mixed-assignment -- Individual post-meta values are intentionally opaque.
         foreach (is_array($values) ? $values : [] as $value) {
-            add_post_meta($post_id, $key, $value);
+            // add_post_meta() unslashes what it is given, as if it came from a
+            // form. Snapshot values are raw, so without this every backslash in
+            // builder JSON (Elementor, Bricks, Breakdance, Oxygen) was stripped
+            // and the page the rollback restored could no longer be decoded.
+            add_post_meta($post_id, $key, wp_slash($value));
         }
     }
     // @mago-expect analysis:mixed-assignment -- Term lists are normalized to integers below.

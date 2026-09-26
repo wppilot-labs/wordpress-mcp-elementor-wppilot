@@ -160,7 +160,10 @@ function enqueue_assets(string $hook_suffix): void
  */
 function register_routes(): void
 {
-    $permission = static fn(): bool => current_user_can('edit_posts');
+    // Completing a job stores an upload and can prune older captures, so the
+    // runtime needs upload rights as well as editing rights; per-job checks
+    // below also require edit access to the post the job is about.
+    $permission = static fn(): bool => current_user_can('edit_posts') && current_user_can('upload_files');
 
     register_rest_route('wppilot/v1', '/visual/claim', [
         'methods' => 'POST',
@@ -306,6 +309,9 @@ function rest_claim(WP_REST_Request $request): array
     foreach (jobs() as $job) {
         $status = (string) ($job['status'] ?? '');
         $claimed = (int) ($job['claimed_at'] ?? 0);
+        if (!job_is_mine_to_run($job)) {
+            continue;
+        }
 
         // A job claimed by a tab that then went away - closed, navigated off,
         // throttled by the browser - would otherwise stay "running" forever.
@@ -325,6 +331,19 @@ function rest_claim(WP_REST_Request $request): array
 }
 
 /**
+ * Whether the current user may work this job: edit rights on the post it
+ * captures, when it captures a post.
+ *
+ * @param array<string, mixed> $job
+ */
+function job_is_mine_to_run(array $job): bool
+{
+    $post_id = (int) ($job['post_id'] ?? 0);
+
+    return $post_id <= 0 || current_user_can('edit_post', $post_id);
+}
+
+/**
  * Store one rasterised viewport.
  *
  * @return array<string, mixed>|WP_Error
@@ -335,6 +354,9 @@ function rest_complete(WP_REST_Request $request): array|WP_Error
     $job = job($id);
     if ($job === null) {
         return new WP_Error('wppilot_visual_no_job', __('No such capture job.', domain: 'wppilot'), ['status' => 404]);
+    }
+    if (!job_is_mine_to_run($job) || (string) ($job['status'] ?? '') !== 'running') {
+        return new WP_Error('wppilot_visual_not_running', __('That capture job is not running for you.', domain: 'wppilot'), ['status' => 403]);
     }
 
     $viewport = (int) $request->get_param('viewport');
@@ -354,7 +376,7 @@ function rest_complete(WP_REST_Request $request): array|WP_Error
         'viewport' => $viewport,
         'label' => (string) ($job['label'] ?? ''),
         'job_id' => $id,
-    ]);
+    ], owned: true);
 
     $job['captures'][] = ['viewport' => $viewport, 'attachment_id' => $attachment_id, 'notes' => $notes];
     if (count($job['captures']) >= count($job['viewports'])) {
@@ -376,6 +398,9 @@ function rest_fail(WP_REST_Request $request): array|WP_Error
     $job = job($id);
     if ($job === null) {
         return new WP_Error('wppilot_visual_no_job', __('No such capture job.', domain: 'wppilot'), ['status' => 404]);
+    }
+    if (!job_is_mine_to_run($job)) {
+        return new WP_Error('wppilot_visual_not_running', __('That capture job is not running for you.', domain: 'wppilot'), ['status' => 403]);
     }
 
     $job['status'] = 'failed';

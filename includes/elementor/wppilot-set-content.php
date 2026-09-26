@@ -167,15 +167,19 @@ function elementor_set_content(array $input): array
         return ['success' => false, 'error' => $result->get_error_message()];
     }
 
-    return [
-        'success' => true,
-        'post_id' => $post_id,
-        'assigned_ids' => $assigned,
+    // array_merge, not spreads: unpacking string keys is a fatal on PHP 8.0,
+    // and it would land after the page was already written.
+    return array_merge(
+        [
+            'success' => true,
+            'post_id' => $post_id,
+            'assigned_ids' => $assigned,
+        ],
         // What the document was written without. Reported rather than logged,
         // because a page that built with a property missing and said nothing is
         // the same silence this whole change exists to remove - the caller has
         // to be able to see it and decide whether it mattered.
-        ...(($prepared['dropped'] ?? []) !== [] ? ['dropped' => $prepared['dropped']] : []),
-        ...el_look_at_it($post_id),
-    ];
+        ($prepared['dropped'] ?? []) !== [] ? ['dropped' => $prepared['dropped']] : [],
+        el_look_at_it($post_id),
+    );
 }

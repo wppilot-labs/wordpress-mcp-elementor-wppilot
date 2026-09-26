@@ -18,12 +18,13 @@ Do not report a page finished until you have looked at it.
 **If you have a browser tool** — Claude Code, Cursor, an MCP browser, anything
 that can open a URL — use that. It is immediate and needs nobody.
 
-1. `wppilot/get-page-view-link` with the `post_id`. It works on a draft: the
-   result carries a one-time sign-in exchange when the page is not public.
-2. If `requires_sign_in` is true, POST to `sign_in.exchange_url` with the token
-   and nonce in the headers it names, then open the returned `login_url`
-   **immediately** — its nonce expires within 60 seconds. That establishes the
-   session; then open `url`.
+1. `wppilot/get-page-view-link` with the `post_id`. On a draft it returns the
+   preview URL and `requires_sign_in: true`.
+2. If `requires_sign_in` is true and your browser is not already signed in to
+   this site, do not work around it. Ask the person to open the preview, or use
+   the no-browser route below. `wppilot/create-admin-access-link` can sign a
+   browser in, but it is a critical ability: call it only when the person has
+   agreed, with `confirm=true`, and accept a refusal from the safety profile.
 3. Screenshot at each width in `viewports`. Three widths, not a sweep: the
    failures worth catching are a layout that breaks between desktop and phone,
    and text that is unreadable over an image.

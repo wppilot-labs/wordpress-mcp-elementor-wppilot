@@ -204,7 +204,7 @@ function update(string $id, array $changes): bool
     if ($record === null) {
         return false;
     }
-    update_option(option_name($id), [...$record, ...$changes], autoload: false);
+    update_option(option_name($id), array_merge($record, $changes), autoload: false);
     return true;
 }
 
