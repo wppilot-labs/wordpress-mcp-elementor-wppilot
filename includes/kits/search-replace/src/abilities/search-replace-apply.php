@@ -51,7 +51,15 @@ wp_register_ability('wppilot/search-replace-apply', [
     'permission_callback' => static fn(): bool => Runtime\can_run(),
     'meta' => [
         'show_in_rest' => true,
-        'mcp' => ['public' => true],
+        'mcp' => [
+            'public' => true,
+            // An MCP client can run this as a task: the call is made with background=true, the task
+            // follows the queued job, and the finished task's result is search-replace-status for it.
+            // Hosts without MCP Tasks ignore these keys.
+            'task_support' => 'optional',
+            'task_input' => ['background' => true],
+            'task_result_ability' => 'wppilot/search-replace-status',
+        ],
         'annotations' => ['readonly' => false, 'destructive' => true, 'idempotent' => false],
     ],
 ]);

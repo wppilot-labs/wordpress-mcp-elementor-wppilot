@@ -65,6 +65,10 @@ Plans and locks are stored in non-autoloaded `wppilot_kit_sr_*` options. Expired
 removed on each preview.
 
 <!-- kit-export:omit -->
+Inside WPPilot, an MCP client on the 2026-07-28 transport can also call apply as a task
+(`meta.mcp.task_support`): the task follows the background job, `tasks/cancel` cancels it, and
+`tasks/result` returns search-replace-status for the job.
+
 Inside WPPilot, the gate pipeline asks for confirmation before apply runs. The ledger is
 WPPilot's change log, and the Changes screen's "Undo this batch" undoes a whole plan by its group.
 <!-- /kit-export:omit -->

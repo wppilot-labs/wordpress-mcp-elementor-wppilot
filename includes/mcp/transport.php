@@ -172,6 +172,12 @@ function handle_modern(WP_REST_Request $request, array $body): array
 
     $params = is_array($body['params'] ?? null) ? $body['params'] : [];
 
+    // Tasks and MCP Apps; see extensions.php.
+    $extension = function_exists('WPPilot\Mcp\dispatch_extensions') ? dispatch_extensions($method, $params, $id) : null;
+    if ($extension !== null) {
+        return $extension;
+    }
+
     // Resources and the Skills extension (SEP-2640) are served by their own module.
     $skills = function_exists('WPPilot\Mcp\SkillResources\dispatch')
         ? SkillResources\dispatch($method, $params, $id)
@@ -258,13 +264,14 @@ function list_tools(): array
             continue;
         }
 
-        $tools[] = [
+        $tool = [
             'name' => tool_name($ability->get_name()),
             'title' => (string) $ability->get_label(),
             'description' => (string) $ability->get_description(),
             'inputSchema' => normalize_schema(advertise_confirmation($ability, $ability->get_input_schema())),
             'outputSchema' => normalize_schema($ability->get_output_schema()),
         ];
+        $tools[] = function_exists('WPPilot\Mcp\decorate_tool') ? decorate_tool($tool, $meta) : $tool;
     }
 
     return sort_tools_deterministically($tools);

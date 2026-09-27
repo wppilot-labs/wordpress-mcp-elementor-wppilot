@@ -27,7 +27,7 @@ if (!defined('ABSPATH')) {
  * Build the capability map from what is actually registered.
  *
  * Capabilities are omitted rather than declared empty when nothing backs them.
- * Three are deliberately never advertised:
+ * Two are deliberately never advertised:
  *
  * - `subscriptions`: WPPilot has no change-notification producer. Nothing in
  *   the plugin emits a tools/prompts/resources list-changed event, so opening a
@@ -36,7 +36,8 @@ if (!defined('ABSPATH')) {
  *   subscription support merely to satisfy a checklist.
  * - `logging`: deprecated in this revision, and WPPilot emits no
  *   `notifications/message`.
- * - `io.modelcontextprotocol/tasks`: the tasks extension is not implemented.
+ *
+ * Tasks are declared by extensions.php, not here, and only while the extension is enabled.
  *
  * Each capability value is an stdClass, not an empty PHP array. `json_encode()`
  * renders an empty array as `[]`, and the schema types these values as objects —
@@ -135,11 +136,20 @@ function runtime_capabilities(): array
         ++$tools;
     }
 
-    $resources = function_exists('WPPilot\Mcp\SkillResources\resource_count')
+    $skill_resources = function_exists('WPPilot\Mcp\SkillResources\resource_count')
         ? SkillResources\resource_count()
         : 0;
+    $extension_resources = function_exists('WPPilot\Mcp\extension_resource_count') ? extension_resource_count() : 0;
 
-    return with_skills_extension(build_capabilities($tools, $prompts, $resources));
+    $capabilities = build_capabilities($tools, $prompts, $skill_resources + $extension_resources);
+    // The Skills extension promises skills/list; an Apps card alone is a resource, not a skill.
+    if ($skill_resources > 0) {
+        $capabilities = with_skills_extension($capabilities);
+    }
+
+    return function_exists('WPPilot\Mcp\with_extension_capabilities')
+        ? with_extension_capabilities($capabilities)
+        : $capabilities;
 }
 
 /**
