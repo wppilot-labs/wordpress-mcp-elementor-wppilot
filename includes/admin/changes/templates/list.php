@@ -16,23 +16,26 @@ if (!current_user_can_manage()) {
 }
 
 /** @var array<string, string|int> $filters */
-$rows = \wppilot_query_change_log($filters);
-$total = count($rows);
+// Counted and paged by the ledger itself: the table can hold ten thousand rows with their
+// before-images, and only one page of them is ever shown.
+$total = \wppilot_count_change_log($filters);
 // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Pagination of a read.
 $paged = max(1, (int) ($_GET['paged'] ?? 1));
 $pages = max(1, (int) ceil($total / PER_PAGE));
 $paged = min($paged, $pages);
-$visible = array_slice($rows, ($paged - 1) * PER_PAGE, PER_PAGE);
-$undoable = count(array_filter($rows, static fn(array $row): bool => \wppilot_change_status($row) === 'undoable'));
+$visible = \wppilot_query_change_log($filters, PER_PAGE, ($paged - 1) * PER_PAGE);
+$status_filter = (string) ($filters['status'] ?? '');
+$undoable = match ($status_filter) {
+    '' => \wppilot_count_change_log(array_merge($filters, ['status' => 'undoable'])),
+    'undoable' => $total,
+    default => 0,
+};
 
 // How many rows each group has in the whole log, so a row can say "1 of a batch of 40".
-$group_sizes = [];
-foreach (\wppilot_get_change_log() as $row) {
-    $group = (string) ($row['group'] ?? '');
-    if ($group !== '') {
-        $group_sizes[$group] = ($group_sizes[$group] ?? 0) + 1;
-    }
-}
+$group_sizes = \wppilot_change_group_sizes(array_values(array_unique(array_map(
+    static fn(array $row): string => (string) ($row['group'] ?? ''),
+    $visible,
+))));
 $datetime_format = \wppilot_get_datetime_format();
 $active_group = (string) ($filters['group'] ?? '');
 

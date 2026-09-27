@@ -22,11 +22,8 @@ $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
 $group = (string) ($entry['group'] ?? '');
 $recorded = strtotime((string) ($entry['recorded_at'] ?? ''));
 $is_audit = ($entry['kind'] ?? 'change') === 'audit-read';
-$group_rows = $group !== '' ? \wppilot_query_change_log(['group' => $group]) : [];
-$group_undoable = count(array_filter(
-    $group_rows,
-    static fn(array $row): bool => \wppilot_change_status($row) === 'undoable',
-));
+$group_size = $group !== '' ? \wppilot_count_change_log(['group' => $group]) : 0;
+$group_undoable = $group !== '' ? \wppilot_count_change_log(['group' => $group, 'status' => 'undoable']) : 0;
 $pretty = static fn(mixed $value): string => (string) wp_json_encode(
     $value,
     JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
@@ -70,7 +67,7 @@ $pretty = static fn(mixed $value): string => (string) wp_json_encode(
                     <?php } ?>
                 </td>
             </tr>
-            <?php if ($group !== '' && count($group_rows) > 1) { ?>
+            <?php if ($group !== '' && $group_size > 1) { ?>
                 <tr>
                     <th scope="row"><?php esc_html_e('Batch', domain: 'wppilot'); ?></th>
                     <td>
@@ -78,7 +75,7 @@ $pretty = static fn(mixed $value): string => (string) wp_json_encode(
                             <?php echo esc_html(sprintf(
                                 /* translators: %d: number of changes in the batch */
                                 __('One of %d changes made by the same bulk call', domain: 'wppilot'),
-                                count($group_rows),
+                                $group_size,
                             )); ?>
                         </a>
                     </td>

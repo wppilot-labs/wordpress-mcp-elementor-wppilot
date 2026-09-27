@@ -183,7 +183,8 @@ function load_both(string $free, string $pro, string $export): array
         'wppilot_get_safety_profile' => static fn(): string => 'production',
         'wppilot_register_rollback_strategy' => static fn(): bool => true,
         'wppilot_ledger_record_items' => static fn(string $ability, array $items, ?string $group = null): array => ['group' => (string) $group, 'change_ids' => [], 'without_before_image' => 0],
-        'wppilot_query_change_log' => static fn(array $filters = []): array => [],
+        'wppilot_query_change_log' => static fn(array $filters = [], int $limit = 0, int $offset = 0): array => [],
+        'wppilot_count_change_log' => static fn(array $filters = []): int => 0,
         'wppilot_change_export_row' => static fn(array $entry): array => $entry,
     ];
     $GLOBALS['kit_coexistence_stubs'] = $stubs;

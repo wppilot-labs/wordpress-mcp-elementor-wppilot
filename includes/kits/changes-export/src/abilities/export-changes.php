@@ -46,14 +46,22 @@ function export(array $input): array
         ],
         static fn(mixed $value): bool => $value !== '' && $value !== 0,
     );
-    $rows = $ledger->query($filters);
-    $total = count($rows);
     $offset = max(0, (int) ($input['offset'] ?? 0));
     $limit = min(MAX_ROWS, max(1, (int) ($input['limit'] ?? MAX_ROWS)));
+    // Paged in storage where the host can: loading every row to return one page would pull every
+    // before-image on the site into memory.
+    if ($ledger instanceof Runtime\PagedLedger) {
+        $total = $ledger->count($filters);
+        $slice = $ledger->query_page($filters, $limit, $offset);
+    } else {
+        $rows = $ledger->query($filters);
+        $total = count($rows);
+        $slice = array_slice($rows, $offset, $limit);
+    }
 
     $page = [];
     $bytes = 0;
-    foreach (array_slice($rows, $offset, $limit) as $entry) {
+    foreach ($slice as $entry) {
         $row = $ledger->export_row($entry);
         $size = strlen((string) wp_json_encode($row));
         if ($page !== [] && $bytes + $size > MAX_BYTES) {

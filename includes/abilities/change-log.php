@@ -25,7 +25,7 @@ wp_register_ability('wppilot/list-changes', [
     'output_schema' => ['type' => 'object'],
     'execute_callback' => static function (array $input): array {
         $limit = min(200, max(1, (int) ($input['limit'] ?? 50)));
-        $rows = array_slice(array: array_reverse(wppilot_get_change_log()), offset: 0, length: $limit);
+        $rows = wppilot_query_change_log([], $limit);
         return ['items' => array_map('wppilot_change_public_summary', $rows), 'count' => count($rows)];
     },
     'permission_callback' => 'wppilot_permission_callback',

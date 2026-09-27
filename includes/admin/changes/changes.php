@@ -30,6 +30,9 @@ const PER_PAGE = 50;
 /** Most rows one "undo everything shown" may touch, so one click cannot run for minutes. */
 const UNDO_MATCHING_MAX = 200;
 
+/** Ledger rows read per query while building a download. */
+const EXPORT_PAGE = 200;
+
 /** The query-string keys the screen and its downloads accept as filters. */
 const FILTER_KEYS = ['kind', 'ability', 'user_id', 'agent', 'group', 'status', 'since', 'until'];
 
@@ -152,18 +155,19 @@ function handle_undo_matching(): void
     // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in require_capability_and_nonce().
     $filters = read_filters($_POST);
     $filters['status'] = 'undoable';
-    $rows = \wppilot_query_change_log($filters);
-    if ($rows === []) {
+    $matching = \wppilot_count_change_log($filters);
+    if ($matching === 0) {
         redirect_with_notice('info', __('Nothing matching those filters can be undone.', domain: 'wppilot'), $filters);
     }
-    if (count($rows) > UNDO_MATCHING_MAX) {
+    if ($matching > UNDO_MATCHING_MAX) {
         redirect_with_notice('error', sprintf(
             /* translators: 1: number of matching changes, 2: the most one action may undo. */
             __('%1$d changes match. One action undoes at most %2$d; narrow the filters and try again.', domain: 'wppilot'),
-            count($rows),
+            $matching,
             UNDO_MATCHING_MAX,
         ), $filters);
     }
+    $rows = \wppilot_query_change_log($filters, UNDO_MATCHING_MAX);
     $result = \wppilot_rollback_changes(array_map(static fn(array $row): string => (string) ($row['id'] ?? ''), $rows));
     unset($filters['status']);
     redirect_with_notice(summary_notice_type($result), summary_message($result), $filters);
@@ -178,7 +182,7 @@ function handle_export(): void
     // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in require_capability_and_nonce().
     $filters = read_filters($_POST);
     $format = posted('format') === 'json' ? 'json' : 'csv';
-    $rows = array_map('wppilot_change_export_row', \wppilot_query_change_log($filters));
+    $rows = export_rows($filters);
     $filename = sprintf('wppilot-changes-%s.%s', gmdate('Ymd-His'), $format);
 
     nocache_headers();
@@ -196,6 +200,36 @@ function handle_export(): void
 
     echo csv_document($rows); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A CSV download, escaped by csv_cell().
     exit();
+}
+
+/**
+ * Every matching row as it leaves the site, read a page at a time.
+ *
+ * A page at a time because the full rows carry before-images and the export rows do not: holding
+ * ten thousand of the former to produce the latter would need hundreds of megabytes.
+ *
+ * @param array<string, mixed> $filters
+ * @return list<array<string, mixed>>
+ */
+function export_rows(array $filters): array
+{
+    $rows = [];
+    $seen = [];
+    for ($offset = 0; ; $offset += EXPORT_PAGE) {
+        $page = \wppilot_query_change_log($filters, EXPORT_PAGE, $offset);
+        foreach ($page as $entry) {
+            // A row recorded while the download runs shifts later pages by one; skip the repeat.
+            $id = (string) ($entry['id'] ?? '');
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $rows[] = \wppilot_change_export_row($entry);
+        }
+        if (count($page) < EXPORT_PAGE) {
+            return $rows;
+        }
+    }
 }
 
 /**
