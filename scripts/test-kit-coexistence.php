@@ -272,7 +272,11 @@ function load_both(string $free, string $pro, string $export): array
             continue;
         }
         $result = ($args['execute_callback'])([]);
-        if (!is_array($result)) {
+        // A read that needs input (a search string, a job id) refuses an empty call with a 400;
+        // that still proves it loaded and ran on its own runtime, which is what this checks.
+        $data = $result instanceof \WP_Error ? $result->get_error_data() : null;
+        $refused_input = is_array($data) && ($data['status'] ?? null) === 400;
+        if (!is_array($result) && !$refused_input) {
             $problems[] = "{$name}: execute returned " . get_debug_type($result);
         }
     }
