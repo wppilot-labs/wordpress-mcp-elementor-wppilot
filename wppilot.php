@@ -259,6 +259,7 @@ require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';
 require_once __DIR__ . '/includes/tokens.php';
 require_once __DIR__ . '/includes/agent-identities.php';
+require_once __DIR__ . '/includes/ledger-map.php';
 require_once __DIR__ . '/includes/privacy.php';
 require_once __DIR__ . '/includes/rest/transport-hardening.php';
 
