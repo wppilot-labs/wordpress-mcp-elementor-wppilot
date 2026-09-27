@@ -468,29 +468,3 @@ function wppilot_ability_schema_has_property(WP_Ability $ability, string $proper
     $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
     return array_key_exists($property, $properties);
 }
-
-/**
- * Validate and prepare a direct REST ability invocation.
- */
-function wppilot_safety_prepare_rest_input(WP_Ability $ability, mixed $input): mixed
-{
-    $allowed = wppilot_safety_check_ability($ability);
-    if ($allowed instanceof WP_Error) {
-        return $allowed;
-    }
-
-    $values = is_array($input) ? $input : [];
-    if (wppilot_ability_requires_confirmation($ability) && ($values['confirm'] ?? null) !== true) {
-        return wppilot_confirmation_required_error($ability);
-    }
-
-    if (
-        is_array($input)
-        && array_key_exists(key: 'confirm', array: $input)
-        && !wppilot_ability_schema_has_property($ability, property: 'confirm')
-    ) {
-        unset($input['confirm']);
-    }
-
-    return $input;
-}
