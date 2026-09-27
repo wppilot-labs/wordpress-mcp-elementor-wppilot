@@ -114,7 +114,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 ## What the free plugin can do
 
-142 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+168 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -133,7 +133,13 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Preview** | `8` | Compute what a write would change without performing it, then apply the reviewed result. Plus a view link, so an agent with a browser can look at the page it built - including one still in draft - and a capture store that compares two screenshots of a page and reports which regions moved. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
 | **Changes** | `5` | Read the redacted change ledger, attributed to the agent credential that made each write, export it as rows for a client report or an audit, and roll a change back. |
-| **Diagnostics** | `3` | Scoped health, performance and configuration-security checks. |
+| **Diagnostics** | `4` | Scoped health, performance and configuration-security checks, and a Connection Doctor that finds what blocks an MCP client (firewalls, a stripped Authorization header, disabled Application Passwords) and names the fix. |
+| **Search and replace** | `4` | Preview a search-and-replace across posts and their meta (serialized and builder JSON included) as a reviewed plan, apply only posts unchanged since, 100 per call or as a background job, cancel it, and undo one post or the whole run. |
+| **Media and accessibility** | `5` | Resize, crop, rotate or flip an image as a copy or in place, with undo. Audit a served page against WCAG 2.2, find images with missing or filename alt text, show an image to the model so it can write real alt text, and set alt text in bulk with undo. |
+| **Content audit** | `2` | Broken internal links, orphan pages, thin content, missing SEO descriptions and structured-data problems across the site, as a background job. |
+| **Block Notes** | `4` | Leave a note on a block for a person, reply, resolve, and read the notes they resolved. Every one can be undone. |
+| **Site tools** | `8` | WP-Cron list, run and delete (undoable), Site Health tests, transient flush, and - on Developer Full Access, audited - an options explorer and a read-only database SELECT with redaction. |
+| **Multisite** | `2` | List a network's sites and run an ability on one of them through that site's own safety profile and gates. Loads only on a multisite network. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 
 Content creation is draft-first: an absent, blank or malformed status resolves to `draft` before any capability check, so nothing is published by accident. Capabilities are read from each post type's and taxonomy's own capability object, so a custom type declaring its own set is enforced on its own terms.
@@ -176,7 +182,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 77 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **142 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **168 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 77 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -315,7 +321,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 142 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 168 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.
