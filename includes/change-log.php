@@ -1607,6 +1607,13 @@ function wppilot_restore_post_snapshot(array $snapshot): array|WP_Error
             $postarr[$key] = wp_slash((string) $postarr[$key]);
         }
     }
+    // A draft that was never scheduled has a floating date (post_date_gmt of zeroes), and
+    // wp_update_post() moves a floating date to "now" unless edit_date says the date is
+    // deliberate. Without it every undo of a draft change more than a second old restored the
+    // content, then failed its own verification on post_date.
+    if (array_key_exists('post_date', $postarr)) {
+        $postarr['edit_date'] = true;
+    }
     // @mago-expect analysis:possibly-invalid-argument -- Keys are restricted to WP's post update allowlist above.
     $updated = wp_update_post($postarr, wp_error: true);
     if (is_wp_error($updated)) {
