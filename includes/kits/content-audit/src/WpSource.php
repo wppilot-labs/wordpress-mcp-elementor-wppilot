@@ -1,0 +1,191 @@
+<?php
+
+// SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+declare(strict_types=1);
+
+namespace WPPilot\Kits\ContentAudit;
+
+use WP_Error;
+use WPPilot\Kits\Runtime;
+use WPPilot\Kits\Runtime\Page;
+
+if (!defined('ABSPATH')) {
+    exit();
+}
+
+/**
+ * The audit's Source, answered from WordPress.
+ */
+final class WpSource implements Source
+{
+    public function home_url(): string
+    {
+        return home_url('/');
+    }
+
+    public function published_ids(array $post_types, int $after, int $limit): array
+    {
+        global $wpdb;
+        if ($post_types === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($post_types), '%s'));
+        // A keyset cursor rather than an offset: posts published between two pages would shift
+        // an offset and skip or repeat content.
+        $ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders}) AND ID > %d ORDER BY ID ASC LIMIT %d",
+            ...array_values(array_merge($post_types, [$after, $limit])),
+        ));
+        return array_map('intval', is_array($ids) ? $ids : []);
+    }
+
+    public function count_published(array $post_types): int
+    {
+        global $wpdb;
+        if ($post_types === []) {
+            return 0;
+        }
+        $placeholders = implode(',', array_fill(0, count($post_types), '%s'));
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders})",
+            ...$post_types,
+        ));
+    }
+
+    public function post(int $id): ?array
+    {
+        $post = get_post($id);
+        if (!$post instanceof \WP_Post) {
+            return null;
+        }
+        /** @var mixed $builder */
+        $builder = get_post_meta($id, '_elementor_data', true);
+        $url = get_permalink($post);
+        return [
+            'id' => $id,
+            'title' => (string) $post->post_title,
+            'type' => (string) $post->post_type,
+            'url' => is_string($url) ? $url : '',
+            'content' => (string) $post->post_content,
+            'builder' => is_string($builder) ? $builder : '',
+        ];
+    }
+
+    public function url_to_post_id(string $url): int
+    {
+        return (int) url_to_postid($url);
+    }
+
+    public function post_status(int $id): ?string
+    {
+        $status = get_post_status($id);
+        return is_string($status) ? $status : null;
+    }
+
+    public function upload_file_exists(string $url): ?bool
+    {
+        $uploads = wp_get_upload_dir();
+        $base = preg_replace('#^https?:#i', '', (string) ($uploads['baseurl'] ?? ''));
+        $target = preg_replace('#^https?:#i', '', strtok($url, '?#') ?: '');
+        if (!is_string($base) || $base === '' || !is_string($target) || !str_starts_with($target, rtrim($base, '/') . '/')) {
+            return null;
+        }
+        $relative = rawurldecode(substr($target, strlen(rtrim($base, '/'))));
+        if (str_contains($relative, '..') || str_contains($relative, "\0")) {
+            // Never let a link in content walk the check out of the uploads directory.
+            return false;
+        }
+        return file_exists(rtrim((string) $uploads['basedir'], '/\\') . $relative);
+    }
+
+    public function head(string $url, int $timeout): array|WP_Error
+    {
+        $args = [
+            'timeout' => max(2, min(10, $timeout)),
+            'redirection' => 0,
+            'user-agent' => 'WordPress content audit (' . home_url('/') . ')',
+        ];
+        $response = wp_safe_remote_head($url, $args);
+        if ($response instanceof WP_Error) {
+            return $response;
+        }
+        $status = (int) wp_remote_retrieve_response_code($response);
+        if (in_array($status, [405, 501], true)) {
+            // Some servers refuse HEAD outright; a GET capped at a few bytes asks the same question.
+            $response = wp_safe_remote_get($url, $args + ['limit_response_size' => 2048]);
+            if ($response instanceof WP_Error) {
+                return $response;
+            }
+            $status = (int) wp_remote_retrieve_response_code($response);
+        }
+        return ['status' => $status, 'location' => (string) wp_remote_retrieve_header($response, 'location')];
+    }
+
+    public function structural_ids(): array
+    {
+        $front = get_option('show_on_front') === 'page' ? (int) get_option('page_on_front') : 0;
+        $posts_page = get_option('show_on_front') === 'page' ? (int) get_option('page_for_posts') : 0;
+        $menu = [];
+        $menus = wp_get_nav_menus();
+        foreach (is_array($menus) ? $menus : [] as $nav) {
+            $items = wp_get_nav_menu_items($nav->term_id);
+            foreach (is_array($items) ? $items : [] as $item) {
+                if (($item->type ?? '') === 'post_type') {
+                    $menu[] = (int) $item->object_id;
+                } elseif (($item->type ?? '') === 'custom' && is_string($item->url ?? null)) {
+                    $id = (int) url_to_postid($item->url);
+                    if ($id > 0) {
+                        $menu[] = $id;
+                    }
+                }
+            }
+        }
+        return ['front' => $front, 'posts_page' => $posts_page, 'menu' => array_values(array_unique($menu))];
+    }
+
+    public function present_meta_keys(array $keys): array
+    {
+        global $wpdb;
+        if ($keys === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($keys), '%s'));
+        $found = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT meta_key FROM {$wpdb->postmeta} WHERE meta_key IN ({$placeholders}) AND meta_value <> ''",
+            ...$keys,
+        ));
+        return array_values(array_map('strval', is_array($found) ? $found : []));
+    }
+
+    public function meta(int $id, array $keys): array
+    {
+        $values = [];
+        foreach ($keys as $key) {
+            /** @var mixed $value */
+            $value = get_post_meta($id, $key, true);
+            $values[$key] = is_scalar($value) ? trim((string) $value) : '';
+        }
+        return $values;
+    }
+
+    public function fetch(string $url): array|WP_Error
+    {
+        $page = Page::fetch($url, 15);
+        if ($page instanceof WP_Error) {
+            return $page;
+        }
+        return ['status' => $page['status'], 'html' => $page['html']];
+    }
+
+    public function has_ability(string $name): bool
+    {
+        return function_exists('wp_has_ability') && wp_has_ability($name);
+    }
+
+    public function ability_namespace(): string
+    {
+        return Runtime\host()->id();
+    }
+}
