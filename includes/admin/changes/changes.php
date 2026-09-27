@@ -205,7 +205,7 @@ function csv_document(array $rows): string
 {
     $columns = [
         'id', 'recorded_at', 'kind', 'ability', 'risk', 'user_id', 'user_login', 'agent_method',
-        'agent_label', 'agent_client', 'group', 'status', 'rollback_reason', 'rolled_back_at', 'input',
+        'agent_label', 'agent_client', 'group', 'status', 'rollback_reason', 'rolled_back_at', 'confirmation', 'input',
     ];
     $lines = [implode(',', array_map(__NAMESPACE__ . '\\csv_cell', $columns))];
     foreach ($rows as $row) {

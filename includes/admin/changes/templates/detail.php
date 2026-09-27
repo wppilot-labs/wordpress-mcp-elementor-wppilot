@@ -54,6 +54,27 @@ $pretty = static fn(mixed $value): string => (string) wp_json_encode(
                 <th scope="row"><?php esc_html_e('Risk', domain: 'wppilot'); ?></th>
                 <td><?php echo esc_html((string) ($entry['risk'] ?? '')); ?></td>
             </tr>
+            <?php
+            $confirmation = is_array($entry['confirmation'] ?? null) ? $entry['confirmation'] : [];
+            $confirmed_via = (string) ($confirmation['method'] ?? '');
+            if ($confirmed_via !== '' && $confirmed_via !== 'not-required') {
+                $approver = (int) ($confirmation['approved_by'] ?? 0);
+                ?>
+                <tr>
+                    <th scope="row"><?php esc_html_e('Confirmed by', domain: 'wppilot'); ?></th>
+                    <td><?php echo esc_html(match ($confirmed_via) {
+                        'argument' => __('The agent (confirm=true)', domain: 'wppilot'),
+                        'elicitation' => __('The user, in their MCP client', domain: 'wppilot'),
+                        'approval-url' => $approver > 0
+                            /* translators: %d: WordPress user id */
+                            ? sprintf(__('A person, on the wp-admin approval link (user #%d)', domain: 'wppilot'), $approver)
+                            : __('A person, on the wp-admin approval link', domain: 'wppilot'),
+                        'chat' => __('A person, in WPPilot Chat', domain: 'wppilot'),
+                        'approval-queue' => __('A person, in the approval queue', domain: 'wppilot'),
+                        default => $confirmed_via,
+                    }); ?></td>
+                </tr>
+            <?php } ?>
             <tr>
                 <th scope="row"><?php esc_html_e('Status', domain: 'wppilot'); ?></th>
                 <td>
