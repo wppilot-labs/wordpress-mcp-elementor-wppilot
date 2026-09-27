@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.13.0
+Stable tag: 1.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,17 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.14.0 =
+* Chat now runs every ability through the same controls as MCP and the REST API. It called the ability directly, so a Chat write skipped the write rate limit, the design gate and anything a companion plugin adds, such as Pro's approval queue. Every execution path - the modern MCP transport, WPPilot's REST route, WordPress core's ability runner, Chat and Pro's approval replay - now runs one gate pipeline: safety profile, confirmation, then the shared wppilot_pre_ability_execute filter. Chat's approve button is the confirmation, so the model is not asked for confirm=true there. The require-preview rule still stands aside for Chat, as its setting has always said. The modern-only wppilot_modern_mcp_pre_ability_execute filter is no longer fired; hook wppilot_pre_ability_execute, which now runs on that transport too.
+* New screen: WPPilot > Changes. Code and skills have long said to undo a mistake "from the Changes screen", but there was no such screen; the only way back was the rollback-change ability, run by the same agent that made the mistake. The screen lists every recorded change newest first, filters by ability, agent, date range, status and kind, shows one change's redacted input, result and undo verification, and undoes one change, one bulk batch, or every undoable change a filter shows - all of one agent's work today, say - up to 200 at once, newest first, with a report of any that did not come back. The same filters download as CSV or JSON, without before-images; CSV cells that a spreadsheet would run as a formula are defused.
+* New ability: wppilot/export-changes. The change record as flat rows for a client report or an audit, filtered like the Changes screen and paged 500 rows or 256 KB at a time. Before-images never leave the site.
+* Undoing a change to a draft failed. A draft that was never scheduled has a floating date, and WordPress moves a floating date to "now" whenever the post is updated unless told the date is deliberate, so the undo put the content back and then failed its own check on the date, reporting "Rollback ran but the observed state did not match the before-image". It keeps the draft's date now.
+* Bulk writes record one undoable change per item, grouped, so a batch can be undone as one or item by item, and one call cannot fill the change record: before-images stop after 1 MB per call and later items say plainly that none was kept. The change record is written under a database lock, so two writes recorded at the same moment can no longer erase each other.
+* An ability can now keep a sensitive read off Production Safe and have every call recorded: meta.safety.min_profile names the least permissive profile it runs under, and meta.safety.audit_reads records who ran it and with what input, never what it returned. A read-only ability used to pass every profile, because its read-only flag was checked before anything else.
+* Kits. A feature can now be built as a self-contained folder - kit.json, abilities, skill - on a small runtime that supplies the safety profile, confirmation, change record, undo and background jobs, so the same folder can be exported into another plugin with scripts/export-kit.php, renamed under that plugin's own prefix. wppilot/export-changes is the first. A kit that cannot load on this site says why instead of registering nothing.
+* Modules can register how their own changes are undone (wppilot_register_rollback_strategy), so a write that keeps its own before-image is no longer recorded as impossible to undo.
+* One new ability, read-only. No permission changes; existing connections keep working and do not need re-authorising.
 
 = 1.13.0 =
 * WPPilot no longer fatals beside another plugin that bundles the same dependencies. Composer derives the Jetpack autoloader's namespace from the dependency set, so two plugins with similar composer.json files generate the identical namespace and the second one to activate dies with "Cannot declare class Automattic\Jetpack\Autoloader\jp<hash>\al<version>\Autoloader, because the name is already in use" - a fatal that names a hashed class nobody can search for and reads as a WPPilot bug. The namespace is now pinned to one WPPilot owns, so it cannot collide with a hash another project happened to generate. On WP_DEBUG sites the autoloader's own conflict check is switched on as well, so the next collision of any kind is logged by name instead of appearing as a white screen.
