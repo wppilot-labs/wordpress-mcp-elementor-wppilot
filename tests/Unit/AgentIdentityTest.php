@@ -220,6 +220,44 @@ final class AgentIdentityTest extends TestCase
         self::assertSame('Invalid, expired, or revoked WPPilot access token.', request_authentication_error()?->get_error_message());
     }
 
+    /**
+     * A plugin that reads the current user during plugins_loaded settles "nobody" before the
+     * middleware is registered, so no verdict was recorded and a bad token got core's generic
+     * 401. The REST authentication step now judges an unjudged Bearer credential itself.
+     */
+    public function testAnUnjudgedBearerIsJudgedAtRestAuthentication(): void
+    {
+        $secret = 'wpp_expired-late';
+        $this->wpdb->rows[11] = [
+            'id' => 11,
+            'user_id' => 1,
+            'name' => 'Late',
+            'token_hash' => wppilot_token_hash($secret),
+            'expires' => gmdate('Y-m-d H:i:s', time() - 60),
+            'scope' => null,
+            'ceiling' => '',
+        ];
+        $saved_server = $_SERVER;
+        $saved_get = $_GET;
+        $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $secret;
+        $_GET['rest_route'] = '/mcp/wppilot';
+        // The refusal carries a WWW-Authenticate challenge naming the metadata URL, which the
+        // discovery module (not loaded in unit tests) builds.
+        if (!function_exists('WPPilot\\OAuth\\Endpoints\\Discovery\\protected_resource_metadata_url')) {
+            eval('namespace WPPilot\\OAuth\\Endpoints\\Discovery; function protected_resource_metadata_url(): string { return "https://example.test/.well-known/oauth-protected-resource"; }');
+        }
+        reset_request_context();
+        try {
+            $result = \WPPilot\OAuth\Middleware\reject_invalid_bearer(null);
+        } finally {
+            $_SERVER = $saved_server;
+            $_GET = $saved_get;
+        }
+
+        self::assertInstanceOf(WP_Error::class, $result);
+        self::assertStringContainsString('expired on', $result->get_error_message());
+    }
+
     public function testPolicyValidation(): void
     {
         self::assertInstanceOf(WP_Error::class, wppilot_token_validate_policy(['abilities' => [], 'categories' => []], ''));
