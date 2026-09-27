@@ -93,6 +93,27 @@ final class ProfileGateTest extends TestCase
         self::assertFalse($host->enforce_min_profile(false, 'kitprobe/plain-read', []));
     }
 
+    /**
+     * Inside WPPilot the answer is WPPilot's own profile rule, read from its setting.
+     */
+    public function testTheWPPilotHostAnswersWithItsOwnProfile(): void
+    {
+        require_once dirname(__DIR__, 3) . '/includes/kits/_runtime/hosts/wppilot.php';
+        Runtime\host(new \WPPilot\Kits\Runtime\Hosts\WPPilotHost());
+
+        \WPPilot_Test_State::$options[WPPILOT_SAFETY_PROFILE_OPTION] = 'production';
+        $blocked = Runtime\require_profile('kitprobe/dev-read');
+        self::assertInstanceOf(WP_Error::class, $blocked);
+        self::assertSame('wppilot_safety_profile_blocked', $blocked->get_error_code());
+        self::assertTrue(Runtime\require_profile('kitprobe/plain-read'));
+
+        \WPPilot_Test_State::$options[WPPILOT_SAFETY_PROFILE_OPTION] = 'developer';
+        self::assertTrue(Runtime\require_profile('kitprobe/dev-read'));
+
+        \WPPilot_Test_State::$options[WPPILOT_SAFETY_PROFILE_OPTION] = 'readonly';
+        self::assertInstanceOf(WP_Error::class, Runtime\require_profile('kitprobe/prod-write'), 'Read Only refuses a write whatever its min_profile');
+    }
+
     public function testAnAbilityWhosePolicyCannotBeReadIsRefused(): void
     {
         Runtime\host(new StandaloneHost('kitprobe', ['safety_profile' => 'developer']));
