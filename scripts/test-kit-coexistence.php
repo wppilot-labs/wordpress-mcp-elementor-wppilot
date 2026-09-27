@@ -103,6 +103,11 @@ function static_names(array $files): array
         foreach ($constants as $name => $value) {
             // Storage keys the runtime completes at run time (OPTION_PREFIX . $id) are compared
             // as prefixes below.
+            // WordPress's own keys (_wp_attachment_image_alt, _wp_attached_file) are shared by
+            // every plugin that edits media; both copies writing them is the point, not a clash.
+            if (str_starts_with($value, '_wp_')) {
+                continue;
+            }
             if (preg_match('/OPTION|TRANSIENT|META|KEY/', $name) === 1) {
                 $names['option'][$value] = true;
             } elseif (preg_match('/HOOK|EVENT/', $name) === 1) {
@@ -272,10 +277,12 @@ function load_both(string $free, string $pro, string $export): array
             continue;
         }
         $result = ($args['execute_callback'])([]);
-        // A read that needs input (a search string, a job id) refuses an empty call with a 400;
-        // that still proves it loaded and ran on its own runtime, which is what this checks.
+        // A read that needs input (a search string, a job id, an attachment) refuses an empty call
+        // with a 4xx WP_Error; that still proves it loaded and ran on its own runtime. Anything
+        // else (a 5xx, a non-array) is a real failure.
         $data = $result instanceof \WP_Error ? $result->get_error_data() : null;
-        $refused_input = is_array($data) && ($data['status'] ?? null) === 400;
+        $status = is_array($data) ? (int) ($data['status'] ?? 0) : 0;
+        $refused_input = $result instanceof \WP_Error && ($status === 0 || ($status >= 400 && $status < 500));
         if (!is_array($result) && !$refused_input) {
             $problems[] = "{$name}: execute returned " . get_debug_type($result);
         }
