@@ -24,6 +24,10 @@ if (!defined('ABSPATH')) {
  *
  * It records only the kit's own abilities — those a kit named through capture_for() or
  * record_items() — never the host plugin's other writes, which are not the kit's to undo.
+ *
+ * Given the host id, it also keeps an `audit-read` row for each call of that host's read-only
+ * abilities that declare `meta.safety.audit_reads` (a raw SQL SELECT), as WPPilot's ledger does:
+ * the result never, the redacted input always, so the site owner can see who read what.
  */
 final class MiniLedger implements Ledger
 {
@@ -41,7 +45,11 @@ final class MiniLedger implements Ledger
     /** @var array<string, array<string, mixed>> */
     private array $pending = [];
 
-    public function __construct()
+    /**
+     * @param string $audit_scope The host id; abilities under `<id>/` that declare audit_reads
+     *                            get an audit row. Empty records no reads.
+     */
+    public function __construct(private string $audit_scope = '')
     {
         add_action('wp_before_execute_ability', [$this, 'before'], 10, 2);
         add_action('wp_after_execute_ability', [$this, 'after'], 10, 3);
@@ -54,10 +62,13 @@ final class MiniLedger implements Ledger
 
     public function before(string $ability_name, mixed $input): void
     {
+        $values = is_array($input) ? $input : [];
         if (!isset($this->captures[$ability_name])) {
+            if ($this->audits($ability_name)) {
+                $this->pending[$ability_name] = ['input' => self::redact($values), 'audit' => true];
+            }
             return;
         }
-        $values = is_array($input) ? $input : [];
         /** @var mixed $before */
         $before = ($this->captures[$ability_name])($values);
         $this->pending[$ability_name] = [
@@ -73,7 +84,37 @@ final class MiniLedger implements Ledger
             return;
         }
         unset($this->pending[$ability_name]);
+        if (($pending['audit'] ?? false) === true) {
+            $row = $this->row(
+                $ability_name,
+                $pending['input'],
+                null,
+                $result,
+                'A read-only call, recorded for audit. Nothing changed, so there is nothing to undo.',
+                '',
+                [],
+            );
+            $row['kind'] = 'audit-read';
+            $this->store([$row]);
+            return;
+        }
         $this->store([$this->row($ability_name, $pending['input'], $pending['before'], $result, null, '', [])]);
+    }
+
+    /**
+     * Whether a call is a read the host's own ability asked to have audited.
+     */
+    private function audits(string $ability_name): bool
+    {
+        if ($this->audit_scope === '' || !str_starts_with($ability_name, $this->audit_scope . '/')) {
+            return false;
+        }
+        $ability = wp_get_ability($ability_name);
+        if (!$ability instanceof \WP_Ability) {
+            return false;
+        }
+        $meta = $ability->get_meta();
+        return ($meta['annotations']['readonly'] ?? false) === true && ($meta['safety']['audit_reads'] ?? false) === true;
     }
 
     public function record_items(string $ability_name, array $items, ?string $group = null): array

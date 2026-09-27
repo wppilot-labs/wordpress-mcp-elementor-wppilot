@@ -53,8 +53,9 @@ final class KitRuntimeTest extends TestCase
     public static function constraints(): array
     {
         return [
-            'same major and minor' => ['^1.0', true],
-            'newer minor than the runtime' => ['^1.1', false],
+            'same major, older minor' => ['^1.0', true],
+            'same major and minor' => ['^1.1', true],
+            'newer minor than the runtime' => ['^1.2', false],
             'other major' => ['^2.0', false],
             'no caret' => ['1.0', false],
             'garbage' => ['latest', false],

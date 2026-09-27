@@ -463,3 +463,72 @@ function top_level_declarations(string $source): array
     }
     return $found;
 }
+
+/**
+ * Registrations that declare `meta.safety.min_profile` without enforcing it.
+ *
+ * The key alone is a declaration. On WordPress before 7.1 nothing core runs reads it, so a
+ * Developer-only ability declared this way runs under Production Safe for every caller that
+ * does not pass through the host's own gate. Each such registration must call
+ * Runtime\require_profile() with its own literal name inside the wp_register_ability() call,
+ * where the permission callback is, so the rule is visible to a reader and to this check.
+ *
+ * A file that names min_profile anywhere outside a registration is reported too: meta built in
+ * a variable would hide the declaration from the check.
+ *
+ * @param list<array{0: int, 1: string, 2: int}> $tokens
+ * @return list<array{line: int, message: string}>
+ */
+function profile_gate_problems(array $tokens): array
+{
+    $problems = [];
+    $covered = [];
+    foreach ($tokens as $i => $token) {
+        $called = called_function($tokens, $i);
+        if ($called === null || substr($called, (int) strrpos('\\' . $called, '\\')) !== 'wp_register_ability') {
+            continue;
+        }
+        $open = next_significant($tokens, $i);
+        $close = matching_close($tokens, $open);
+        $name_range = argument($tokens, call_args($tokens, $open), 0, 'name');
+        $name = $name_range !== null && $name_range[0] === $name_range[1] ? literal($tokens[$name_range[0]]) : null;
+
+        $declares = false;
+        $gated_by = [];
+        for ($j = $open; $j <= $close; $j++) {
+            $covered[$j] = true;
+            if (literal($tokens[$j]) === 'min_profile' && ($tokens[next_significant($tokens, $j)][0] ?? 0) === T_DOUBLE_ARROW) {
+                $declares = true;
+            }
+            $inner = called_function($tokens, $j);
+            if ($inner !== null && substr($inner, (int) strrpos('\\' . $inner, '\\')) === 'require_profile') {
+                $first = argument($tokens, call_args($tokens, next_significant($tokens, $j)), 0, 'ability_name');
+                $gated_by[] = $first !== null && $first[0] === $first[1] ? literal($tokens[$first[0]]) : null;
+            }
+        }
+        if (!$declares) {
+            continue;
+        }
+        $label = $name ?? 'this ability';
+        if ($gated_by === []) {
+            $problems[] = [
+                'line' => $token[2],
+                'message' => "{$label} declares meta.safety.min_profile but its permission callback never calls Runtime\\require_profile('{$label}'); before WordPress 7.1 nothing else enforces it",
+            ];
+        } elseif (!in_array($name, $gated_by, true)) {
+            $problems[] = [
+                'line' => $token[2],
+                'message' => "{$label} calls Runtime\\require_profile() with a name other than its own literal name",
+            ];
+        }
+    }
+    foreach ($tokens as $i => $token) {
+        if (!isset($covered[$i]) && literal($token) === 'min_profile') {
+            $problems[] = [
+                'line' => $token[2],
+                'message' => "'min_profile' outside a wp_register_ability() call: declare meta.safety inline so the require_profile() check can see it",
+            ];
+        }
+    }
+    return $problems;
+}

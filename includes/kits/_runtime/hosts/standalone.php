@@ -13,7 +13,10 @@ use WPPilot\Kits\Runtime\Host;
 use WPPilot\Kits\Runtime\Jobs;
 use WPPilot\Kits\Runtime\Ledger;
 use WPPilot\Kits\Runtime\MiniLedger;
+use WPPilot\Kits\Runtime\ProfileGate;
 use WPPilot\Kits\Runtime\Runner;
+
+use function WPPilot\Kits\Runtime\profile_check;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -30,7 +33,7 @@ if (!defined('ABSPATH')) {
  * literal `wp_register_ability('wppilot/…')` anywhere under includes/ is counted as a WPPilot
  * ability by every verifier and by the website, and these never register inside WPPilot.
  */
-final class StandaloneHost implements Host
+final class StandaloneHost implements Host, ProfileGate
 {
     private MiniLedger $ledger;
 
@@ -47,7 +50,7 @@ final class StandaloneHost implements Host
      */
     public function __construct(private string $id, private array $config = [])
     {
-        $this->ledger = new MiniLedger();
+        $this->ledger = new MiniLedger($id);
         $this->jobs = new Runner();
         add_filter('wp_ability_permission_result', [$this, 'enforce_min_profile'], 10, 4);
         add_action('wp_abilities_api_categories_init', [$this, 'register_category'], 20);
@@ -112,7 +115,17 @@ final class StandaloneHost implements Host
     }
 
     /**
-     * Refuse an ability whose meta.safety.min_profile is above this host's profile.
+     * The min_profile answer every kit ability asks for through Runtime\require_profile().
+     */
+    public function profile_allows(string $ability_name): bool|WP_Error
+    {
+        return profile_check($ability_name, $this->safety_profile());
+    }
+
+    /**
+     * The same rule for every caller on WordPress 7.1+, where core runs this filter inside
+     * WP_Ability itself; it also covers a kit ability that declares min_profile but was written
+     * before require_profile() existed.
      *
      * @param bool|WP_Error $permission
      * @return bool|WP_Error
@@ -122,20 +135,7 @@ final class StandaloneHost implements Host
         if ($permission !== true || !is_string($ability_name) || !str_starts_with($ability_name, $this->id . '/')) {
             return $permission;
         }
-        $ability = $ability instanceof WP_Ability ? $ability : wp_get_ability($ability_name);
-        $safety = $ability instanceof WP_Ability && is_array($ability->get_meta()['safety'] ?? null)
-            ? $ability->get_meta()['safety']
-            : [];
-        $rank = ['readonly' => 0, 'production' => 1, 'developer' => 2];
-        $needed = (string) ($safety['min_profile'] ?? '');
-        if ($needed === '' || !isset($rank[$needed]) || $rank[$this->safety_profile()] >= $rank[$needed]) {
-            return $permission;
-        }
-        return new WP_Error(
-            'kit_safety_profile_blocked',
-            sprintf('Ability "%s" needs the %s safety profile.', $ability_name, $needed),
-            ['status' => 403],
-        );
+        return $this->profile_allows($ability_name);
     }
 
     public function register_category(): void
