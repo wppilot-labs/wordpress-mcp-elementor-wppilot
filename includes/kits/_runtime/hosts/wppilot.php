@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 namespace WPPilot\Kits\Runtime\Hosts;
 
+use WP_Ability;
 use WP_Error;
 use WPPilot\Kits\Runtime\Host;
 use WPPilot\Kits\Runtime\Jobs;
@@ -63,10 +64,49 @@ final class WPPilotHost implements Host
     /**
      * Pro, and anything else, offers extension points through this filter:
      * `add_filter('wppilot_kit_extension', fn($ext, $point) => $point === 'seo-providers' ? $registry : $ext, 10, 2)`.
+     *
+     * `ability-runner` is WPPilot's own and not filterable: it is the gate pipeline, and a filter
+     * that could swap it would be a way to run abilities around it.
      */
     public function extension(string $point): mixed
     {
+        if ($point === 'ability-runner') {
+            return [$this, 'run_ability'];
+        }
         return apply_filters('wppilot_kit_extension', null, $point);
+    }
+
+    /**
+     * Run an ability a kit ability is running on the agent's behalf; see Runtimeun_ability().
+     *
+     * The whole gate pipeline applies — safety profile, the inner ability's own confirmation,
+     * the confirm strip and every wppilot_pre_ability_execute control — under the `nested`
+     * transport. Nothing vouches for a human here, so a destructive inner ability still needs
+     * its own `confirm: true`. The rate limiter and Pro's approval holds skip `nested`: the call
+     * that carried this one was charged and held (or not) when it arrived, and holding the inner
+     * call would queue a replay that runs outside the context it was made in (another site).
+     */
+    public function run_ability(WP_Ability $ability, mixed $input): mixed
+    {
+        // An ability switched off in the Abilities Hub is unregistered on the site the request
+        // arrived at, which is the only place that switch is otherwise enforced. A kit ability
+        // running this one on another network site has already switched there, so read that
+        // site's rules here, or its Hub setting would not apply to it.
+        $name = $ability->get_name();
+        $rules = \wppilot_get_ability_rules();
+        if (($rules[$name]['disabled'] ?? false) === true && !\wppilot_ability_is_hub_protected($name)) {
+            return new WP_Error(
+                'wppilot_ability_disabled',
+                sprintf('Ability "%s" is switched off in this site\'s Abilities Hub.', $name),
+                ['status' => 403, 'ability' => $name],
+            );
+        }
+        /** @var mixed $gated */
+        $gated = \wppilot_gate_ability_call($ability, $input, transport: 'nested');
+        if ($gated instanceof WP_Error) {
+            return $gated;
+        }
+        return $ability->execute(\WPPilot\Kits\Runtime\empty_input_for($ability, $gated));
     }
 
     public function admin_parent_slug(): string

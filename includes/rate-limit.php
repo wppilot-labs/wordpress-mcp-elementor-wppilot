@@ -180,7 +180,8 @@ function wppilot_rate_pre_ability_execute(mixed $input, WP_Ability $ability, str
     // 'mcp' is the modern transport and 'chat' the admin Chat; both reach this
     // through wppilot_gate_ability_call(). 'approval' is deliberately absent: a
     // held call was charged when the agent sent it, and charging the approver
-    // again would refuse an approval for a reason they cannot act on.
+    // again would refuse an approval for a reason they cannot act on. 'nested'
+    // is absent for the same reason: the kit ability that runs it was charged.
     if (!in_array($transport, ['rest', 'mcp', 'chat'], strict: true) || wppilot_ability_is_readonly($ability)) {
         return $input;
     }

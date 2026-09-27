@@ -1,0 +1,34 @@
+{
+    "slug": "multisite",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\Multisite",
+    "tier": "free",
+    "runtime": "^1.0",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "functions": ["is_multisite"]
+    },
+    "categories": {
+        "wordpress": {
+            "label": "WordPress",
+            "description": "Typed WordPress operations: content, taxonomies, media, comments, revisions, menus, users, sites, and allowlisted site settings."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/network-list-sites",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/network-run-ability",
+            "readonly": false,
+            "destructive": false,
+            "ledger": "irreversible:the inner ability's change is recorded, and undone, in the target site's own change ledger"
+        }
+    ],
+    "skills": ["multisite"],
+    "tests": ["tests/Unit/Kits/Multisite"]
+}

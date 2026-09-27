@@ -177,6 +177,9 @@ function load_both(string $free, string $pro, string $export): array
     define('WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES', 1_048_576);
     require_once __DIR__ . '/lib/coexistence-doubles.php';
     require_once $free . '/tests/doubles/wordpress.php';
+    // A network: a kit that skips itself on a single site (multisite) must load here, or its
+    // names are never compared.
+    \WPPilot_Test_State::$multisite = true;
 
     // What WPPilotHost calls; the rest of WPPilot is not loaded here.
     $stubs = [

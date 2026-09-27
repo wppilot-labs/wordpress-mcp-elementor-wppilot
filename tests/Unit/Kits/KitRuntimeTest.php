@@ -86,4 +86,54 @@ final class KitRuntimeTest extends TestCase
             Runtime\incompatibility(['slug' => 'x', 'runtime' => '^1.0', 'requires' => ['php' => '99.0']]),
         );
     }
+
+    /**
+     * A condition kit.json cannot state is the bootstrap's to report: the kit is skipped with its
+     * reason, never booted, and none of its abilities are queued.
+     */
+    public function testABootstrapCanSkipItsKitWithAReason(): void
+    {
+        mkdir($this->dir . '/skipper');
+        file_put_contents($this->dir . '/skipper/kit.json', (string) json_encode(['slug' => 'skipper', 'runtime' => '^1.0']));
+        file_put_contents(
+            $this->dir . '/skipper/bootstrap.php',
+            "<?php return ['skip' => 'Not here.', 'boot' => static function (): void { throw new \\LogicException('booted'); }, 'ability_files' => ['x.php']];",
+        );
+        $queued = count(Runtime\pending_kits());
+
+        try {
+            $report = Runtime\load_kits($this->dir, ['skipper']);
+        } finally {
+            @unlink($this->dir . '/skipper/kit.json');
+            @unlink($this->dir . '/skipper/bootstrap.php');
+            @rmdir($this->dir . '/skipper');
+        }
+
+        self::assertSame(['loaded' => [], 'skipped' => ['skipper' => 'Not here.']], $report);
+        self::assertSame('Not here.', Runtime\registry()['skipped']['skipper']);
+        self::assertCount($queued, Runtime\pending_kits());
+    }
+
+    /**
+     * The multisite kit loads its abilities on a network only; on a single site it says why not.
+     */
+    public function testTheMultisiteKitSkipsItselfOffANetwork(): void
+    {
+        $bootstrap = dirname(__DIR__, 3) . '/includes/kits/multisite/bootstrap.php';
+
+        \WPPilot_Test_State::$multisite = false;
+        $single = require $bootstrap;
+        self::assertSame('This site is not a multisite network.', $single['skip']);
+        self::assertSame([], $single['ability_files']);
+
+        \WPPilot_Test_State::$multisite = true;
+        try {
+            $network = require $bootstrap;
+        } finally {
+            \WPPilot_Test_State::$multisite = false;
+        }
+        self::assertArrayNotHasKey('skip', $network);
+        self::assertSame(['network-list-sites.php', 'network-run-ability.php'], array_map('basename', $network['ability_files']));
+        self::assertIsCallable($network['boot']);
+    }
 }
