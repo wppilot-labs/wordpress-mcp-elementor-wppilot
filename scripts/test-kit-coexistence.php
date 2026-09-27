@@ -193,6 +193,36 @@ function load_both(string $free, string $pro, string $export): array
         }
     }
 
+    // A kit that needs a vendor plugin (woo-reports: WooCommerce) would be skipped here, and a
+    // skipped kit proves nothing about clashes. Its required classes and functions get empty
+    // stand-ins so it loads and registers; its abilities are not executed below, because the
+    // stand-ins have nothing behind them.
+    $vendor_bound = [];
+    foreach (array_merge(glob($free . '/includes/kits/*/kit.json') ?: [], $pro !== '' ? (glob($pro . '/includes/kits/*/kit.json') ?: []) : []) as $kit_json) {
+        $kit = json_decode((string) file_get_contents($kit_json), true);
+        $requires = is_array($kit['requires'] ?? null) ? $kit['requires'] : [];
+        $classes = array_values(array_filter((array) ($requires['classes'] ?? []), 'is_string'));
+        $functions = array_values(array_filter((array) ($requires['functions'] ?? []), 'is_string'));
+        if ($classes === [] && $functions === []) {
+            continue;
+        }
+        foreach ($classes as $class) {
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $class) === 1 && !class_exists($class)) {
+                eval("class {$class} {}");
+            }
+        }
+        foreach ($functions as $function) {
+            if (preg_match('/^[a-z_][a-z0-9_]*$/', $function) === 1 && !function_exists($function)) {
+                eval("function {$function}(...\$args) { return null; }");
+            }
+        }
+        foreach ((array) ($kit['abilities'] ?? []) as $ability) {
+            $name = (string) ($ability['name'] ?? '');
+            $vendor_bound[$name] = true;
+            $vendor_bound[PREFIX . substr($name, strlen('wppilot'))] = true;
+        }
+    }
+
     \Kit_Coexistence::$owners = ['wppilot' => $free . '/includes/kits/', 'export' => $export . '/'];
     if ($pro !== '') {
         \Kit_Coexistence::$owners['wppilot-pro'] = $pro . '/includes/kits/';
@@ -234,7 +264,7 @@ function load_both(string $free, string $pro, string $export): array
     // Run what is safe to run: every read-only ability, as an agent would.
     foreach (\Kit_Coexistence::$abilities as $name => $args) {
         $annotations = $args['meta']['annotations'] ?? [];
-        if (($annotations['readonly'] ?? false) !== true) {
+        if (($annotations['readonly'] ?? false) !== true || isset($vendor_bound[$name])) {
             continue;
         }
         if (($args['permission_callback'])([]) !== true) {

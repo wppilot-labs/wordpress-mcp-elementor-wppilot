@@ -1,6 +1,6 @@
 {
 	"name": "wppilot/wppilot",
-	"description": "WordPress MCP server with free Elementor MCP editing. 133 typed abilities for posts, pages, Gutenberg, Elementor, media, menus and themes, served over MCP with OAuth 2.1, safety profiles, change evidence and rollback.",
+	"description": "WordPress MCP server with free Elementor MCP editing. 142 typed abilities for posts, pages, Gutenberg, Elementor, media, menus and themes, served over MCP with OAuth 2.1, safety profiles, change evidence and rollback.",
 	"type": "wordpress-plugin",
 	"keywords": [
 		"wordpress",
