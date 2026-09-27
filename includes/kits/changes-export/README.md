@@ -8,17 +8,26 @@ Exports the change ledger as flat rows for reports and audits.
 
 ## Host needs
 
-- `Ledger::query()` and `Ledger::export_row()`. Inside WPPilot these are the Changes screen's
-  own reader (`wppilot_query_change_log()`), so the ability, the screen and the CSV/JSON
-  download always agree. Standalone, the runtime's MiniLedger answers, covering the changes
-  the plugin's own kits recorded.
-- `Ledger::download_url()`: WPPilot's Changes screen, or empty standalone.
+- `Ledger::query()` and `Ledger::export_row()`: the rows, and their flat shape.
+- `Ledger::download_url()`: where a person downloads an export too large to return inline, or
+  empty when there is no such screen.
+
+Standalone, the runtime's MiniLedger answers all three, covering the changes the plugin's own
+kits recorded, and there is no download screen.
+
+<!-- kit-export:omit -->
+Inside WPPilot these are the Changes screen's own reader (`wppilot_query_change_log()`), so the
+ability, the screen and the CSV/JSON download always agree, and `download_url()` is WPPilot's
+Changes screen.
+<!-- /kit-export:omit -->
 
 ## Safety
 
 Read-only (`readonly: true`), so it runs under every safety profile and is never
 confirmation-gated. The row shape leaves out rollback snapshots by construction.
 
+<!-- kit-export:omit -->
 ## Tests
 
-`wppilot/tests/Unit/Kits/ChangesExport/` (not shipped).
+`tests/Unit/Kits/ChangesExport/` in the WPPilot repository (not shipped).
+<!-- /kit-export:omit -->

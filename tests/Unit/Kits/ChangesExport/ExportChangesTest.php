@@ -14,7 +14,6 @@ use WPPilot\Kits\Runtime;
 use WPPilot\Kits\Runtime\Host;
 use WPPilot\Kits\Runtime\Jobs;
 use WPPilot\Kits\Runtime\Ledger;
-use WPPilot_Test_State;
 
 /**
  * wppilot/export-changes against a host ledger, as the kit sees it.
@@ -44,7 +43,9 @@ final class ExportChangesTest extends TestCase
 
     public function testTheAbilityIsRegisteredWithItsLiteralName(): void
     {
-        self::assertContains('wppilot/export-changes', WPPilot_Test_State::$registered_abilities);
+        // Asked through wp_has_ability() rather than this suite's doubles, so the test still runs
+        // when scripts/export-kit.php carries it into another plugin's harness.
+        self::assertTrue(wp_has_ability('wppilot/export-changes'));
     }
 
     public function testFiltersAreForwardedAndEmptyOnesDropped(): void
