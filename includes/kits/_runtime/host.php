@@ -65,6 +65,24 @@ interface Host
 }
 
 /**
+ * A host that answers `meta.safety.min_profile` itself.
+ *
+ * Separate from Host so a host written against runtime 1.0 (another plugin's, or a test double)
+ * still satisfies the contract; require_profile() falls back to comparing Host::safety_profile()
+ * with the ability's own min_profile when the host does not implement this.
+ */
+interface ProfileGate
+{
+    /**
+     * Whether the ability's `meta.safety.min_profile` is within this host's safety profile.
+     *
+     * Returns true or a WP_Error that names the profile needed, never false; `bool` only because
+     * a `true` type needs PHP 8.2.
+     */
+    public function profile_allows(string $ability_name): bool|WP_Error;
+}
+
+/**
  * The change record a kit writes to, and reads back.
  *
  * Row shape is the host's; a kit builds rows only through record_items() and reads them only

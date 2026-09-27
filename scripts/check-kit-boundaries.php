@@ -35,7 +35,10 @@ declare(strict_types=1);
  *   - shop_order read through the posts table, which returns nothing on an HPOS store;
  *   - a kit hooking wp_abilities_api_init or wp_abilities_api_categories_init itself: the
  *     runtime owns those hooks, once per copy, and a registration outside them is silent;
- *   - an i18n call without WPPilot's literal text domain, which the exporter cannot rewrite.
+ *   - an i18n call without WPPilot's literal text domain, which the exporter cannot rewrite;
+ *   - an ability declaring meta.safety.min_profile whose registration does not call
+ *     Runtime\require_profile() with its own name: before WordPress 7.1 the key alone is
+ *     enforced by nothing outside the host's own gate.
  *
  * Per kit it also checks kit.json (slug, version, namespace, tier, runtime, abilities), that the
  * literal wp_register_ability() names in its PHP equal kit.json `abilities[].name` both ways,
@@ -61,6 +64,7 @@ use function WPPilot\Scripts\Kits\matching_close;
 use function WPPilot\Scripts\Kits\next_significant;
 use function WPPilot\Scripts\Kits\opens;
 use function WPPilot\Scripts\Kits\prev_significant;
+use function WPPilot\Scripts\Kits\profile_gate_problems;
 use function WPPilot\Scripts\Kits\registered_ability_literals;
 use function WPPilot\Scripts\Kits\relative;
 use function WPPilot\Scripts\Kits\tokens;
@@ -541,6 +545,9 @@ function check(string $free, string $pro): array
                 $lines = preg_split('/\R/', $source) ?: [];
                 check_syntax($tokens, $lines, $where, $report);
                 check_portable($tokens, $lines, $where, $own, $report);
+                foreach (profile_gate_problems($tokens) as $problem) {
+                    $report->add($where, $problem['line'], $problem['message']);
+                }
                 foreach (registered_ability_literals($source) as $ability) {
                     $registered[$ability['name']] = $where . ':' . $ability['line'];
                 }

@@ -11,6 +11,7 @@ use WP_Error;
 use WPPilot\Kits\Runtime\Host;
 use WPPilot\Kits\Runtime\Jobs;
 use WPPilot\Kits\Runtime\Ledger;
+use WPPilot\Kits\Runtime\ProfileGate;
 use WPPilot\Kits\Runtime\Runner;
 
 if (!defined('ABSPATH')) {
@@ -24,7 +25,7 @@ if (!defined('ABSPATH')) {
  * (scripts/check-kit-boundaries.php enforces it). The exporter does not ship it: a kit carried
  * into another plugin runs on hosts/standalone.php instead.
  */
-final class WPPilotHost implements Host
+final class WPPilotHost implements Host, ProfileGate
 {
     private ?WPPilotLedger $ledger = null;
 
@@ -72,6 +73,23 @@ final class WPPilotHost implements Host
     public function admin_parent_slug(): string
     {
         return 'wppilot-connect';
+    }
+
+    /**
+     * WPPilot's own profile rule, so a kit ability answers exactly as the Abilities Hub and the
+     * MCP transports do: min_profile first, then the risk class the profile allows.
+     */
+    public function profile_allows(string $ability_name): bool|WP_Error
+    {
+        $ability = wp_get_ability($ability_name);
+        if (!$ability instanceof \WP_Ability) {
+            return new WP_Error(
+                'kit_ability_unknown',
+                sprintf('Ability "%s" is not registered, so its safety policy cannot be checked.', $ability_name),
+                ['status' => 403],
+            );
+        }
+        return \wppilot_safety_check_ability($ability);
     }
 
     /**

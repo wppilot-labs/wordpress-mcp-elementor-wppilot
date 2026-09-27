@@ -51,6 +51,12 @@ use function WPPilot\Scripts\Kits\tokens;
 require_once __DIR__ . '/lib/kit-tools.php';
 
 const PREFIX = 'kitprobe';
+
+/**
+ * Names WordPress itself owns. Both copies reading or taking core's cron lock is the point, not a
+ * collision: it is how each one stays out of the way of wp-cron.
+ */
+const CORE_NAMES = ['transient' => ['doing_cron' => true]];
 const NS = 'KitProbe\\Kits';
 
 /** Call => [kind, argument position, argument name]. */
@@ -166,6 +172,17 @@ function remove_tree(string $path): void
 }
 
 /**
+ * Whether an ability's meta asks for a safety profile above Production Safe.
+ *
+ * @param array<string, mixed> $meta
+ */
+function min_profile_above_production(array $meta): bool
+{
+    $safety = is_array($meta['safety'] ?? null) ? $meta['safety'] : [];
+    return ($safety['min_profile'] ?? '') === 'developer';
+}
+
+/**
  * The child process: both copies, one PHP runtime.
  *
  * @return list<string> Problems.
@@ -185,6 +202,10 @@ function load_both(string $free, string $pro, string $export): array
         'wppilot_ledger_record_items' => static fn(string $ability, array $items, ?string $group = null): array => ['group' => (string) $group, 'change_ids' => [], 'without_before_image' => 0],
         'wppilot_query_change_log' => static fn(array $filters = []): array => [],
         'wppilot_change_export_row' => static fn(array $entry): array => $entry,
+        // Production Safe, as wppilot_get_safety_profile() above: a Developer-only ability is refused.
+        'wppilot_safety_check_ability' => static fn(\WP_Ability $ability): bool|\WP_Error => min_profile_above_production($ability->get_meta())
+            ? new \WP_Error('wppilot_safety_profile_blocked', 'blocked by the stubbed Production Safe profile')
+            : true,
     ];
     $GLOBALS['kit_coexistence_stubs'] = $stubs;
     foreach (array_keys($stubs) as $function) {
@@ -272,6 +293,14 @@ function load_both(string $free, string $pro, string $export): array
         if (($annotations['readonly'] ?? false) !== true || isset($vendor_bound[$name])) {
             continue;
         }
+        if (min_profile_above_production(is_array($args['meta'] ?? null) ? $args['meta'] : [])) {
+            // Both hosts run Production Safe here, so this ability must be refused by its own
+            // permission callback: before WordPress 7.1 that callback is the only enforcement.
+            if (($args['permission_callback'])([]) === true) {
+                $problems[] = "{$name}: declares a min_profile above Production Safe, but its permission callback allowed it there";
+            }
+            continue;
+        }
         if (($args['permission_callback'])([]) !== true) {
             $problems[] = "{$name}: permission refused for an administrator";
             continue;
@@ -347,7 +376,7 @@ function load_both(string $free, string $pro, string $export): array
         $theirs = $sides['export'][$kind] ?? [];
         foreach (array_keys($ours) as $name) {
             $name = (string) $name;
-            $clash = isset($theirs[$name]);
+            $clash = isset($theirs[$name]) && !isset(CORE_NAMES[$kind][$name]);
             if (!$clash && $kind === 'option' && str_ends_with($name, '_')) {
                 foreach (array_keys($theirs) as $other) {
                     $clash = $clash || str_starts_with((string) $other, $name);

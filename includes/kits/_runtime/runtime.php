@@ -24,8 +24,10 @@ if (!defined('ABSPATH')) {
  * API_VERSION is the contract kits are written against. A kit declares the major it needs in
  * kit.json (`"runtime": "^1.0"`); a host skips a kit whose major differs and reports why, rather
  * than loading code written against a different contract.
+ *
+ * 1.1 added require_profile() and the ProfileGate host interface.
  */
-const API_VERSION = '1.0';
+const API_VERSION = '1.1';
 
 require_once __DIR__ . '/host.php';
 require_once __DIR__ . '/ledger/post-partial.php';
@@ -89,6 +91,59 @@ function can_run(): bool
 {
     $host = host();
     return $host->is_enabled() && $host->can_manage();
+}
+
+/**
+ * Refuse an ability whose `meta.safety.min_profile` is above the host's safety profile.
+ *
+ * Every kit ability that declares min_profile calls this from its permission callback, with its
+ * own literal name (scripts/check-kit-boundaries.php fails the build otherwise). The meta key on
+ * its own is only a declaration: the `wp_ability_permission_result` filter that could enforce it
+ * for every caller exists from WordPress 7.1, and kits run on 6.9, where a Developer-only read
+ * would otherwise run under Production Safe for any caller that does not go through the host's
+ * own gate (core REST, WP-CLI, another MCP adapter).
+ *
+ * Returns true or a WP_Error, never false; `bool` only because a `true` type needs PHP 8.2.
+ */
+function require_profile(string $ability_name): bool|WP_Error
+{
+    $host = host();
+    if ($host instanceof ProfileGate) {
+        return $host->profile_allows($ability_name);
+    }
+    return profile_check($ability_name, $host->safety_profile());
+}
+
+/**
+ * The min_profile comparison itself, for a host that keeps its profile as a plain string.
+ *
+ * Fails closed: an ability whose policy cannot be read is refused rather than assumed harmless.
+ */
+function profile_check(string $ability_name, string $profile): bool|WP_Error
+{
+    $ability = wp_get_ability($ability_name);
+    if (!$ability instanceof \WP_Ability) {
+        return new WP_Error(
+            'kit_ability_unknown',
+            sprintf('Ability "%s" is not registered, so its safety policy cannot be checked.', $ability_name),
+            ['status' => 403],
+        );
+    }
+    $meta = $ability->get_meta();
+    $safety = is_array($meta['safety'] ?? null) ? $meta['safety'] : [];
+    $rank = ['readonly' => 0, 'production' => 1, 'developer' => 2];
+    $needed = is_string($safety['min_profile'] ?? null) ? $safety['min_profile'] : '';
+    if ($needed === '' || !isset($rank[$needed])) {
+        return true;
+    }
+    if (($rank[$profile] ?? $rank['production']) >= $rank[$needed]) {
+        return true;
+    }
+    return new WP_Error(
+        'kit_safety_profile_blocked',
+        sprintf('Ability "%1$s" needs the %2$s safety profile; this site runs %3$s.', $ability_name, $needed, $profile),
+        ['status' => 403, 'ability' => $ability_name, 'min_profile' => $needed, 'profile' => $profile],
+    );
 }
 
 /**
