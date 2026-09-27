@@ -27,10 +27,8 @@ const RESULT_COMPLETE = 'complete';
 /**
  * An interim result awaiting client input.
  *
- * Declared for completeness of the vocabulary. WPPilot never returns it: no
- * ability implements a multi-round-trip workflow, and advertising one that
- * does not exist would strand a client waiting to answer an input request it
- * will never receive.
+ * Returned only when the site's confirmation mode is `human` and a client that
+ * declared elicitation calls a destructive or critical tool; see confirmation.php.
  */
 const RESULT_INPUT_REQUIRED = 'input_required';
 

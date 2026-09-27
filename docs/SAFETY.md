@@ -34,6 +34,17 @@ For an MCP adapter call, confirmation belongs inside the target parameters:
 
 WPPilot removes the control-only `confirm` field before target schema validation unless the target ability explicitly declares its own field with that name.
 
+### Confirmation mode: a person approves
+
+`confirm: true` is written by the AI model, so it proves the model decided to send it, not that a person agreed. **Settings → Confirmation → Confirmation mode** chooses what counts:
+
+- **Agent flag** (`argument`, the default): the contract above, unchanged.
+- **A person approves** (`human`): on MCP (both eras) and REST, a destructive or critical call also needs one of the following, and `confirm` alone is refused.
+  - **Elicitation.** A client on the 2026-07-28 revision that declares form elicitation in `_meta` `io.modelcontextprotocol/clientCapabilities` receives an `input_required` result whose `inputRequests.wppilot_confirmation` is an `elicitation/create` form asking the user to approve a summary of the exact call. The client retries the same `tools/call` with `inputResponses.wppilot_confirmation` (the user's answer) and the `requestState` it was given. That state is a token bound by HMAC (keyed from the site's auth salt) to the ability, the SHA-256 of the input without `confirm`, the user and a 5-minute expiry. It works once.
+  - **An approval link.** Every other caller is refused with a one-time wp-admin link (`wppilot_human_confirmation_required`, `data.approval_url`). An administrator opens it, sees the ability, the account it runs as and the exact input, and approves or denies. The agent's identical retry within 5 minutes of the approval then runs once. After a denial, the retry is refused with `wppilot_confirmation_denied`.
+
+The built-in Chat and Pro's approval queue already have a person approve each call, and are unaffected by this setting.
+
 ## WordPress core surface
 
 The typed WordPress abilities in `includes/abilities/wordpress/` are subject to every rule above, and add their own:
@@ -80,5 +91,7 @@ Safety is enforced identically under both MCP revisions. The modern dispatcher r
 The ledger retains at most 500 records and is also capped by total serialized size. Secrets and sensitive metadata are redacted or excluded. Before images are bounded. Rollback is offered only for supported operations and succeeds only when the observed result matches the expected fingerprint.
 
 Permanent deletion, payment refunds, and other irreversible external side effects are recorded as non-reversible.
+
+Each record also says how the call was confirmed (`confirmation.method`): `argument`, `elicitation`, `approval-url` (with the approving user's id), `chat`, `approval-queue`, or `not-required` for a write that needed no confirmation.
 
 Each record names the agent behind the write as well as the WordPress user. The user is not an agent identity - several AI clients usually connect as the same administrator - so the credential is what distinguishes them: an OAuth client id, stored hashed, or an application-password UUID. The client name and version the agent introduced itself with are recorded alongside it. Writes that arrive outside an authenticated MCP request, from wp-admin, WP-CLI or another plugin, are recorded as `direct` rather than attributed to the last agent seen.

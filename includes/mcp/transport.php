@@ -579,9 +579,11 @@ function call_tool(array $params, mixed $id): array
     // rate limit, design and preview gates, and whatever a companion plugin adds. This transport
     // used to reproduce each of those by hand; see wppilot_gate_ability_call().
     /** @var mixed $gated */
-    $gated = \wppilot_gate_ability_call($ability, $arguments, transport: 'mcp');
+    $gated = \wppilot_gate_ability_call($ability, $arguments, transport: 'mcp', context: confirmation_context($params));
     if ($gated instanceof WP_Error) {
-        return tool_error($gated, $id);
+        // A destructive call awaiting the user's approval goes back as input_required; see confirmation.php.
+        $input_required = input_required_payload($gated);
+        return $input_required !== null ? input_required_response($input_required, $id) : tool_error($gated, $id);
     }
     if (is_array($gated)) {
         $arguments = $gated;

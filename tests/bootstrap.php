@@ -74,10 +74,11 @@ require_once dirname(__DIR__) . '/includes/safety.php';
 // nothing at file scope.
 require_once dirname(__DIR__) . '/includes/abilities/policy.php';
 require_once dirname(__DIR__) . '/includes/gate-pipeline.php';
+require_once dirname(__DIR__) . '/includes/confirmation.php';
 
 // The MCP protocol layer is deliberately free of WordPress dependencies beyond
 // the ABSPATH guard, so it loads and is exercised here directly.
-foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $module) {
+foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport', 'confirmation'] as $module) {
     require_once dirname(__DIR__) . '/includes/mcp/' . $module . '.php';
 }
 
