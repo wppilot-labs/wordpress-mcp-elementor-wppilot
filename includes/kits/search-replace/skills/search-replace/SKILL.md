@@ -5,7 +5,7 @@ description: Find and replace text across posts, pages and post meta (including 
 
 # Search and replace across posts
 
-Three abilities, always in this order:
+Three abilities, always in this order (plus `wppilot/search-replace-cancel` to stop a background apply):
 
 1. `wppilot/search-replace-preview` finds matches and stores a plan. It writes nothing.
 2. `wppilot/search-replace-apply` writes that plan, after the person approves it.
@@ -69,6 +69,9 @@ only the posts the person agreed to.
   avoids writing any post it could not undo. Just continue with the cursor.
 - For a large plan, pass `background: true` instead. You get a `job_id` back. Poll
   `wppilot/search-replace-status` with it every few seconds until `status` is `done` or `failed`.
+  If the person asks to stop it, call `wppilot/search-replace-cancel` with the `job_id`: posts
+  already written stay written (and undoable), the rest stay pending, and applying the same
+  `plan_id` again continues. A cancelled job cannot be resumed.
 - Posts in `skipped` with `kit_sr_changed_since_preview` were edited after the preview and were
   left alone. To include them, preview those `post_ids` again, show the new diff, and apply the new
   plan. Never retry the old plan for them.

@@ -30,6 +30,7 @@ return [
         __DIR__ . '/src/abilities/search-replace-preview.php',
         __DIR__ . '/src/abilities/search-replace-apply.php',
         __DIR__ . '/src/abilities/search-replace-status.php',
+        __DIR__ . '/src/abilities/search-replace-cancel.php',
     ],
     'boot' => static function (Host $host): void {
         $host->jobs()->register(JOB_KIND, static fn(array $payload, array $state): array => job_step($payload, $state));

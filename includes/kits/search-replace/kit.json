@@ -32,6 +32,12 @@
             "readonly": true,
             "destructive": false,
             "ledger": "self"
+        },
+        {
+            "name": "wppilot/search-replace-cancel",
+            "readonly": false,
+            "destructive": false,
+            "ledger": "irreversible:changes only the background job record, which cannot be resumed once cancelled"
         }
     ],
     "skills": ["search-replace"],

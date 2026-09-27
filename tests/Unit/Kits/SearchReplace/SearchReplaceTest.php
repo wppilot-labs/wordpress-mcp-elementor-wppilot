@@ -32,6 +32,7 @@ final class SearchReplaceTest extends TestCase
         require_once dirname(__DIR__, 4) . '/includes/kits/search-replace/src/abilities/search-replace-preview.php';
         require_once dirname(__DIR__, 4) . '/includes/kits/search-replace/src/abilities/search-replace-apply.php';
         require_once dirname(__DIR__, 4) . '/includes/kits/search-replace/src/abilities/search-replace-status.php';
+        require_once dirname(__DIR__, 4) . '/includes/kits/search-replace/src/abilities/search-replace-cancel.php';
     }
 
     protected function setUp(): void
@@ -79,6 +80,7 @@ final class SearchReplaceTest extends TestCase
         self::assertTrue(wp_has_ability('wppilot/search-replace-preview'));
         self::assertTrue(wp_has_ability('wppilot/search-replace-apply'));
         self::assertTrue(wp_has_ability('wppilot/search-replace-status'));
+        self::assertTrue(wp_has_ability('wppilot/search-replace-cancel'));
     }
 
     public function testPreviewStoresAPlanAndWritesNothing(): void
@@ -348,6 +350,48 @@ final class SearchReplaceTest extends TestCase
 
         Kit_Test_Site::as_user(2, 'edit_post');
         self::assertSame('kit_sr_job_not_found', SR\status(['job_id' => $queued['job_id']])->get_error_code());
+    }
+
+    /**
+     * A cancel stops the job after the step in flight, leaves the rest of the plan pending so it
+     * can be applied again, records an honest irreversible row, and only works on your own job.
+     */
+    public function testCancelStopsABackgroundJobAndLeavesTheRestPending(): void
+    {
+        for ($i = 0; $i < 150; $i++) {
+            self::post('Old Co ' . $i);
+        }
+        $plan = self::preview(['search' => 'Old Co', 'replace' => 'New Co']);
+        $queued = self::apply(['plan_id' => $plan['plan_id'], 'background' => true]);
+        $this->host->jobs->run($queued['job_id'], 1);
+
+        Kit_Test_Site::as_user(2, 'edit_post');
+        self::assertSame('kit_sr_job_not_found', SR\cancel(['job_id' => $queued['job_id']])->get_error_code());
+        Kit_Test_Site::as_user(1, 'edit_post');
+
+        $cancelled = SR\cancel(['job_id' => $queued['job_id']]);
+        self::assertTrue($cancelled['cancelled']);
+        self::assertSame('cancelled', $cancelled['status']);
+        self::assertSame($plan['plan_id'], $cancelled['plan_id']);
+
+        $this->host->jobs->run($queued['job_id']);
+        $status = SR\status(['job_id' => $queued['job_id']]);
+        self::assertSame('cancelled', $status['job']['status']);
+        self::assertSame(100, $status['plan']['counts']['applied']);
+        self::assertSame(50, $status['plan']['counts']['pending']);
+        self::assertSame('Old Co 149', get_post(150)->post_title);
+
+        $row = end($this->host->ledger->calls);
+        self::assertSame('wppilot/search-replace-cancel', $row['ability']);
+        self::assertNull($row['items'][0]['before']);
+        self::assertStringContainsString('cannot be resumed', $row['items'][0]['irreversible_reason']);
+
+        $again = SR\cancel(['job_id' => $queued['job_id']]);
+        self::assertFalse($again['cancelled']);
+        self::assertSame('cancelled', $again['status']);
+
+        $rest = self::apply(['plan_id' => $plan['plan_id']]);
+        self::assertSame(50, $rest['applied']);
     }
 
     public function testUndoRestoresOnlyWhatThePlanTouched(): void
