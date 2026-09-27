@@ -339,7 +339,9 @@ function maybe_serve_well_known(): void
     }
     header('Content-Type: application/json; charset=UTF-8');
 
-    if (trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
+    // wp_magic_quotes() slashes $_SERVER too, so the quoted ETag arrives as \"...\" and never
+    // matched: every revalidation was a full 200.
+    if (trim((string) wp_unslash($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
         status_header(304);
         exit();
     }
