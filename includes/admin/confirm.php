@@ -41,6 +41,11 @@ function wppilot_confirm_register_page(): void
     // The decision redirects, so it must be handled before the admin header sends output.
     if (is_string($hook) && $hook !== '') {
         add_action('load-' . $hook, 'wppilot_confirm_handle_load');
+        // A page with no parent menu has no title WordPress can find, so the browser tab read
+        // "‹ Site — WordPress" with nothing in front.
+        add_action('load-' . $hook, static function (): void {
+            add_filter('admin_title', static fn(string $title): string => __('Approve an agent action', domain: 'wppilot') . ' ' . $title);
+        });
     }
 }
 
