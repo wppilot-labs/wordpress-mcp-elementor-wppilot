@@ -89,7 +89,7 @@
         if (input.classList.contains('wppilot-hub-select-all-input')) {
             var section = input.closest('.wppilot-hub-section, .wppilot-hub-subsection');
             if (section) {
-                section.querySelectorAll('.wppilot-hub-row input[type="checkbox"]').forEach(function (box) {
+                section.querySelectorAll('.wppilot-hub-row input[name="ability_names[]"]').forEach(function (box) {
                     box.checked = input.checked;
                 });
             }
@@ -111,7 +111,7 @@
             if (!section) {
                 return;
             }
-            var boxes = section.querySelectorAll('.wppilot-hub-row input[type="checkbox"]');
+            var boxes = section.querySelectorAll('.wppilot-hub-row input[name="ability_names[]"]');
             var checked = 0;
             boxes.forEach(function (box) {
                 if (box.checked) {
@@ -132,7 +132,7 @@
             if (selectedBulkAction() !== 'disable') {
                 return;
             }
-            var count = hub.querySelectorAll('.wppilot-hub-row input[type="checkbox"]:checked').length;
+            var count = hub.querySelectorAll('.wppilot-hub-row input[name="ability_names[]"]:checked').length;
             if (count === 0) {
                 return;
             }

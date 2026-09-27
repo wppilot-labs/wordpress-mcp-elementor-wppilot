@@ -260,6 +260,8 @@ require_once __DIR__ . '/includes/change-log-table.php';
 require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';
 require_once __DIR__ . '/includes/tokens.php';
+require_once __DIR__ . '/includes/agent-identities.php';
+require_once __DIR__ . '/includes/ledger-map.php';
 require_once __DIR__ . '/includes/privacy.php';
 require_once __DIR__ . '/includes/rest/transport-hardening.php';
 
@@ -619,6 +621,7 @@ add_action('admin_init', static function () {
     if ($page === 'wppilot-connect') {
         wppilot_handle_revoke_password();
         wppilot_handle_revoke_token();
+        wppilot_handle_update_token();
         wppilot_handle_dismiss_production_warning();
     }
     if ($page === 'wppilot-abilities') {

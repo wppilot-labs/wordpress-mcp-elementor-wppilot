@@ -50,6 +50,8 @@ function wppilot_render_connect_page(): void
     $result_message = match ($_GET['wppilot_result'] ?? null) {
         'revoked' => __('Application password revoked.', domain: 'wppilot'),
         'token_revoked' => __('Access token revoked.', domain: 'wppilot'),
+        'token_updated' => __('Access token limits saved.', domain: 'wppilot'),
+        'token_update_failed' => __('The access token limits were not saved. A restricted token needs at least one ability or category.', domain: 'wppilot'),
         default => null,
     };
 

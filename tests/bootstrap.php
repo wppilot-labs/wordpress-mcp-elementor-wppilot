@@ -107,6 +107,13 @@ require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
 require_once dirname(__DIR__) . '/includes/change-log.php';
 require_once dirname(__DIR__) . '/includes/change-log-table.php';
 
+// Agent identities (a token's scope and profile ceiling) and the declarative
+// ledger map for third-party abilities. Both reach WordPress only from inside
+// their functions; the map registers its two rollback strategies and one filter
+// at load, which is what the tests assert against.
+require_once dirname(__DIR__) . '/includes/agent-identities.php';
+require_once dirname(__DIR__) . '/includes/ledger-map.php';
+
 // The design system's pure layers: the document parser, the token extractor,
 // the pre-flight rules, the distinctiveness comparison, the spec, and the
 // derivation that turns a brief into a design. Only the pure ones, deliberately

@@ -128,7 +128,8 @@ function resolve_token_identity(mixed $user, string $auth): mixed
 
     $identity = \wppilot_token_authenticate(bearer_secret($auth));
     if ($identity === null) {
-        record_authentication_error('Invalid, expired, or revoked WPPilot access token.');
+        $reason = function_exists('wppilot_token_refusal') ? \wppilot_token_refusal() : '';
+        record_authentication_error($reason !== '' ? $reason : 'Invalid, expired, or revoked WPPilot access token.');
         return $user;
     }
 
