@@ -276,9 +276,10 @@ unset($wppilot_mcp_module);
 // Public server card, and skills/briefs as skill:// resources (SEP-2640) on both eras.
 require_once __DIR__ . '/includes/mcp/server-card.php';
 require_once __DIR__ . '/includes/mcp/skill-resources.php';
-// Tasks (task-augmented tools/call backed by the kit jobs Runner) on the modern transport.
-// extensions.php is the transport's single hook-in point for it.
+// Tasks (task-augmented tools/call backed by the kit jobs Runner) and the MCP Apps preview card, on
+// the modern transport. extensions.php is the transport's single hook-in point for both.
 require_once __DIR__ . '/includes/mcp/tasks.php';
+require_once __DIR__ . '/includes/mcp/apps.php';
 require_once __DIR__ . '/includes/mcp/extensions.php';
 \WPPilot\Mcp\ServerCard\register();
 \WPPilot\Mcp\SkillResources\register();
