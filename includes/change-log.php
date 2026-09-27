@@ -1826,9 +1826,15 @@ function wppilot_rollback_change(string $id): array|WP_Error
         return $result;
     }
     if (($result['verified'] ?? false) !== true) {
+        $mismatched = is_array($result['mismatched'] ?? null) ? array_slice($result['mismatched'], 0, 12) : [];
         return new WP_Error(
             'wppilot_rollback_unverified',
-            __('Rollback ran but the observed state did not match the before-image.', domain: 'wppilot'),
+            __('Rollback ran but the observed state did not match the before-image.', domain: 'wppilot')
+                . ($mismatched !== [] ? ' ' . sprintf(
+                    /* translators: %s: comma-separated field names */
+                    __('Still different: %s.', domain: 'wppilot'),
+                    implode(', ', array_map('strval', $mismatched)),
+                ) : ''),
             $result,
         );
     }
@@ -1936,15 +1942,55 @@ function wppilot_restore_post_snapshot(array $snapshot): array|WP_Error
             append: false,
         );
     }
+    // Both sides use the current, order-independent fingerprint: rows recorded before 1.15.0 carry
+    // one that depended on meta order, so it is recomputed from the stored snapshot itself.
     $observed = wppilot_snapshot_post($post_id);
-    $expected = (string) ($snapshot['fingerprint'] ?? '');
-    $actual = is_array($observed) ? (string) ($observed['fingerprint'] ?? '') : '';
-    return [
+    $expected = wppilot_post_snapshot_fingerprint($snapshot);
+    $actual = is_array($observed) && ($observed['type'] ?? '') === 'post' ? wppilot_post_snapshot_fingerprint($observed) : '';
+    $verified = $expected !== '' && hash_equals($expected, $actual);
+    $result = [
         'post_id' => $post_id,
         'expected_fingerprint' => $expected,
         'observed_fingerprint' => $actual,
-        'verified' => $expected !== '' && hash_equals($expected, $actual),
+        'verified' => $verified,
     ];
+    if (!$verified && is_array($observed)) {
+        // Which fields still differ, by name only: "did not match" alone gives a person nothing to
+        // look at, and values would copy site content into the change log.
+        $result['mismatched'] = wppilot_post_snapshot_mismatch($snapshot, $observed);
+    }
+    return $result;
+}
+
+/**
+ * The post fields, meta keys and taxonomies that differ between two post snapshots.
+ *
+ * @param array<string, mixed> $expected
+ * @param array<string, mixed> $observed
+ * @return list<string>
+ */
+function wppilot_post_snapshot_mismatch(array $expected, array $observed): array
+{
+    $names = [];
+    foreach (['post', 'meta', 'terms'] as $part) {
+        $a = is_array($expected[$part] ?? null) ? $expected[$part] : [];
+        $b = is_array($observed[$part] ?? null) ? $observed[$part] : [];
+        foreach (array_unique(array_merge(array_keys($a), array_keys($b))) as $key) {
+            if ($part === 'post' && in_array($key, WPPILOT_VOLATILE_POST_FIELDS, strict: true)) {
+                continue;
+            }
+            $left = $a[$key] ?? null;
+            $right = $b[$key] ?? null;
+            if ($part === 'terms' && is_array($left) && is_array($right)) {
+                sort($left);
+                sort($right);
+            }
+            if (wp_json_encode($left) !== wp_json_encode($right)) {
+                $names[] = $part . '.' . $key;
+            }
+        }
+    }
+    return $names;
 }
 
 /** @param array<string, mixed> $snapshot @return array<string, mixed> */
@@ -2072,10 +2118,25 @@ function wppilot_post_snapshot_fingerprint(array $snapshot): string
     foreach (WPPILOT_VOLATILE_POST_FIELDS as $volatile) {
         unset($post[$volatile]);
     }
+    // Canonical order. get_post_meta() returns keys in meta_id order, and a restore deletes and
+    // re-adds keys while the ones it leaves alone (_edit_lock and friends) keep their old ids, so
+    // the same data came back in a different order and hashed differently: a WooCommerce product
+    // restored exactly still reported "did not match the before-image". The values of one key keep
+    // their order, which is meaningful.
+    $meta = is_array($snapshot['meta'] ?? null) ? $snapshot['meta'] : [];
+    ksort($meta, SORT_STRING);
+    $terms = is_array($snapshot['terms'] ?? null) ? $snapshot['terms'] : [];
+    ksort($terms, SORT_STRING);
+    foreach ($terms as $taxonomy => $ids) {
+        if (is_array($ids)) {
+            sort($ids);
+            $terms[$taxonomy] = $ids;
+        }
+    }
     return wppilot_snapshot_fingerprint([
         'post' => $post,
-        'meta' => $snapshot['meta'] ?? [],
-        'terms' => $snapshot['terms'] ?? [],
+        'meta' => $meta,
+        'terms' => $terms,
     ]);
 }
 
