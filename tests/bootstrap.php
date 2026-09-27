@@ -33,6 +33,14 @@ define('WPPILOT_MCP_ADAPTER_CLASS', 'WP\\MCP\\Core\\McpAdapter');
 
 require_once __DIR__ . '/doubles/wordpress.php';
 
+// The same WordPress state under neutral names. Kit tests are exported into other plugins by
+// scripts/export-kit.php, where naming this suite's state class fails the export's leftover scan,
+// so their doubles reach posts, meta, capabilities and registrations through these instead.
+$GLOBALS['kit_test_posts'] = &WPPilot_Test_State::$posts;
+$GLOBALS['kit_test_post_meta'] = &WPPilot_Test_State::$post_meta;
+$GLOBALS['kit_test_capabilities'] = &WPPilot_Test_State::$capabilities;
+$GLOBALS['kit_test_registrations'] = &WPPilot_Test_State::$registrations;
+
 // Which copy of the adapter won. Pure path and classmap reading; it registers
 // nothing and touches WordPress only through wp_normalize_path().
 require_once dirname(__DIR__) . '/includes/mcp/adapter-origin.php';
