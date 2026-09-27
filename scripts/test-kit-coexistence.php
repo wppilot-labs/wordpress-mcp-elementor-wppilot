@@ -51,6 +51,12 @@ use function WPPilot\Scripts\Kits\tokens;
 require_once __DIR__ . '/lib/kit-tools.php';
 
 const PREFIX = 'kitprobe';
+
+/**
+ * Names WordPress itself owns. Both copies reading or taking core's cron lock is the point, not a
+ * collision: it is how each one stays out of the way of wp-cron.
+ */
+const CORE_NAMES = ['transient' => ['doing_cron' => true]];
 const NS = 'KitProbe\\Kits';
 
 /** Call => [kind, argument position, argument name]. */
@@ -359,7 +365,7 @@ function load_both(string $free, string $pro, string $export): array
         $theirs = $sides['export'][$kind] ?? [];
         foreach (array_keys($ours) as $name) {
             $name = (string) $name;
-            $clash = isset($theirs[$name]);
+            $clash = isset($theirs[$name]) && !isset(CORE_NAMES[$kind][$name]);
             if (!$clash && $kind === 'option' && str_ends_with($name, '_')) {
                 foreach (array_keys($theirs) as $other) {
                     $clash = $clash || str_starts_with((string) $other, $name);

@@ -349,3 +349,37 @@ function _doing_it_wrong(string $function_name, string $message, string $version
 {
     Kit_Coexistence::$notices[] = "{$function_name}: {$message}";
 }
+
+/** An empty schedule: the read-only cron ability lists nothing, and must not fail doing it. */
+function _get_cron_array(): array
+{
+    return [];
+}
+
+function wp_get_schedules(): array
+{
+    return [
+        'hourly' => ['interval' => HOUR_IN_SECONDS, 'display' => 'Once Hourly'],
+        'daily' => ['interval' => DAY_IN_SECONDS, 'display' => 'Once Daily'],
+    ];
+}
+
+/**
+ * Site Health with no tests registered. The real class lives in wp-admin/includes, which the
+ * read-only Site Health ability loads on demand and this harness does not have.
+ */
+final class WP_Site_Health
+{
+    private static ?self $instance = null;
+
+    public static function get_instance(): self
+    {
+        return self::$instance ??= new self();
+    }
+
+    /** @return array{direct: array<string, mixed>, async: array<string, mixed>} */
+    public static function get_tests(): array
+    {
+        return ['direct' => [], 'async' => []];
+    }
+}
