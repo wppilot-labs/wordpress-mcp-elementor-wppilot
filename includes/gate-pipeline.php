@@ -36,9 +36,11 @@ if (!defined('ABSPATH')) {
  * The ability's own permission callback is not called here: execute() runs it, and running it
  * twice would drift from core's contract the moment core changed it.
  *
- * @param string                     $transport `rest`, `mcp`, `chat` or `approval`. Filters use it to
- *                                              decide what applies; the approval queue, for one, only
- *                                              holds `rest` and `mcp` calls.
+ * @param string                     $transport `rest`, `mcp`, `chat`, `approval` or `nested` (an
+ *                                              ability a kit ability runs on the caller's behalf, e.g.
+ *                                              on another network site). Filters use it to decide
+ *                                              what applies; the approval queue, for one, only holds
+ *                                              `rest` and `mcp` calls.
  * @param array{human_approved?: bool} $context
  * @return mixed The input to pass to execute(), or a WP_Error explaining the refusal.
  */

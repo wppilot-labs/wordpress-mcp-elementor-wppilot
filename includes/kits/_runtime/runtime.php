@@ -147,6 +147,60 @@ function profile_check(string $ability_name, string $profile): bool|WP_Error
 }
 
 /**
+ * Run another ability from inside a kit ability, through the same controls a direct call meets.
+ *
+ * Calling `$ability->execute()` straight away would skip everything the host enforces before
+ * execute(): inside WPPilot the safety profile, the confirmation contract, the rate limit and the
+ * design and preview gates; standalone the confirm flag. A kit that runs abilities on an agent's
+ * behalf (a network kit running one on another site) would then be a way around all of them.
+ *
+ * The richer host offers its runner as the `ability-runner` extension point: a callable taking
+ * the ability and its input and returning what execute() returns, or the refusal. Standalone
+ * there is none, so the confirm guard runs here. Either way execute() still runs the ability's
+ * own permission callback and the ledger's before/after hooks.
+ *
+ * @param mixed $input The inner ability's input, including its own `confirm` when it needs one.
+ * @return mixed The ability's result, or a WP_Error explaining the refusal.
+ */
+function run_ability(\WP_Ability $ability, mixed $input): mixed
+{
+    /** @var mixed $runner */
+    $runner = host()->extension('ability-runner');
+    if (is_callable($runner)) {
+        return $runner($ability, $input);
+    }
+
+    $values = is_array($input) ? $input : [];
+    $confirmed = host()->confirm_guard($ability->get_name(), $values);
+    if ($confirmed instanceof WP_Error) {
+        return $confirmed;
+    }
+    if (is_array($input) && array_key_exists('confirm', $input)) {
+        $properties = $ability->get_input_schema()['properties'] ?? [];
+        // `confirm` is a transport control; an ability whose schema does not declare it would
+        // reject the whole call as having an unknown property.
+        if (!is_array($properties) || !array_key_exists('confirm', $properties)) {
+            unset($input['confirm']);
+        }
+    }
+    return $ability->execute(empty_input_for($ability, $input));
+}
+
+/**
+ * The input to hand execute() when a caller passed nothing.
+ *
+ * An ability with no input schema rejects any input, `[]` included, so it must be given null;
+ * one with an object schema rejects null. Passing one answer for both breaks half of them.
+ */
+function empty_input_for(\WP_Ability $ability, mixed $input): mixed
+{
+    if ($input !== [] && $input !== null) {
+        return $input;
+    }
+    return $ability->get_input_schema() === [] ? null : [];
+}
+
+/**
  * Read kit.json for every kit folder under a directory.
  *
  * Folders whose names start with `_` are the runtime's own and are skipped.
@@ -239,6 +293,14 @@ function load_kits(string $kits_dir, array $only = []): array
         $descriptor = is_file($bootstrap) ? require $bootstrap : null;
         if (!is_array($descriptor)) {
             $report['skipped'][$slug] = 'bootstrap.php did not describe the kit';
+            continue;
+        }
+        // A condition kit.json cannot express — "this is a multisite network" is a runtime fact,
+        // and is_multisite() exists on every install — is the bootstrap's to state. Reported like
+        // any other skip, so integration health says why the kit's abilities are absent.
+        $skip = $descriptor['skip'] ?? null;
+        if (is_string($skip) && $skip !== '') {
+            $report['skipped'][$slug] = $skip;
             continue;
         }
         if (is_callable($descriptor['boot'] ?? null)) {

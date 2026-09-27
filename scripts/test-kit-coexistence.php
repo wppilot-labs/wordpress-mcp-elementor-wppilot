@@ -82,6 +82,12 @@ const NAMING_CALLS = [
 ];
 
 /**
+ * WordPress's own options. Every plugin reads them (which page is the front page, the site name),
+ * so two copies of a kit both naming one is the site being read, not a clash between the copies.
+ */
+const CORE_OPTIONS = ['show_on_front', 'page_on_front', 'page_for_posts', 'blogname', 'blogdescription', 'home', 'siteurl', 'permalink_structure'];
+
+/**
  * Names each kind of shared resource a tree's PHP source spells out, statically.
  *
  * @param list<string> $files
@@ -193,6 +199,9 @@ function load_both(string $free, string $pro, string $export): array
     define('WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES', 1_048_576);
     require_once __DIR__ . '/lib/coexistence-doubles.php';
     require_once $free . '/tests/doubles/wordpress.php';
+    // A network: a kit that skips itself on a single site (multisite) must load here, or its
+    // names are never compared.
+    \WPPilot_Test_State::$multisite = true;
 
     // What WPPilotHost calls; the rest of WPPilot is not loaded here.
     $stubs = [
@@ -382,7 +391,7 @@ function load_both(string $free, string $pro, string $export): array
                     $clash = $clash || str_starts_with((string) $other, $name);
                 }
             }
-            if (!$clash) {
+            if (!$clash || ($kind === 'option' && in_array($name, CORE_OPTIONS, true))) {
                 continue;
             }
             if ($kind === 'hook' && !isset($fired[$name]) && preg_match('/wppilot|' . PREFIX . '|kit/i', $name) !== 1) {

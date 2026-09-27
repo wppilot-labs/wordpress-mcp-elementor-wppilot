@@ -44,6 +44,9 @@ interface Host
      * A named extension point a richer host offers — Pro's SEO provider registry, the theme
      * bridge, the visual renderer — or null. A kit that joins one must still work when this is
      * null, which is what it always returns standalone.
+     *
+     * `ability-runner` is the host's way to run another ability through its controls; kits
+     * reach it through Runtime\run_ability(), which falls back to the confirm guard.
      */
     public function extension(string $point): mixed;
 
