@@ -363,6 +363,38 @@ function actor_label(array $entry): string
 }
 
 /**
+ * Agent filter suggestions: credential key => what the Connections screen calls it.
+ *
+ * The ledger's agent filter matches a credential key exactly (`token-12`), so each
+ * suggestion is the key, labelled with the name a person gave it. Access tokens
+ * are listed even before they have made a change, since they are the identities
+ * the filter is most often asked about.
+ *
+ * @return array<string, string>
+ */
+function agent_filter_options(): array
+{
+    $options = [];
+    if (function_exists('wppilot_get_connections')) {
+        foreach (\wppilot_get_connections(limit: 100) as $connection) {
+            $key = is_string($connection['credential_key'] ?? null) ? $connection['credential_key'] : '';
+            $label = is_string($connection['label'] ?? null) ? $connection['label'] : '';
+            $client = is_string($connection['client_name'] ?? null) ? $connection['client_name'] : '';
+            if ($key !== '' && !isset($options[$key])) {
+                $options[$key] = $client !== '' && $client !== $label ? $label . ' (' . $client . ')' : $label;
+            }
+        }
+    }
+    if (function_exists('wppilot_tokens_for_user')) {
+        foreach (\wppilot_tokens_for_user(get_current_user_id()) as $token) {
+            $options['token-' . $token['id']] ??= $token['name'];
+        }
+    }
+
+    return $options;
+}
+
+/**
  * Hidden fields that carry the current filters into a POST form.
  *
  * @param array<string, string|int> $filters

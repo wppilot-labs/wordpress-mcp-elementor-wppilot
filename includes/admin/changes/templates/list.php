@@ -52,7 +52,13 @@ $active_group = (string) ($filters['group'] ?? '');
             </label>
             <label>
                 <span><?php esc_html_e('Agent', domain: 'wppilot'); ?></span>
-                <input type="search" name="agent" placeholder="<?php esc_attr_e('Connection or client name', domain: 'wppilot'); ?>" value="<?php echo esc_attr((string) ($filters['agent'] ?? '')); ?>">
+                <input type="search" name="agent" list="wppilot-changes-agents" placeholder="<?php esc_attr_e('Connection or client name', domain: 'wppilot'); ?>" value="<?php echo esc_attr((string) ($filters['agent'] ?? '')); ?>">
+                <?php // Every credential that has reached the MCP endpoint, access tokens included, so "what did the SEO token do" is a pick, not a guess at its name. ?>
+                <datalist id="wppilot-changes-agents">
+                    <?php foreach (agent_filter_options() as $credential => $label) { ?>
+                        <option value="<?php echo esc_attr($credential); ?>"><?php echo esc_html($label); ?></option>
+                    <?php } ?>
+                </datalist>
             </label>
             <label>
                 <span><?php esc_html_e('From', domain: 'wppilot'); ?></span>
@@ -178,7 +184,14 @@ $active_group = (string) ($filters['group'] ?? '');
                                     </a>
                                 <?php } ?>
                             </td>
-                            <td><?php echo esc_html(actor_label($entry)); ?></td>
+                            <td>
+                                <?php $credential = (string) (is_array($entry['agent'] ?? null) ? ($entry['agent']['credential'] ?? '') : ''); ?>
+                                <?php if ($credential !== '') { ?>
+                                    <a href="<?php echo esc_url(list_url(['agent' => $credential])); ?>"><?php echo esc_html(actor_label($entry)); ?></a>
+                                <?php } else { ?>
+                                    <?php echo esc_html(actor_label($entry)); ?>
+                                <?php } ?>
+                            </td>
                             <td>
                                 <span class="wppilot-changes__status wppilot-changes__status--<?php echo esc_attr($status); ?>">
                                     <?php echo esc_html($is_audit ? __('Read', domain: 'wppilot') : status_label($status)); ?>

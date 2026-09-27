@@ -84,6 +84,27 @@ function wppilot_get_safety_profile(): string
     return wppilot_is_safety_profile($profile) ? $profile : 'production';
 }
 
+/**
+ * The profile that governs this request: the site's, lowered by the access token's ceiling.
+ *
+ * Only ever stricter than the site profile. A token capped at Read Only on a
+ * Production Safe site reads, and a token capped at Production Safe on a Read Only
+ * site still only reads. Requests that no access token authenticated (wp-admin,
+ * Chat, application passwords, OAuth, WP-CLI) get the site profile unchanged.
+ *
+ * Display code keeps calling wppilot_get_safety_profile(): the setting the site
+ * owner chose is what the screens show; this is what enforcement asks.
+ */
+function wppilot_effective_safety_profile(): string
+{
+    $site = wppilot_get_safety_profile();
+    $ceiling = function_exists('wppilot_agent_profile_ceiling') ? wppilot_agent_profile_ceiling() : '';
+
+    return $ceiling !== '' && wppilot_safety_profile_rank($ceiling) < wppilot_safety_profile_rank($site)
+        ? $ceiling
+        : $site;
+}
+
 function wppilot_update_safety_profile(string $profile): bool
 {
     $profile = sanitize_key($profile);
@@ -286,18 +307,24 @@ function wppilot_safety_profile_allows_ability(WP_Ability $ability): bool
         return true;
     }
 
+    // An access token's scope is part of the same answer, so discovery (tools/list, the
+    // adapter's discover meta-tool, the registry policy) never advertises what the token's
+    // next call would be refused.
+    if (function_exists('wppilot_agent_scope_error') && wppilot_agent_scope_error($ability) !== null) {
+        return false;
+    }
+
+    $profile = wppilot_effective_safety_profile();
+
     // Checked before the risk class, because a read-only ability otherwise always passes: the
     // `readonly` annotation short-circuits wppilot_ability_risk() to `read` before it ever looks
     // at a critical category, which left no way to keep a sensitive read off Production Safe.
     $min_profile = wppilot_ability_safety_policy($ability)['min_profile'];
-    if (
-        $min_profile !== ''
-        && wppilot_safety_profile_rank(wppilot_get_safety_profile()) < wppilot_safety_profile_rank($min_profile)
-    ) {
+    if ($min_profile !== '' && wppilot_safety_profile_rank($profile) < wppilot_safety_profile_rank($min_profile)) {
         return false;
     }
 
-    return match (wppilot_get_safety_profile()) {
+    return match ($profile) {
         'developer' => true,
         'readonly' => wppilot_ability_is_readonly($ability),
         default => wppilot_ability_risk($ability) !== 'critical',
@@ -354,6 +381,11 @@ function wppilot_safety_filter_ability_permission(
         );
     }
 
+    $scope_error = function_exists('wppilot_agent_scope_error') ? wppilot_agent_scope_error($ability) : null;
+    if ($scope_error !== null) {
+        return $scope_error;
+    }
+
     if (!wppilot_safety_profile_allows_ability($ability)) {
         return new WP_Error(
             'wppilot_safety_profile_blocked',
@@ -361,7 +393,7 @@ function wppilot_safety_filter_ability_permission(
                 /* translators: 1: ability name, 2: active safety profile */
                 __('The ability "%1$s" is not allowed by the active WPPilot safety profile (%2$s).', domain: 'wppilot'),
                 $ability_name,
-                wppilot_get_safety_profile(),
+                wppilot_effective_safety_profile(),
             ),
             ['status' => 403],
         );
@@ -421,12 +453,35 @@ function wppilot_safety_pre_mcp_tool_call(array $args, string $tool_name): array
 
 function wppilot_safety_check_ability(WP_Ability $ability): bool|WP_Error
 {
+    // Scope first, so a token that may not call this at all is told that, rather than that
+    // the profile blocks it, which would send its owner to the wrong setting.
+    $scope_error = function_exists('wppilot_agent_scope_error') ? wppilot_agent_scope_error($ability) : null;
+    if ($scope_error !== null) {
+        return $scope_error;
+    }
+
     if (wppilot_safety_profile_allows_ability($ability)) {
         return true;
     }
 
-    $profile = wppilot_get_safety_profile();
+    $profile = wppilot_effective_safety_profile();
     $profiles = wppilot_safety_profiles();
+    if ($profile !== wppilot_get_safety_profile()) {
+        return new WP_Error(
+            'wppilot_safety_profile_blocked',
+            sprintf(
+                /* translators: 1: ability name, 2: safety profile label */
+                __(
+                    'Ability "%1$s" is blocked: the access token behind this request is capped at the %2$s safety profile. The site owner sets that cap on the token; do not retry.',
+                    domain: 'wppilot',
+                ),
+                $ability->get_name(),
+                $profiles[$profile]['label'],
+            ),
+            ['status' => 403, 'ability' => $ability->get_name(), 'profile' => $profile, 'ceiling' => true],
+        );
+    }
+
     return new WP_Error(
         'wppilot_safety_profile_blocked',
         sprintf(
