@@ -1,0 +1,115 @@
+/*
+ * SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Changes screen. Depends on includes/assets/admin.css for the shell, and only
+ * styles the filters, the table and the detail view on top of it.
+ */
+
+.wppilot-changes__filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1rem;
+	align-items: flex-end;
+	margin-bottom: 1rem;
+}
+
+.wppilot-changes__filters label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-weight: 600;
+	font-size: 12px;
+}
+
+.wppilot-changes__filters input[type="search"] {
+	min-width: 12rem;
+}
+
+.wppilot-changes__filter-actions {
+	display: flex;
+	gap: 0.75rem;
+	align-items: center;
+}
+
+.wppilot-changes__toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1rem;
+	align-items: center;
+	margin-bottom: 0.75rem;
+}
+
+.wppilot-changes__export {
+	margin-left: auto;
+	display: flex;
+	gap: 0.5rem;
+}
+
+.wppilot-changes__scope {
+	margin: 0 0 0.75rem;
+}
+
+.wppilot-changes__batch {
+	margin-left: 0.5rem;
+	font-size: 12px;
+}
+
+.wppilot-changes__actions {
+	display: flex;
+	gap: 0.4rem;
+	justify-content: flex-end;
+	white-space: nowrap;
+}
+
+.wppilot-changes__actions form,
+.wppilot-changes__toolbar form,
+.wppilot-changes__detail-actions form {
+	margin: 0;
+}
+
+.wppilot-changes__status {
+	display: inline-block;
+	padding: 0.1rem 0.5rem;
+	border-radius: 999px;
+	font-size: 12px;
+	background: rgba(0, 0, 0, 0.05);
+}
+
+.wppilot-changes__status--undoable {
+	background: rgba(0, 163, 42, 0.12);
+}
+
+.wppilot-changes__status--rolled-back {
+	background: rgba(34, 113, 177, 0.12);
+}
+
+.wppilot-changes__detail-actions {
+	display: flex;
+	gap: 0.75rem;
+	margin-top: 1rem;
+}
+
+/* Long input values scroll inside the panel rather than widening the page. */
+.wppilot-changes__json {
+	margin: 0 0 1.5rem;
+	padding: 0.75rem;
+	max-height: 24rem;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-size: 12px;
+	line-height: 1.5;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.03);
+}
+
+@media (max-width: 782px) {
+	.wppilot-changes__export {
+		margin-left: 0;
+	}
+
+	.wppilot-changes__actions {
+		justify-content: flex-start;
+	}
+}

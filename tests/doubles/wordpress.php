@@ -472,6 +472,23 @@ if (!function_exists('get_current_user_id')) {
     }
 }
 
+if (!function_exists('wp_unslash')) {
+    function wp_unslash(mixed $value): mixed
+    {
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
+if (!function_exists('sanitize_text_field')) {
+    /**
+     * Core's result for plain single-line text: tags stripped, whitespace collapsed.
+     */
+    function sanitize_text_field(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', strip_tags($text)));
+    }
+}
+
 if (!function_exists('esc_html')) {
     function esc_html(string $text): string
     {

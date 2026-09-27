@@ -314,6 +314,10 @@ require_once __DIR__ . '/includes/admin/instructions.php';
 require_once __DIR__ . '/includes/admin/settings.php';
 require_once __DIR__ . '/includes/admin/dashboard.php';
 require_once __DIR__ . '/includes/preview/bootstrap.php';
+if (is_admin()) {
+    // admin-post.php counts as admin, so the screen's undo and download handlers load too.
+    require_once __DIR__ . '/includes/admin/changes/changes.php';
+}
 // Basic Elementor support. Self-gating: the module checks for Elementor and its
 // version floor before loading anything, so this require is inert on a site
 // without it.

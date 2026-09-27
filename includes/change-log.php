@@ -115,6 +115,151 @@ function wppilot_with_change_log_lock(callable $write): mixed
     }
 }
 
+/**
+ * Ledger rows matching a filter, newest first.
+ *
+ * One reader for every place the ledger is searched — the Changes screen, its download and the
+ * export ability — so a filter cannot mean one thing on screen and another in the file.
+ *
+ * @param array{
+ *     kind?: string,
+ *     ability?: string,
+ *     user_id?: int,
+ *     agent?: string,
+ *     group?: string,
+ *     status?: string,
+ *     since?: string,
+ *     until?: string,
+ * } $filters `kind` is `change` or `audit-read`; `ability` matches a prefix; `agent` matches the
+ *            credential key exactly or the label or client name as a substring; `status` is
+ *            `undoable`, `rolled-back` or `not-reversible`; `since`/`until` are anything
+ *            strtotime() reads, compared in UTC and inclusive.
+ * @return list<array<string, mixed>>
+ */
+function wppilot_query_change_log(array $filters = []): array
+{
+    $kind = (string) ($filters['kind'] ?? '');
+    $ability = (string) ($filters['ability'] ?? '');
+    $user_id = (int) ($filters['user_id'] ?? 0);
+    $agent = strtolower(trim((string) ($filters['agent'] ?? '')));
+    $group = (string) ($filters['group'] ?? '');
+    $status = (string) ($filters['status'] ?? '');
+    $since = wppilot_change_filter_time((string) ($filters['since'] ?? ''), end_of_day: false);
+    $until = wppilot_change_filter_time((string) ($filters['until'] ?? ''), end_of_day: true);
+
+    $rows = [];
+    foreach (array_reverse(wppilot_get_change_log()) as $entry) {
+        if ($kind !== '' && (string) ($entry['kind'] ?? 'change') !== $kind) {
+            continue;
+        }
+        if ($ability !== '' && !str_starts_with((string) ($entry['ability'] ?? ''), $ability)) {
+            continue;
+        }
+        $user = is_array($entry['user'] ?? null) ? $entry['user'] : [];
+        if ($user_id > 0 && (int) ($user['id'] ?? 0) !== $user_id) {
+            continue;
+        }
+        if ($agent !== '' && !wppilot_change_agent_matches($entry, $agent)) {
+            continue;
+        }
+        if ($group !== '' && ($entry['group'] ?? null) !== $group) {
+            continue;
+        }
+        if ($status !== '' && wppilot_change_status($entry) !== $status) {
+            continue;
+        }
+        $recorded = strtotime((string) ($entry['recorded_at'] ?? ''));
+        if (($since !== null || $until !== null) && $recorded === false) {
+            continue;
+        }
+        if (($since !== null && $recorded < $since) || ($until !== null && $recorded > $until)) {
+            continue;
+        }
+        $rows[] = $entry;
+    }
+
+    return $rows;
+}
+
+/**
+ * `undoable`, `rolled-back` or `not-reversible`.
+ *
+ * @param array<string, mixed> $entry
+ */
+function wppilot_change_status(array $entry): string
+{
+    if (($entry['rolled_back'] ?? false) === true) {
+        return 'rolled-back';
+    }
+    $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
+    return ($rollback['reversible'] ?? false) === true ? 'undoable' : 'not-reversible';
+}
+
+/** @param array<string, mixed> $entry */
+function wppilot_change_agent_matches(array $entry, string $needle): bool
+{
+    $agent = is_array($entry['agent'] ?? null) ? $entry['agent'] : [];
+    if ($needle === strtolower((string) ($agent['credential'] ?? ''))) {
+        return true;
+    }
+    foreach (['label', 'client'] as $field) {
+        $value = strtolower((string) ($agent[$field] ?? ''));
+        if ($value !== '' && str_contains($value, $needle)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function wppilot_change_filter_time(string $value, bool $end_of_day): ?int
+{
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+    // A bare date means the whole day, so "until 2026-09-27" includes that afternoon.
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+        $value .= $end_of_day ? ' 23:59:59' : ' 00:00:00';
+    }
+    $time = strtotime($value . (preg_match('/(Z|[+-]\d{2}:?\d{2}|UTC)$/i', $value) === 1 ? '' : ' UTC'));
+    return $time === false ? null : $time;
+}
+
+/**
+ * One ledger row as it leaves the site in an export.
+ *
+ * Flat, and without the rollback snapshot: a before-image is a full copy of a post, its meta and
+ * its terms, which is the site's content rather than a record of what happened to it. Input is
+ * already redacted at write time and is passed through as stored.
+ *
+ * @param array<string, mixed> $entry
+ * @return array<string, mixed>
+ */
+function wppilot_change_export_row(array $entry): array
+{
+    $user = is_array($entry['user'] ?? null) ? $entry['user'] : [];
+    $agent = is_array($entry['agent'] ?? null) ? $entry['agent'] : [];
+    $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
+
+    return [
+        'id' => (string) ($entry['id'] ?? ''),
+        'recorded_at' => (string) ($entry['recorded_at'] ?? ''),
+        'kind' => (string) ($entry['kind'] ?? 'change'),
+        'ability' => (string) ($entry['ability'] ?? ''),
+        'risk' => (string) ($entry['risk'] ?? ''),
+        'user_id' => (int) ($user['id'] ?? 0),
+        'user_login' => (string) ($user['login'] ?? ''),
+        'agent_method' => (string) ($agent['method'] ?? ''),
+        'agent_label' => (string) ($agent['label'] ?? ''),
+        'agent_client' => (string) ($agent['client'] ?? ''),
+        'group' => (string) ($entry['group'] ?? ''),
+        'status' => wppilot_change_status($entry),
+        'rollback_reason' => (string) ($rollback['reason'] ?? ''),
+        'rolled_back_at' => (string) ($entry['rolled_back_at'] ?? ''),
+        'input' => is_array($entry['input'] ?? null) ? $entry['input'] : [],
+    ];
+}
+
 /** @return array<string, mixed>|null */
 function wppilot_get_change(string $id): ?array
 {
