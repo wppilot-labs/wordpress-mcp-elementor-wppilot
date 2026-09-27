@@ -121,10 +121,21 @@ function wppilot_change_before(string $ability_name, mixed $input, mixed $abilit
         return;
     }
     $ability = wppilot_change_resolve_ability($ability_name, $ability);
+    $values = wppilot_string_keyed_array($input);
     if ($ability instanceof WP_Ability && wppilot_ability_is_readonly($ability)) {
+        // A read changes nothing, so it is normally not recorded. A read that is sensitive in its
+        // own right (a raw SQL SELECT) opts in through meta.safety.audit_reads, so the site owner
+        // can see who ran what. The input is kept, redacted as for any write; the result never is.
+        if (wppilot_ability_safety_policy($ability)['audit_reads']) {
+            wppilot_change_pending($ability_name, [
+                'started_at' => microtime(true),
+                'input_summary' => wppilot_redact_for_log($values),
+                'input_sha256' => hash('sha256', (string) wp_json_encode($values)),
+                'audit_read' => true,
+            ]);
+        }
         return;
     }
-    $values = wppilot_string_keyed_array($input);
     wppilot_change_pending($ability_name, [
         'started_at' => microtime(true),
         'input_summary' => wppilot_redact_for_log($values),
@@ -163,15 +174,21 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result,
         return;
     }
     wppilot_change_pending($ability_name, value: null, clear: true);
+    $audit_read = ($pending['audit_read'] ?? false) === true;
     // @mago-expect analysis:mixed-assignment -- Pending data is internal and normalized below.
     $before_value = $pending['before'] ?? null;
     $before = is_array($before_value) ? wppilot_string_keyed_array($before_value) : null;
-    $rollback = wppilot_build_rollback_payload($ability_name, $before, $result);
+    $rollback = $audit_read
+        ? ['reversible' => false, 'reason' => 'A read-only call, recorded for audit. Nothing changed, so there is nothing to undo.']
+        : wppilot_build_rollback_payload($ability_name, $before, $result);
     $ability = wppilot_change_resolve_ability($ability_name, $ability);
     $risk = $ability instanceof WP_Ability ? wppilot_ability_risk($ability) : 'write';
     $user = wp_get_current_user();
 
     wppilot_store_change([
+        // 'audit-read' rows are a record of access, not of a change; the Changes screen and the
+        // export filter on it, and nothing offers to undo one.
+        'kind' => $audit_read ? 'audit-read' : 'change',
         'id' => wp_generate_uuid4(),
         'ability' => $ability_name,
         'risk' => $risk,
@@ -187,7 +204,7 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result,
         'agent' => function_exists('wppilot_current_agent') ? wppilot_current_agent() : [],
         'input' => $pending['input_summary'] ?? [],
         'input_sha256' => (string) ($pending['input_sha256'] ?? ''),
-        'result' => wppilot_result_summary($result),
+        'result' => $audit_read ? wppilot_audit_read_summary($result) : wppilot_result_summary($result),
         'rollback' => $rollback,
         'rolled_back' => false,
         // What the design gate saw, when it saw anything. In warn mode the write
@@ -1433,6 +1450,35 @@ function wppilot_result_summary(mixed $result): array
     return [
         'type' => gettype($result),
         'value' => is_scalar($result) ? mb_substr((string) $result, start: 0, length: 200) : null,
+    ];
+}
+
+/**
+ * What an audited read returned, without any of it.
+ *
+ * The point of auditing a SELECT is to know it ran, not to copy the rows it read into an option
+ * any administrator can open: those rows can be exactly the data the audit exists to watch. So
+ * only the shape survives — the top-level keys and how many rows each list held.
+ *
+ * @return array<string, mixed>
+ */
+function wppilot_audit_read_summary(mixed $result): array
+{
+    if (!is_array($result)) {
+        return ['type' => gettype($result)];
+    }
+
+    $counts = [];
+    foreach (array_slice(array: $result, offset: 0, length: 50, preserve_keys: true) as $key => $value) {
+        if (is_array($value)) {
+            $counts[(string) $key] = count($value);
+        }
+    }
+
+    return [
+        'type' => 'array',
+        'keys' => array_slice(array: array_map('strval', array_keys($result)), offset: 0, length: 50),
+        'row_counts' => $counts,
     ];
 }
 

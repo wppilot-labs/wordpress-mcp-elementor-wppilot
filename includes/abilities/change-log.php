@@ -93,6 +93,8 @@ function wppilot_change_public_summary(array $entry): array
     $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
     return [
         'id' => (string) ($entry['id'] ?? ''),
+        // Rows written before 1.14.0 carry no kind; every one of them was a change.
+        'kind' => (string) ($entry['kind'] ?? 'change'),
         'ability' => (string) ($entry['ability'] ?? ''),
         'risk' => (string) ($entry['risk'] ?? ''),
         'recorded_at' => (string) ($entry['recorded_at'] ?? ''),

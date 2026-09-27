@@ -472,6 +472,18 @@ if (!function_exists('get_current_user_id')) {
     }
 }
 
+if (!function_exists('wp_get_current_user')) {
+    /**
+     * The two fields the change ledger reads off the acting user.
+     */
+    function wp_get_current_user(): object
+    {
+        $id = WPPilot_Test_State::$current_user_id;
+
+        return (object) ['ID' => $id, 'user_login' => $id > 0 ? 'user' . $id : ''];
+    }
+}
+
 if (!function_exists('wp_has_ability')) {
     function wp_has_ability(string $name): bool
     {

@@ -243,10 +243,58 @@ function wppilot_ability_name_is_destructive(string $name): bool
     return false;
 }
 
+/**
+ * The ability's own safety policy, `meta.safety`.
+ *
+ * Neutral on purpose: the key is not WPPilot-branded, so a portable kit exported into another
+ * plugin keeps the same policy without the exporter having to rewrite it.
+ *
+ * - `min_profile`: the least permissive profile the ability may run under. A read that is still
+ *   too sensitive for Production Safe (a raw SQL SELECT) declares `developer`. Its risk stays
+ *   `read`, so it is never confirmation-gated; it is simply absent below that profile.
+ * - `audit_reads`: record each call in the change log even though it changes nothing.
+ *
+ * @return array{min_profile: string, audit_reads: bool}
+ */
+function wppilot_ability_safety_policy(WP_Ability $ability): array
+{
+    $meta = $ability->get_meta();
+    $safety = is_array($meta['safety'] ?? null) ? $meta['safety'] : [];
+    $min_profile = $safety['min_profile'] ?? '';
+
+    return [
+        'min_profile' => is_string($min_profile) && wppilot_is_safety_profile($min_profile) ? $min_profile : '',
+        'audit_reads' => ($safety['audit_reads'] ?? false) === true,
+    ];
+}
+
+/**
+ * Order the profiles from least to most permissive, so `min_profile` can be compared.
+ */
+function wppilot_safety_profile_rank(string $profile): int
+{
+    return match ($profile) {
+        'readonly' => 0,
+        'developer' => 2,
+        default => 1,
+    };
+}
+
 function wppilot_safety_profile_allows_ability(WP_Ability $ability): bool
 {
     if (wppilot_ability_is_hub_protected($ability->get_name())) {
         return true;
+    }
+
+    // Checked before the risk class, because a read-only ability otherwise always passes: the
+    // `readonly` annotation short-circuits wppilot_ability_risk() to `read` before it ever looks
+    // at a critical category, which left no way to keep a sensitive read off Production Safe.
+    $min_profile = wppilot_ability_safety_policy($ability)['min_profile'];
+    if (
+        $min_profile !== ''
+        && wppilot_safety_profile_rank(wppilot_get_safety_profile()) < wppilot_safety_profile_rank($min_profile)
+    ) {
+        return false;
     }
 
     return match (wppilot_get_safety_profile()) {
