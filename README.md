@@ -114,7 +114,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 ## What the free plugin can do
 
-141 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+142 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -132,7 +132,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Design system** | `19` | Typed design tokens, saved designs and activation, plus the checks that grade a built page against them: contrast, composition, layout grammars and a rendered-page verification pass. |
 | **Preview** | `8` | Compute what a write would change without performing it, then apply the reviewed result. Plus a view link, so an agent with a browser can look at the page it built - including one still in draft - and a capture store that compares two screenshots of a page and reports which regions moved. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
-| **Changes** | `4` | Read the redacted change ledger, attributed to the agent credential that made each write, and roll a change back. |
+| **Changes** | `5` | Read the redacted change ledger, attributed to the agent credential that made each write, export it as rows for a client report or an audit, and roll a change back. |
 | **Diagnostics** | `3` | Scoped health, performance and configuration-security checks. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 
@@ -176,7 +176,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 77 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **141 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **142 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 77 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -315,7 +315,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 141 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 142 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.
