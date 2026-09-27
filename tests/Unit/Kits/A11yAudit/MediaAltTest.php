@@ -9,6 +9,7 @@ namespace WPPilot\Tests\Unit\Kits\A11yAudit;
 
 use Kit_Fake_Image_Editor;
 use Kit_Media_Test_State;
+use Kit_Test_Site;
 use PHPUnit\Framework\TestCase;
 use WP_Error;
 use WPPilot\Kits\A11yAudit;
@@ -42,10 +43,9 @@ final class MediaAltTest extends TestCase
 
     protected function setUp(): void
     {
-        $GLOBALS['kit_test_posts'] = [];
-        $GLOBALS['kit_test_post_meta'] = [];
+        Kit_Test_Site::reset();
         delete_option(MiniLedger::OPTION);
-        $GLOBALS['kit_test_capabilities'] = ['edit_post', 'read_post', 'upload_files', 'manage_options'];
+        Kit_Test_Site::as_user(1, 'edit_post', 'read_post', 'upload_files', 'manage_options');
         Kit_Media_Test_State::reset();
         Kit_Fake_Image_Editor::$saved_paths = [];
         // One host for the class: each StandaloneHost hooks the permission filter again.
@@ -88,9 +88,8 @@ final class MediaAltTest extends TestCase
         Kit_Media_Test_State::add_image(12, '2026/09/IMG_2041.jpg', 1600, 900);
         Kit_Media_Test_State::add_image(13, '2026/09/team.jpg', 1600, 900);
         Kit_Media_Test_State::add_image(14, '2026/09/divider-line.png', 1200, 20, 'image/png');
-        $GLOBALS['kit_test_post_meta'][12]['_wp_attachment_image_alt'] = ['IMG_2041'];
-        $GLOBALS['kit_test_post_meta'][13]['_wp_attachment_image_alt'] = ['The team outside the office'];
-        Kit_Media_Test_State::$get_posts = [14, 13, 12, 11];
+        Kit_Test_Site::set_meta(12, '_wp_attachment_image_alt', 'IMG_2041');
+        Kit_Test_Site::set_meta(13, '_wp_attachment_image_alt', 'The team outside the office');
         Kit_Media_Test_State::$attachment_counts = ['image/jpeg' => 3, 'image/png' => 1, 'trash' => 5];
 
         $scan = A11yAudit\scan_media_alt([]);
@@ -111,7 +110,6 @@ final class MediaAltTest extends TestCase
         foreach (range(1, 5) as $id) {
             Kit_Media_Test_State::add_image($id, "2026/09/p{$id}.jpg", 800, 600);
         }
-        Kit_Media_Test_State::$get_posts = [5, 4, 3, 2, 1];
         Kit_Media_Test_State::$attachment_counts = ['image/jpeg' => 5];
 
         $first = A11yAudit\scan_media_alt(['per_page' => 2, 'include' => 'all']);
@@ -142,7 +140,7 @@ final class MediaAltTest extends TestCase
     {
         Kit_Media_Test_State::add_image(21, '2026/09/a.jpg', 800, 600);
         Kit_Media_Test_State::add_image(22, '2026/09/b.jpg', 800, 600);
-        $GLOBALS['kit_test_post_meta'][22]['_wp_attachment_image_alt'] = ['b.jpg'];
+        Kit_Test_Site::set_meta(22, '_wp_attachment_image_alt', 'b.jpg');
 
         $result = A11yAudit\update_alts(['items' => [
             ['attachment_id' => 21, 'alt' => 'A kayak on a "calm" lake'],
@@ -151,9 +149,9 @@ final class MediaAltTest extends TestCase
 
         self::assertIsArray($result);
         self::assertSame(2, $result['updated']);
-        self::assertSame(['A kayak on a "calm" lake'], $GLOBALS['kit_test_post_meta'][21]['_wp_attachment_image_alt']);
+        self::assertSame(['A kayak on a "calm" lake'], get_post_meta(21, '_wp_attachment_image_alt'));
         // wp_slash on the write: WordPress unslashes, and a backslash in alt text must survive.
-        self::assertSame(['C:\\path is not special'], $GLOBALS['kit_test_post_meta'][22]['_wp_attachment_image_alt']);
+        self::assertSame(['C:\\path is not special'], get_post_meta(22, '_wp_attachment_image_alt'));
 
         $rows = $this->ledger->all();
         self::assertCount(2, $rows);
@@ -175,7 +173,7 @@ final class MediaAltTest extends TestCase
     {
         Kit_Media_Test_State::add_image(21, '2026/09/a.jpg', 800, 600);
         Kit_Media_Test_State::add_image(22, '2026/09/b.jpg', 800, 600);
-        $GLOBALS['kit_test_post_meta'][22]['_wp_attachment_image_alt'] = ['old b'];
+        Kit_Test_Site::set_meta(22, '_wp_attachment_image_alt', 'old b');
         $result = A11yAudit\update_alts(['items' => [['attachment_id' => 21, 'alt' => 'New a'], ['attachment_id' => 22, 'alt' => 'New b']]]);
         self::assertIsArray($result);
 
@@ -183,20 +181,20 @@ final class MediaAltTest extends TestCase
 
         self::assertIsArray($undone);
         self::assertTrue($undone['verified']);
-        self::assertSame(['old b'], $GLOBALS['kit_test_post_meta'][22]['_wp_attachment_image_alt']);
-        self::assertSame(['New a'], $GLOBALS['kit_test_post_meta'][21]['_wp_attachment_image_alt']);
+        self::assertSame(['old b'], get_post_meta(22, '_wp_attachment_image_alt'));
+        self::assertSame(['New a'], get_post_meta(21, '_wp_attachment_image_alt'));
 
         // An image that had no alt before goes back to having none, not an empty one.
         $first = $this->ledger->rollback((string) $result['results'][0]['change_id']);
         self::assertIsArray($first);
-        self::assertArrayNotHasKey(A11yAudit\ALT_META_KEY, $GLOBALS['kit_test_post_meta'][21]);
+        self::assertArrayNotHasKey(A11yAudit\ALT_META_KEY, Kit_Test_Site::raw_meta(21));
     }
 
     public function testTheWholeBatchCanBeUndoneThroughItsGroup(): void
     {
         foreach ([31, 32, 33] as $id) {
             Kit_Media_Test_State::add_image($id, "2026/09/{$id}.jpg", 800, 600);
-            $GLOBALS['kit_test_post_meta'][$id]['_wp_attachment_image_alt'] = ["old {$id}"];
+            Kit_Test_Site::set_meta($id, '_wp_attachment_image_alt', "old {$id}");
         }
         $result = A11yAudit\update_alts(['items' => array_map(static fn(int $id): array => ['attachment_id' => $id, 'alt' => "new {$id}"], [31, 32, 33])]);
         self::assertIsArray($result);
@@ -207,7 +205,7 @@ final class MediaAltTest extends TestCase
         }
 
         foreach ([31, 32, 33] as $id) {
-            self::assertSame(["old {$id}"], $GLOBALS['kit_test_post_meta'][$id]['_wp_attachment_image_alt']);
+            self::assertSame(["old {$id}"], get_post_meta($id, '_wp_attachment_image_alt'));
         }
     }
 
@@ -216,7 +214,7 @@ final class MediaAltTest extends TestCase
         Kit_Media_Test_State::add_image(41, '2026/09/a.jpg', 800, 600);
         Kit_Media_Test_State::add_image(42, '2026/09/doc.pdf', 0, 0, 'application/pdf');
         Kit_Media_Test_State::add_image(43, '2026/09/c.jpg', 800, 600);
-        $GLOBALS['kit_test_post_meta'][43]['_wp_attachment_image_alt'] = ['Same'];
+        Kit_Test_Site::set_meta(43, '_wp_attachment_image_alt', 'Same');
 
         $result = A11yAudit\update_alts(['items' => [
             ['attachment_id' => 41, 'alt' => 'First'],
@@ -229,14 +227,14 @@ final class MediaAltTest extends TestCase
 
         self::assertIsArray($result);
         self::assertSame(['updated', 'skipped', 'skipped', 'unchanged', 'skipped', 'skipped'], array_column($result['results'], 'status'));
-        self::assertSame(['First'], $GLOBALS['kit_test_post_meta'][41]['_wp_attachment_image_alt']);
+        self::assertSame(['First'], get_post_meta(41, '_wp_attachment_image_alt'));
         self::assertCount(1, $this->ledger->all());
     }
 
     public function testNothingWrittenMeansNoGroupAndNoRows(): void
     {
         Kit_Media_Test_State::add_image(43, '2026/09/c.jpg', 800, 600);
-        $GLOBALS['kit_test_post_meta'][43]['_wp_attachment_image_alt'] = ['Same'];
+        Kit_Test_Site::set_meta(43, '_wp_attachment_image_alt', 'Same');
 
         $result = A11yAudit\update_alts(['items' => [['attachment_id' => 43, 'alt' => 'Same']]]);
 
@@ -250,20 +248,20 @@ final class MediaAltTest extends TestCase
         Kit_Media_Test_State::add_image(51, '2026/09/a.jpg', 800, 600);
         Kit_Media_Test_State::add_image(52, '2026/09/b.jpg', 800, 600);
         // The first snapshot fits; the second would pass the budget.
-        $GLOBALS['kit_test_post_meta'][51]['_wp_attachment_image_alt'] = ['x'];
-        $GLOBALS['kit_test_post_meta'][52]['_wp_attachment_image_alt'] = [str_repeat('y', MiniLedger::SNAPSHOT_BUDGET)];
+        Kit_Test_Site::set_meta(51, '_wp_attachment_image_alt', 'x');
+        Kit_Test_Site::set_meta(52, '_wp_attachment_image_alt', str_repeat('y', MiniLedger::SNAPSHOT_BUDGET));
 
         $result = A11yAudit\update_alts(['items' => [['attachment_id' => 51, 'alt' => 'A'], ['attachment_id' => 52, 'alt' => 'B']]]);
 
         self::assertIsArray($result);
         self::assertSame(['updated', 'skipped'], array_column($result['results'], 'status'));
-        self::assertSame([str_repeat('y', MiniLedger::SNAPSHOT_BUDGET)], $GLOBALS['kit_test_post_meta'][52]['_wp_attachment_image_alt']);
+        self::assertSame([str_repeat('y', MiniLedger::SNAPSHOT_BUDGET)], get_post_meta(52, '_wp_attachment_image_alt'));
     }
 
     public function testAWriteWordPressDidNotKeepIsReportedAsFailed(): void
     {
         Kit_Media_Test_State::add_image(61, '2026/09/a.jpg', 800, 600);
-        Kit_Media_Test_State::$refuse_meta_writes = true;
+        Kit_Test_Site::$refuse_meta_writes = true;
 
         $result = A11yAudit\update_alts(['items' => [['attachment_id' => 61, 'alt' => 'A']]]);
 
@@ -281,13 +279,13 @@ final class MediaAltTest extends TestCase
     public function testEmptyAltMarksAnImageDecorative(): void
     {
         Kit_Media_Test_State::add_image(71, '2026/09/spacer.gif', 1, 1, 'image/gif');
-        $GLOBALS['kit_test_post_meta'][71]['_wp_attachment_image_alt'] = ['spacer.gif'];
+        Kit_Test_Site::set_meta(71, '_wp_attachment_image_alt', 'spacer.gif');
 
         $result = A11yAudit\update_alts(['items' => [['attachment_id' => 71, 'alt' => '']]]);
 
         self::assertIsArray($result);
         self::assertTrue($result['results'][0]['decorative']);
-        self::assertSame([''], $GLOBALS['kit_test_post_meta'][71]['_wp_attachment_image_alt']);
+        self::assertSame([''], get_post_meta(71, '_wp_attachment_image_alt'));
     }
 
     // --- get-media-image ------------------------------------------------------------------------
@@ -295,7 +293,7 @@ final class MediaAltTest extends TestCase
     public function testPreviewIsDownscaledAndReturnedAsImageContentWithNoTempFileLeft(): void
     {
         Kit_Media_Test_State::add_image(81, '2026/09/photo.jpg', 4000, 3000);
-        $GLOBALS['kit_test_post_meta'][81]['_wp_attachment_image_alt'] = ['Old alt'];
+        Kit_Test_Site::set_meta(81, '_wp_attachment_image_alt', 'Old alt');
         $opened = [];
         Kit_Media_Test_State::$editor_factory = static function (string $path) use (&$opened): Kit_Fake_Image_Editor {
             $opened[] = $path;
@@ -368,7 +366,7 @@ final class MediaAltTest extends TestCase
         self::assertSame('kit_a11y_image_id', self::code(A11yAudit\media_image([])));
 
         Kit_Media_Test_State::add_image(85, '2026/09/p.jpg', 100, 100);
-        $GLOBALS['kit_test_capabilities'] = ['upload_files'];
+        Kit_Test_Site::as_user(1, 'upload_files');
         self::assertSame('kit_a11y_image_forbidden', self::code(A11yAudit\media_image(['attachment_id' => 85])));
     }
 
@@ -391,11 +389,9 @@ final class MediaAltTest extends TestCase
 
     public function testTargetIsAPublishedPostsPermalinkOrASiteUrl(): void
     {
-        $post = new \WP_Post();
-        $post->ID = 5;
-        $post->post_type = 'page';
-        $post->post_status = 'publish';
-        $GLOBALS['kit_test_posts'][5] = $post;
+        Kit_Test_Site::insert(['ID' => 5, 'post_type' => 'page', 'post_status' => 'publish']);
+        $post = get_post(5);
+        self::assertInstanceOf(\WP_Post::class, $post);
 
         self::assertSame('https://example.test/?p=5', A11yAudit\target_url(['post_id' => 5]));
         self::assertSame('https://example.test/about/', A11yAudit\target_url(['url' => '/about/']));
@@ -426,7 +422,7 @@ final class MediaAltTest extends TestCase
     /** @return array<string, mixed> */
     private static function registration(string $name): array
     {
-        $args = kit_test_registration($name);
+        $args = Kit_Test_Site::registration($name);
         self::assertIsArray($args, "{$name} is not registered");
         return $args;
     }

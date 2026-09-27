@@ -65,17 +65,6 @@ if (!function_exists('wp_generate_password')) {
     }
 }
 
-if (!function_exists('get_posts')) {
-    /**
-     * @param array<string, mixed> $args
-     * @return list<WP_Post>
-     */
-    function get_posts(array $args = []): array
-    {
-        return [];
-    }
-}
-
 if (!function_exists('wp_remote_request')) {
     /** @param array<string, mixed> $args */
     function wp_remote_request(string $url, array $args = []): array

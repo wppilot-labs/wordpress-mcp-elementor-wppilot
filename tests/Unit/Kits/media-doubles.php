@@ -6,30 +6,23 @@
 declare(strict_types=1);
 
 /**
- * WordPress media, meta and HTTP doubles for the media-edit and a11y-audit kit tests.
+ * WordPress media and HTTP doubles for the media-edit and a11y-audit kit tests.
  *
- * Kept beside the kit tests rather than in tests/doubles/wordpress.php so scripts/export-kit.php
- * carries them with the kits (both kit.json files declare this file). Every function is guarded:
- * the suite may already have a double of the same name, and so may the plugin an export lands in.
- *
- * Posts, meta, capabilities and ability registrations live in $GLOBALS['kit_test_*']. The host
- * suite's bootstrap binds those to its own state, so its get_post() and get_post_meta() doubles
- * see what these write; a harness without them gets the guarded doubles at the end of this file.
- * Meta writes unslash what they are given, as WordPress does. Files are real files in a temporary
- * uploads directory, so "the original is still on disk" is tested against a disk.
+ * Posts, meta, capabilities and ability registrations are Kit_Test_Site's (tests/doubles/
+ * kit-site.php, which a receiving plugin's harness replaces with its own): meta is stored raw and
+ * read back unserialized, as WordPress does, and this file defines none of those functions again.
+ * What is here is only what media work adds: attachment files and metadata, the image editor,
+ * uploads paths and the page fetch. Files are real files in a temporary uploads directory, so
+ * "the original is still on disk" is tested against a disk.
  */
 
-$GLOBALS['kit_test_posts'] ??= [];
-$GLOBALS['kit_test_post_meta'] ??= [];
-$GLOBALS['kit_test_capabilities'] ??= [];
-$GLOBALS['kit_test_registrations'] ??= [];
+if (!class_exists('Kit_Test_Site')) {
+    require_once dirname(__DIR__, 3) . '/doubles/kit-site.php';
+}
 
 final class Kit_Media_Test_State
 {
     public static string $basedir = '';
-
-    /** @var array<int, string> */
-    public static array $mime = [];
 
     /** @var (callable(string): (object|WP_Error))|null */
     public static $editor_factory = null;
@@ -38,9 +31,6 @@ final class Kit_Media_Test_State
 
     /** @var list<array<string, mixed>> */
     public static array $inserted = [];
-
-    /** @var list<int> */
-    public static array $get_posts = [];
 
     /** @var array<string, int> */
     public static array $attachment_counts = [];
@@ -54,25 +44,17 @@ final class Kit_Media_Test_State
     /** @var array<string, array{code: int, body: string}|WP_Error> */
     public static array $http = [];
 
-    public static bool $refuse_meta_writes = false;
-
-    public static int $next_id = 1000;
-
     public static function reset(): void
     {
         self::$basedir = sys_get_temp_dir() . '/kit-media-' . bin2hex(random_bytes(5));
         mkdir(self::$basedir . '/2026/09', recursive: true);
-        self::$mime = [];
         self::$editor_factory = null;
         self::$editor_supports = true;
         self::$inserted = [];
-        self::$get_posts = [];
         self::$attachment_counts = [];
         self::$subsizes = ['thumbnail' => ['width' => 150, 'height' => 150, 'crop' => true]];
         self::$post_status = [];
         self::$http = [];
-        self::$refuse_meta_writes = false;
-        self::$next_id = 1000;
         unset($GLOBALS['wp_filter']['image_resize_dimensions']);
     }
 
@@ -98,26 +80,22 @@ final class Kit_Media_Test_State
      */
     public static function add_image(int $id, string $relative, int $width, int $height, string $mime = 'image/jpeg', array $meta = []): WP_Post
     {
-        $post = new WP_Post();
-        $post->ID = $id;
-        $post->post_type = 'attachment';
-        $post->post_status = 'inherit';
-        $post->post_title = 'Photo ' . $id;
-        $GLOBALS['kit_test_posts'][$id] = $post;
-        self::$mime[$id] = $mime;
+        Kit_Test_Site::insert(['ID' => $id, 'post_type' => 'attachment', 'post_status' => 'inherit', 'post_title' => 'Photo ' . $id, 'post_mime_type' => $mime]);
         $path = self::$basedir . '/' . $relative;
         if (!is_dir(dirname($path))) {
             mkdir(dirname($path), recursive: true);
         }
         file_put_contents($path, str_repeat('x', 64));
-        $GLOBALS['kit_test_post_meta'][$id]['_wp_attached_file'] = [$relative];
-        $GLOBALS['kit_test_post_meta'][$id]['_wp_attachment_metadata'] = [array_merge([
+        Kit_Test_Site::set_meta($id, '_wp_attached_file', $relative);
+        Kit_Test_Site::set_meta($id, '_wp_attachment_metadata', array_merge([
             'width' => $width,
             'height' => $height,
             'file' => $relative,
             'filesize' => 64,
             'sizes' => [],
-        ], $meta)];
+        ], $meta));
+        $post = get_post($id);
+        assert($post instanceof WP_Post);
         return $post;
     }
 }
@@ -227,60 +205,11 @@ final class Kit_Fake_Image_Editor
     }
 }
 
-if (!function_exists('kit_media_deep_unslash')) {
-    function kit_media_deep_unslash(mixed $value): mixed
-    {
-        if (is_array($value)) {
-            return array_map('kit_media_deep_unslash', $value);
-        }
-        return is_string($value) ? stripslashes($value) : $value;
-    }
-}
-
-if (!function_exists('update_post_meta')) {
-    function update_post_meta(int $post_id, string $meta_key, mixed $meta_value, mixed $prev_value = ''): bool
-    {
-        if (Kit_Media_Test_State::$refuse_meta_writes) {
-            return false;
-        }
-        $value = kit_media_deep_unslash($meta_value);
-        if (($GLOBALS['kit_test_post_meta'][$post_id][$meta_key] ?? null) === [$value]) {
-            return false;
-        }
-        $GLOBALS['kit_test_post_meta'][$post_id][$meta_key] = [$value];
-        return true;
-    }
-}
-
-if (!function_exists('add_post_meta')) {
-    function add_post_meta(int $post_id, string $meta_key, mixed $meta_value, bool $unique = false): int|false
-    {
-        $GLOBALS['kit_test_post_meta'][$post_id][$meta_key][] = kit_media_deep_unslash($meta_value);
-        return 1;
-    }
-}
-
-if (!function_exists('delete_post_meta')) {
-    function delete_post_meta(int $post_id, string $meta_key, mixed $meta_value = ''): bool
-    {
-        $existed = isset($GLOBALS['kit_test_post_meta'][$post_id][$meta_key]);
-        unset($GLOBALS['kit_test_post_meta'][$post_id][$meta_key]);
-        return $existed;
-    }
-}
-
-if (!function_exists('metadata_exists')) {
-    function metadata_exists(string $meta_type, int $object_id, string $meta_key): bool
-    {
-        return isset($GLOBALS['kit_test_post_meta'][$object_id][$meta_key]);
-    }
-}
-
 if (!function_exists('get_post_mime_type')) {
     function get_post_mime_type(mixed $post = null): string|false
     {
-        $id = $post instanceof WP_Post ? $post->ID : (int) $post;
-        return Kit_Media_Test_State::$mime[$id] ?? false;
+        $post = $post instanceof WP_Post ? $post : get_post((int) $post);
+        return $post instanceof WP_Post ? $post->post_mime_type : false;
     }
 }
 
@@ -309,7 +238,7 @@ if (!function_exists('path_is_absolute')) {
 if (!function_exists('get_attached_file')) {
     function get_attached_file(int $attachment_id, bool $unfiltered = false): string|false
     {
-        $file = $GLOBALS['kit_test_post_meta'][$attachment_id]['_wp_attached_file'][0] ?? '';
+        $file = get_post_meta($attachment_id, '_wp_attached_file', true);
         if (!is_string($file) || $file === '') {
             return false;
         }
@@ -335,7 +264,8 @@ if (!function_exists('update_attached_file')) {
 if (!function_exists('wp_get_attachment_metadata')) {
     function wp_get_attachment_metadata(int $attachment_id = 0, bool $unfiltered = false): mixed
     {
-        return $GLOBALS['kit_test_post_meta'][$attachment_id]['_wp_attachment_metadata'][0] ?? false;
+        $meta = get_post_meta($attachment_id, '_wp_attachment_metadata', true);
+        return is_array($meta) ? $meta : false;
     }
 }
 
@@ -343,15 +273,14 @@ if (!function_exists('wp_update_attachment_metadata')) {
     /** @param array<string, mixed> $data */
     function wp_update_attachment_metadata(int $attachment_id, array $data): bool
     {
-        $GLOBALS['kit_test_post_meta'][$attachment_id]['_wp_attachment_metadata'] = [$data];
-        return true;
+        return (bool) update_post_meta($attachment_id, '_wp_attachment_metadata', $data);
     }
 }
 
 if (!function_exists('wp_get_attachment_url')) {
     function wp_get_attachment_url(int $attachment_id = 0): string|false
     {
-        $file = $GLOBALS['kit_test_post_meta'][$attachment_id]['_wp_attached_file'][0] ?? '';
+        $file = get_post_meta($attachment_id, '_wp_attached_file', true);
         return is_string($file) && $file !== '' ? 'https://example.test/wp-content/uploads/' . $file : false;
     }
 }
@@ -392,17 +321,15 @@ if (!function_exists('wp_insert_attachment')) {
     /** @param array<string, mixed> $args */
     function wp_insert_attachment(array $args, string|false $file = false, int $parent_post_id = 0, bool $wp_error = false): int|WP_Error
     {
-        $id = Kit_Media_Test_State::$next_id++;
-        $post = new WP_Post();
-        $post->ID = $id;
-        $post->post_type = 'attachment';
-        $post->post_status = 'inherit';
-        $post->post_title = stripslashes((string) ($args['post_title'] ?? ''));
-        $post->post_parent = $parent_post_id;
-        $GLOBALS['kit_test_posts'][$id] = $post;
-        Kit_Media_Test_State::$mime[$id] = (string) ($args['post_mime_type'] ?? '');
+        $id = Kit_Test_Site::insert([
+            'post_type' => 'attachment',
+            'post_status' => 'inherit',
+            'post_title' => stripslashes((string) ($args['post_title'] ?? '')),
+            'post_parent' => $parent_post_id,
+            'post_mime_type' => (string) ($args['post_mime_type'] ?? ''),
+        ]);
         if (is_string($file)) {
-            $GLOBALS['kit_test_post_meta'][$id]['_wp_attached_file'] = [_wp_relative_upload_path($file)];
+            update_attached_file($id, $file);
         }
         Kit_Media_Test_State::$inserted[] = ['id' => $id, 'args' => $args, 'file' => $file, 'parent' => $parent_post_id];
         return $id;
@@ -420,15 +347,15 @@ if (!function_exists('wp_generate_attachment_metadata')) {
 if (!function_exists('wp_delete_attachment')) {
     function wp_delete_attachment(int $post_id, bool $force_delete = false): mixed
     {
-        $post = $GLOBALS['kit_test_posts'][$post_id] ?? null;
-        if ($post === null) {
+        $post = get_post($post_id);
+        if (!$post instanceof WP_Post) {
             return false;
         }
         $path = get_attached_file($post_id);
         if (is_string($path) && file_exists($path)) {
             unlink($path);
         }
-        unset($GLOBALS['kit_test_posts'][$post_id], $GLOBALS['kit_test_post_meta'][$post_id]);
+        Kit_Test_Site::remove($post_id);
         return $post;
     }
 }
@@ -488,19 +415,6 @@ if (!function_exists('get_temp_dir')) {
     }
 }
 
-if (!function_exists('get_posts')) {
-    /**
-     * @param array<string, mixed> $args
-     * @return list<int>
-     */
-    function get_posts(array $args = []): array
-    {
-        $per_page = (int) ($args['posts_per_page'] ?? 5);
-        $page = max(1, (int) ($args['paged'] ?? 1));
-        return array_slice(Kit_Media_Test_State::$get_posts, ($page - 1) * $per_page, $per_page);
-    }
-}
-
 if (!function_exists('wp_count_attachments')) {
     function wp_count_attachments(string|array $mime_type = ''): object
     {
@@ -508,18 +422,12 @@ if (!function_exists('wp_count_attachments')) {
     }
 }
 
-if (!function_exists('wp_cache_delete')) {
-    function wp_cache_delete(int|string $key, string $group = ''): bool
-    {
-        return true;
-    }
-}
-
 if (!function_exists('get_post_status')) {
     function get_post_status(mixed $post = null): string|false
     {
         $id = $post instanceof WP_Post ? $post->ID : (int) $post;
-        return Kit_Media_Test_State::$post_status[$id] ?? (isset($GLOBALS['kit_test_posts'][$id]) ? $GLOBALS['kit_test_posts'][$id]->post_status : false);
+        $found = get_post($id);
+        return Kit_Media_Test_State::$post_status[$id] ?? ($found instanceof WP_Post ? $found->post_status : false);
     }
 }
 
@@ -534,7 +442,7 @@ if (!function_exists('get_permalink')) {
     function get_permalink(mixed $post = 0): string|false
     {
         $id = $post instanceof WP_Post ? $post->ID : (int) $post;
-        return isset($GLOBALS['kit_test_posts'][$id]) ? 'https://example.test/?p=' . $id : false;
+        return get_post($id) instanceof WP_Post ? 'https://example.test/?p=' . $id : false;
     }
 }
 
@@ -568,81 +476,3 @@ if (!function_exists('wp_remote_retrieve_response_code')) {
     }
 }
 
-if (!class_exists('WP_Post')) {
-    class WP_Post
-    {
-        public int $ID = 0;
-
-        public int $post_parent = 0;
-
-        public string $post_type = 'post';
-
-        public string $post_status = 'draft';
-
-        public string $post_title = '';
-
-        public string $post_content = '';
-
-        public string $post_excerpt = '';
-
-        public string $post_name = '';
-    }
-}
-
-if (!function_exists('get_post')) {
-    function get_post(int $post_id, string $output = 'OBJECT'): ?WP_Post
-    {
-        return $GLOBALS['kit_test_posts'][$post_id] ?? null;
-    }
-}
-
-if (!function_exists('get_post_meta')) {
-    function get_post_meta(int $post_id, string $key = '', bool $single = false): mixed
-    {
-        $meta = $GLOBALS['kit_test_post_meta'][$post_id] ?? [];
-        if ($key === '') {
-            return $meta;
-        }
-        $values = $meta[$key] ?? [];
-        return $single ? ($values[0] ?? '') : $values;
-    }
-}
-
-if (!function_exists('current_user_can')) {
-    function current_user_can(string $capability, mixed ...$args): bool
-    {
-        return in_array($capability, $GLOBALS['kit_test_capabilities'], true);
-    }
-}
-
-if (!function_exists('wp_register_ability')) {
-    /** @param array<string, mixed> $args */
-    function wp_register_ability(string $name, array $args): void
-    {
-        $GLOBALS['kit_test_registrations'][] = ['name' => $name, 'args' => $args];
-    }
-}
-
-if (!function_exists('wp_has_ability')) {
-    function wp_has_ability(string $name): bool
-    {
-        return in_array($name, array_column($GLOBALS['kit_test_registrations'], 'name'), true);
-    }
-}
-
-if (!function_exists('kit_test_registration')) {
-    /**
-     * The arguments an ability was registered with.
-     *
-     * @return array<string, mixed>|null
-     */
-    function kit_test_registration(string $name): ?array
-    {
-        foreach (array_reverse($GLOBALS['kit_test_registrations']) as $registration) {
-            if (($registration['name'] ?? null) === $name) {
-                return $registration['args'];
-            }
-        }
-        return null;
-    }
-}

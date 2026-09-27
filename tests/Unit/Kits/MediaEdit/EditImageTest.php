@@ -9,6 +9,7 @@ namespace WPPilot\Tests\Unit\Kits\MediaEdit;
 
 use Kit_Fake_Image_Editor;
 use Kit_Media_Test_State;
+use Kit_Test_Site;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WP_Error;
@@ -40,10 +41,9 @@ final class EditImageTest extends TestCase
 
     protected function setUp(): void
     {
-        $GLOBALS['kit_test_posts'] = [];
-        $GLOBALS['kit_test_post_meta'] = [];
+        Kit_Test_Site::reset();
         delete_option(MiniLedger::OPTION);
-        $GLOBALS['kit_test_capabilities'] = ['edit_post', 'upload_files', 'manage_options'];
+        Kit_Test_Site::as_user(1, 'edit_post', 'upload_files', 'manage_options');
         Kit_Media_Test_State::reset();
         Kit_Fake_Image_Editor::$saved_paths = [];
         Kit_Media_Test_State::$editor_factory = function (string $path): Kit_Fake_Image_Editor {
@@ -78,7 +78,7 @@ final class EditImageTest extends TestCase
     {
         $permission = self::registration('wppilot/edit-image')['permission_callback'];
         self::assertTrue($permission());
-        $GLOBALS['kit_test_capabilities'] = ['manage_options', 'edit_post'];
+        Kit_Test_Site::as_user(1, 'manage_options', 'edit_post');
         self::assertFalse($permission());
     }
 
@@ -214,7 +214,7 @@ final class EditImageTest extends TestCase
     public function testRefusesWithoutEditPostOnTheAttachment(): void
     {
         Kit_Media_Test_State::add_image(1, '2026/09/photo.jpg', 1200, 800);
-        $GLOBALS['kit_test_capabilities'] = ['upload_files'];
+        Kit_Test_Site::as_user(1, 'upload_files');
 
         self::assertSame('kit_media_edit_forbidden', self::code(MediaEdit\edit(['attachment_id' => 1, 'operations' => [['op' => 'rotate', 'degrees' => 90]]])));
     }
@@ -270,22 +270,23 @@ final class EditImageTest extends TestCase
     public function testCopyMakesANewAttachmentAndLeavesTheOriginalAlone(): void
     {
         Kit_Media_Test_State::add_image(1, '2026/09/photo.jpg', 1200, 800);
-        $GLOBALS['kit_test_post_meta'][1]['_wp_attachment_image_alt'] = ['A red door'];
-        $original_meta = $GLOBALS['kit_test_post_meta'][1];
+        Kit_Test_Site::set_meta(1, '_wp_attachment_image_alt', 'A red door');
+        $original_meta = Kit_Test_Site::raw_meta(1);
 
         $result = MediaEdit\edit(['attachment_id' => 1, 'operations' => [['op' => 'resize', 'width' => 600]]]);
 
         self::assertIsArray($result);
         self::assertSame('copy', $result['mode']);
-        self::assertSame(1000, $result['attachment_id']);
+        $copy = $result['attachment_id'];
+        self::assertNotSame(1, $copy);
         self::assertSame('2026/09/photo-edited.jpg', $result['file']);
         self::assertSame([600, 400], [$result['width'], $result['height']]);
         self::assertTrue($result['alt_copied']);
-        self::assertSame(['A red door'], $GLOBALS['kit_test_post_meta'][1000]['_wp_attachment_image_alt']);
-        self::assertSame('Photo 1 (edited)', $GLOBALS['kit_test_posts'][1000]->post_title);
+        self::assertSame(['A red door'], get_post_meta($copy, '_wp_attachment_image_alt'));
+        self::assertSame('Photo 1 (edited)', get_post($copy)?->post_title);
         self::assertFileExists(Kit_Media_Test_State::$basedir . '/2026/09/photo-edited.jpg');
         self::assertFileExists(Kit_Media_Test_State::$basedir . '/2026/09/photo.jpg');
-        self::assertSame($original_meta, $GLOBALS['kit_test_post_meta'][1]);
+        self::assertSame($original_meta, Kit_Test_Site::raw_meta(1));
     }
 
     public function testCopyNeverOverwritesAnEarlierCopy(): void
@@ -308,14 +309,15 @@ final class EditImageTest extends TestCase
         $row = $this->ledger->all()[0];
         self::assertTrue($row['rollback']['reversible']);
         self::assertSame(MediaEdit\TYPE_CREATED, $row['rollback']['type']);
-        self::assertSame(1000, $row['rollback']['attachment_id']);
+        $copy = (int) $row['rollback']['attachment_id'];
+        self::assertSame('2026/09/photo-edited.jpg', get_post_meta($copy, '_wp_attached_file', true));
         self::assertSame('2026/09/photo-edited.jpg', $row['rollback']['file']);
         self::assertSame(1, $row['rollback']['source_attachment_id']);
 
         $undone = $this->ledger->rollback($id);
         self::assertIsArray($undone);
         self::assertTrue($undone['verified']);
-        self::assertArrayNotHasKey(1000, $GLOBALS['kit_test_posts']);
+        self::assertNull(get_post($copy));
         self::assertFileDoesNotExist(Kit_Media_Test_State::$basedir . '/2026/09/photo-edited.jpg');
         self::assertFileExists(Kit_Media_Test_State::$basedir . '/2026/09/photo.jpg');
     }
@@ -324,12 +326,13 @@ final class EditImageTest extends TestCase
     {
         Kit_Media_Test_State::add_image(1, '2026/09/photo.jpg', 1200, 800);
         $id = $this->run_through_ledger(['attachment_id' => 1, 'operations' => [['op' => 'rotate', 'degrees' => 90]]]);
-        $GLOBALS['kit_test_post_meta'][1000]['_wp_attached_file'] = ['2026/09/photo-edited-e1.jpg'];
+        $copy = Kit_Test_Site::post_ids()[1];
+        Kit_Test_Site::set_meta($copy, '_wp_attached_file', '2026/09/photo-edited-e1.jpg');
 
         $undone = $this->ledger->rollback($id);
 
         self::assertSame('kit_media_edit_undo_changed', self::code($undone));
-        self::assertArrayHasKey(1000, $GLOBALS['kit_test_posts']);
+        self::assertNotNull(get_post($copy));
     }
 
     public function testCopyUndoOfAnAlreadyDeletedCopyIsVerified(): void
@@ -362,12 +365,12 @@ final class EditImageTest extends TestCase
         self::assertSame('replace', $result['mode']);
         self::assertMatchesRegularExpression('#^2026/09/photo-e\d+100\.jpg$#', $result['file']);
         self::assertSame('2026/09/photo.jpg', $result['previous_file']);
-        self::assertSame([$result['file']], $GLOBALS['kit_test_post_meta'][1]['_wp_attached_file']);
-        $meta = $GLOBALS['kit_test_post_meta'][1]['_wp_attachment_metadata'][0];
+        self::assertSame([$result['file']], get_post_meta(1, '_wp_attached_file'));
+        $meta = get_post_meta(1, '_wp_attachment_metadata', true);
         self::assertSame([800, 1200], [$meta['width'], $meta['height']]);
         self::assertSame($result['file'], $meta['file']);
         self::assertStringStartsWith('photo-e', $meta['sizes']['thumbnail']['file']);
-        $backup = $GLOBALS['kit_test_post_meta'][1]['_wp_attachment_backup_sizes'][0];
+        $backup = get_post_meta(1, '_wp_attachment_backup_sizes', true);
         self::assertSame(['width' => 1200, 'height' => 800, 'filesize' => 64, 'file' => 'photo.jpg'], $backup['full-orig']);
         self::assertSame('photo-150x150.jpg', $backup['thumbnail-orig']['file']);
         // Never deletes: the old file is still there for the undo to point back at.
@@ -380,13 +383,13 @@ final class EditImageTest extends TestCase
         Kit_Media_Test_State::add_image(1, '2026/09/photo.jpg', 1200, 800);
         $first = MediaEdit\edit(['attachment_id' => 1, 'mode' => 'replace', 'operations' => [['op' => 'rotate', 'degrees' => 90]]]);
         self::assertIsArray($first);
-        $GLOBALS['kit_test_post_meta'][1]['_wp_attachment_metadata'][0]['width'] = 800;
-        $GLOBALS['kit_test_post_meta'][1]['_wp_attachment_metadata'][0]['height'] = 1200;
+        get_post_meta(1, '_wp_attachment_metadata', true)['width'] = 800;
+        get_post_meta(1, '_wp_attachment_metadata', true)['height'] = 1200;
 
         $second = MediaEdit\edit(['attachment_id' => 1, 'mode' => 'replace', 'operations' => [['op' => 'flip', 'direction' => 'vertical']]]);
 
         self::assertIsArray($second);
-        $backup = $GLOBALS['kit_test_post_meta'][1]['_wp_attachment_backup_sizes'][0];
+        $backup = get_post_meta(1, '_wp_attachment_backup_sizes', true);
         self::assertSame('photo.jpg', $backup['full-orig']['file']);
         $later = array_values(array_filter(array_keys($backup), static fn(string $key): bool => preg_match('/^full-\d+$/', $key) === 1));
         self::assertCount(1, $later);
@@ -407,7 +410,7 @@ final class EditImageTest extends TestCase
         $result = MediaEdit\edit(['attachment_id' => 1, 'mode' => 'replace', 'operations' => [['op' => 'rotate', 'degrees' => 90]]]);
 
         self::assertSame('kit_media_edit_converted', self::code($result));
-        self::assertSame(['2026/09/photo.jpg'], $GLOBALS['kit_test_post_meta'][1]['_wp_attached_file']);
+        self::assertSame(['2026/09/photo.jpg'], get_post_meta(1, '_wp_attached_file'));
         foreach (Kit_Fake_Image_Editor::$saved_paths as $path) {
             self::assertFileDoesNotExist($path);
         }
@@ -416,7 +419,7 @@ final class EditImageTest extends TestCase
     public function testReplaceIsUndoneByRestoringTheThreeMetaKeys(): void
     {
         Kit_Media_Test_State::add_image(1, '2026/09/photo.jpg', 1200, 800);
-        $before = $GLOBALS['kit_test_post_meta'][1];
+        $before = Kit_Test_Site::raw_meta(1);
         $id = $this->run_through_ledger(['attachment_id' => 1, 'mode' => 'replace', 'operations' => [['op' => 'crop', 'x' => 0, 'y' => 0, 'width' => 600, 'height' => 400]]]);
 
         $row = $this->ledger->all()[0];
@@ -429,21 +432,21 @@ final class EditImageTest extends TestCase
 
         self::assertIsArray($undone);
         self::assertTrue($undone['verified']);
-        self::assertSame($before, $GLOBALS['kit_test_post_meta'][1]);
+        self::assertSame($before, Kit_Test_Site::raw_meta(1));
     }
 
     public function testReplaceUndoRefusesWhenTheOldFileIsGone(): void
     {
         Kit_Media_Test_State::add_image(1, '2026/09/photo.jpg', 1200, 800);
         $id = $this->run_through_ledger(['attachment_id' => 1, 'mode' => 'replace', 'operations' => [['op' => 'rotate', 'degrees' => 270]]]);
-        $after = $GLOBALS['kit_test_post_meta'][1];
+        $after = Kit_Test_Site::raw_meta(1);
         unlink(Kit_Media_Test_State::$basedir . '/2026/09/photo.jpg');
 
         $undone = $this->ledger->rollback($id);
 
         self::assertSame('kit_media_edit_undo_file_missing', self::code($undone));
         // Nothing was restored: the attachment still points at the edited file, which exists.
-        self::assertSame($after, $GLOBALS['kit_test_post_meta'][1]);
+        self::assertSame($after, Kit_Test_Site::raw_meta(1));
     }
 
     public function testCaptureDependsOnTheMode(): void
@@ -477,7 +480,7 @@ final class EditImageTest extends TestCase
     /** @return array<string, mixed> */
     private static function registration(string $name): array
     {
-        $args = kit_test_registration($name);
+        $args = Kit_Test_Site::registration($name);
         self::assertIsArray($args, "{$name} is not registered");
         return $args;
     }

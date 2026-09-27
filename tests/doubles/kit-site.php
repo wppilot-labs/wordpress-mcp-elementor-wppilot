@@ -14,13 +14,18 @@ declare(strict_types=1);
  * Kit_Test_Site over its own doubles. The WordPress functions below are the post and meta writes
  * the shared doubles lack; each is guarded, so a harness that already has one keeps its own.
  *
- * Meta is stored as the raw strings the postmeta table would hold, as in wordpress.php, whose
- * get_post_meta() returns them unserialized-as-stored.
+ * One meta model for every kit test: WPPilot_Test_State::$post_meta holds the raw strings the
+ * postmeta table would (arrays serialized by maybe_serialize() on write), raw_meta() reads them
+ * the way a $wpdb query does, and wordpress.php's get_post_meta() returns them unserialized, as
+ * WordPress does. These are the only definitions of the meta and post writes in the suite.
  */
 final class Kit_Test_Site
 {
     /** When set, wp_update_post() passes post_content through it, as kses would. */
     public static ?Closure $content_filter = null;
+
+    /** When true, meta writes store nothing, like a filter or read-only meta layer refusing them. */
+    public static bool $refuse_meta_writes = false;
 
     public static function reset(): void
     {
@@ -37,6 +42,7 @@ final class Kit_Test_Site
             }
         }
         self::$content_filter = null;
+        self::$refuse_meta_writes = false;
     }
 
     public static function as_user(int $user_id, string ...$capabilities): void
@@ -91,47 +97,37 @@ final class Kit_Test_Site
     {
         return WPPilot_Test_State::$post_meta[$post_id] ?? [];
     }
+
+    /** One meta value as update_post_meta() would store it, replacing any others. */
+    public static function set_meta(int $post_id, string $key, mixed $value): void
+    {
+        WPPilot_Test_State::$post_meta[$post_id][$key] = [(string) maybe_serialize($value)];
+    }
+
+    /** Remove a post and its meta, as a permanent delete would. */
+    public static function remove(int $post_id): void
+    {
+        unset(WPPilot_Test_State::$posts[$post_id], WPPilot_Test_State::$post_meta[$post_id]);
+    }
+
+    /**
+     * The arguments an ability was last registered with, or null.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function registration(string $name): ?array
+    {
+        foreach (array_reverse(WPPilot_Test_State::$registrations) as $registration) {
+            if ($registration['name'] === $name) {
+                return $registration['args'];
+            }
+        }
+        return null;
+    }
 }
 
 if (!defined('ARRAY_A')) {
     define('ARRAY_A', 'ARRAY_A');
-}
-
-if (!function_exists('is_serialized')) {
-    function is_serialized(mixed $data, bool $strict = true): bool
-    {
-        if (!is_string($data)) {
-            return false;
-        }
-        $data = trim($data);
-        if ($data === 'N;' || $data === 'b:0;') {
-            return true;
-        }
-        if (preg_match('/^[aOsibdC]:/', $data) !== 1) {
-            return false;
-        }
-        return @unserialize($data, ['allowed_classes' => false]) !== false;
-    }
-}
-
-if (!function_exists('maybe_serialize')) {
-    /**
-     * Arrays and objects are serialized, as in core. Core also serializes an already-serialized
-     * string again; this double does not, because wordpress.php's get_post_meta() hands back the
-     * stored string rather than the unserialized value, and a restore that writes it back would
-     * otherwise double-serialize where WordPress, which reads the array, never would.
-     */
-    function maybe_serialize(mixed $data): mixed
-    {
-        return is_array($data) || is_object($data) ? serialize($data) : $data;
-    }
-}
-
-if (!function_exists('wp_cache_delete')) {
-    function wp_cache_delete(int|string $key, string $group = ''): bool
-    {
-        return true;
-    }
 }
 
 if (!function_exists('metadata_exists')) {
@@ -144,7 +140,14 @@ if (!function_exists('metadata_exists')) {
 if (!function_exists('update_post_meta')) {
     function update_post_meta(int $post_id, string $meta_key, mixed $meta_value, mixed $prev_value = ''): int|bool
     {
+        if (Kit_Test_Site::$refuse_meta_writes) {
+            return false;
+        }
         $value = (string) maybe_serialize(is_string($meta_value) ? wp_unslash($meta_value) : $meta_value);
+        // As core: writing the value already stored changes nothing and reports false.
+        if ((WPPilot_Test_State::$post_meta[$post_id][$meta_key] ?? null) === [$value]) {
+            return false;
+        }
         WPPilot_Test_State::$post_meta[$post_id][$meta_key] = [$value];
         return true;
     }
@@ -153,6 +156,9 @@ if (!function_exists('update_post_meta')) {
 if (!function_exists('add_post_meta')) {
     function add_post_meta(int $post_id, string $meta_key, mixed $meta_value, bool $unique = false): int|false
     {
+        if (Kit_Test_Site::$refuse_meta_writes) {
+            return false;
+        }
         $value = (string) maybe_serialize(is_string($meta_value) ? wp_unslash($meta_value) : $meta_value);
         WPPilot_Test_State::$post_meta[$post_id][$meta_key][] = $value;
         return count(WPPilot_Test_State::$post_meta[$post_id][$meta_key]);
