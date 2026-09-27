@@ -273,8 +273,10 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
 }
 unset($wppilot_mcp_module);
 \WPPilot\Mcp\register_modern_transport();
-// Skills and industry briefs as skill:// resources (SEP-2640), on both protocol eras.
+// Public server card, and skills/briefs as skill:// resources (SEP-2640) on both eras.
+require_once __DIR__ . '/includes/mcp/server-card.php';
 require_once __DIR__ . '/includes/mcp/skill-resources.php';
+\WPPilot\Mcp\ServerCard\register();
 \WPPilot\Mcp\SkillResources\register();
 
 require_once __DIR__ . '/includes/abilities/bootstrap.php';
