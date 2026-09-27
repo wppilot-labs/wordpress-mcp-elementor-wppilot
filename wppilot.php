@@ -273,6 +273,11 @@ foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] a
 }
 unset($wppilot_mcp_module);
 \WPPilot\Mcp\register_modern_transport();
+// Public server card, and skills/briefs as skill:// resources (SEP-2640) on both eras.
+require_once __DIR__ . '/includes/mcp/server-card.php';
+require_once __DIR__ . '/includes/mcp/skill-resources.php';
+\WPPilot\Mcp\ServerCard\register();
+\WPPilot\Mcp\SkillResources\register();
 
 require_once __DIR__ . '/includes/abilities/bootstrap.php';
 // Portable feature kits: the runtime, WPPilot's host for it, and the kits in includes/kits/.

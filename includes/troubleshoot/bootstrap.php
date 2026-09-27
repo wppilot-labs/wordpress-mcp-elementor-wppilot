@@ -19,6 +19,9 @@ require_once __DIR__ . '/rest.php';
 require_once __DIR__ . '/ui.php';
 require_once __DIR__ . '/notice.php';
 require_once __DIR__ . '/admin.php';
+require_once __DIR__ . '/doctor.php';
+require_once __DIR__ . '/doctor-ui.php';
+require_once __DIR__ . '/doctor-ability.php';
 
 /**
  * Record the moment an authenticated request reaches any WPPilot MCP route, per auth method.
@@ -121,6 +124,10 @@ function mcp_route_method(string $route): ?string
 // request that got its 401 challenge never counts, and after core auth has set the user.
 add_filter('rest_pre_dispatch', __NAMESPACE__ . '\\record_mcp_request', priority: 20, accepted_args: 3);
 add_action('rest_api_init', __NAMESPACE__ . '\\Rest\\register_routes');
+Doctor\register();
+if (\wppilot_wordpress_abilities_supported()) {
+    add_action('wp_abilities_api_init', __NAMESPACE__ . '\\DoctorAbility\\register', priority: 20);
+}
 // Priority 20 places Troubleshoot right after the Connect group (Configuration + Abilities Hub,
 // both at 10) and before Context (30). Diagnostics belong next to the connection they check.
 add_action('admin_menu', __NAMESPACE__ . '\\Admin\\register_menu', priority: 20);

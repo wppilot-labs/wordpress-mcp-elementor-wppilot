@@ -172,6 +172,14 @@ function handle_modern(WP_REST_Request $request, array $body): array
 
     $params = is_array($body['params'] ?? null) ? $body['params'] : [];
 
+    // Resources and the Skills extension (SEP-2640) are served by their own module.
+    $skills = function_exists('WPPilot\Mcp\SkillResources\dispatch')
+        ? SkillResources\dispatch($method, $params, $id)
+        : null;
+    if ($skills !== null) {
+        return $skills;
+    }
+
     return match ($method) {
         'server/discover' => success(build_discover_result(
             runtime_capabilities(),

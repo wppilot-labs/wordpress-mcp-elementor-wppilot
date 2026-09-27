@@ -135,5 +135,30 @@ function runtime_capabilities(): array
         ++$tools;
     }
 
-    return build_capabilities($tools, $prompts, resource_count: 0);
+    $resources = function_exists('WPPilot\Mcp\SkillResources\resource_count')
+        ? SkillResources\resource_count()
+        : 0;
+
+    return with_skills_extension(build_capabilities($tools, $prompts, $resources));
+}
+
+/**
+ * Declare the Skills extension (SEP-2640) alongside the resources that carry it.
+ *
+ * The extension commits the server to skills/list and skills/get and requires the `resources`
+ * capability, so it is declared exactly when resources are: a site whose skills are all hidden
+ * advertises neither rather than an extension with nothing behind it.
+ *
+ * @param array<string, object> $capabilities
+ * @return array<string, object>
+ */
+function with_skills_extension(array $capabilities): array
+{
+    if (!isset($capabilities['resources'])) {
+        return $capabilities;
+    }
+
+    $capabilities['extensions'] = (object) ['io.modelcontextprotocol/skills' => new \stdClass()];
+
+    return $capabilities;
 }

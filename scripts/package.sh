@@ -40,6 +40,9 @@ fi
 
 echo "Packaging WPPilot $VERSION"
 
+# The MCP Registry entry carries the version too; a release must not leave it describing the last one.
+php "$ROOT/scripts/generate-registry-server-json.php" --check
+
 # zip(1) is absent on a stock Windows Git Bash. bsdtar (shipped as tar.exe in
 # System32 on Windows 10+, and as `tar` on macOS) writes a spec-compliant zip;
 # GNU tar cannot write zip at all, and PowerShell's Compress-Archive emits
@@ -107,6 +110,8 @@ for entry in * .[!.]*; do
     build|dist|node_modules|scripts|src|tests|.git|.github|.gitignore) continue ;;
     package.json|package-lock.json|bun.lockb|tsconfig.json) continue ;;
     composer.json|composer.lock|.phpunit.result.cache|.DS_Store) continue ;;
+    # The MCP Registry entry is published from the repository, not read by the plugin.
+    server.json) continue ;;
     phpunit.xml|phpunit.xml.dist|.phpunit.cache|phpcs.xml|phpcs.xml.dist|mago.toml) continue ;;
     .gitattributes|.editorconfig) continue ;;
     *.zip) continue ;;

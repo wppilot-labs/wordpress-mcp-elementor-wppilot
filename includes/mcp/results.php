@@ -45,6 +45,8 @@ const CACHEABLE_METHODS = [
     'resources/list',
     'resources/read',
     'resources/templates/list',
+    // SEP-2640: in 2026-07-28 and later, skills/list carries the same list-caching attributes.
+    'skills/list',
     'server/discover',
 ];
 
