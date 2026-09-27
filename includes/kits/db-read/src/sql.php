@@ -38,7 +38,7 @@ const MAX_LENGTH = 10000;
 
 /**
  * Words refused anywhere outside a string: writes to files or variables, sleeps, lock and
- * replication waits, locking reads, sequence writes, index and partition hints, and the TABLE
+ * replication waits, locking reads, sequence writes, index hints, and the TABLE
  * statement form.
  */
 const FORBIDDEN_WORDS = [
@@ -67,7 +67,6 @@ const FORBIDDEN_WORDS = [
     'SETVAL' => 'SETVAL writes a sequence',
     'LASTVAL' => 'sequence functions are not supported',
     'TABLE' => 'the TABLE statement form is not supported; write SELECT * FROM',
-    'PARTITION' => 'partition selection is not supported',
     'USE' => 'index hints are not supported',
     'FORCE' => 'index hints are not supported',
     'IGNORE' => 'index hints are not supported',

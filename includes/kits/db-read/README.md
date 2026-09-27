@@ -22,7 +22,7 @@ matched with patterns. Refused:
   depending on `ANSI_QUOTES`), `@` variables, `?` and `{ }`;
 - `INTO`, `OUTFILE`, `DUMPFILE`, `LOAD_FILE`, `SLEEP`, `BENCHMARK`, named-lock and
   replication-wait functions, sequence functions, `FOR UPDATE`, `FOR SHARE`,
-  `LOCK IN SHARE MODE`, `PROCEDURE`, index hints, `PARTITION`, `NATURAL JOIN`;
+  `LOCK IN SHARE MODE`, `PROCEDURE`, index hints, `NATURAL JOIN`;
 - any name equal to `information_schema`, `mysql`, `performance_schema` or `sys`;
 - any name, anywhere in the statement, equal to a table in this database that is not queryable,
   and any table in a FROM or JOIN position that is not queryable, including a

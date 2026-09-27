@@ -103,7 +103,12 @@ final class SqlValidatorTest extends TestCase
             'star over a table with sensitive columns' => ['SELECT * FROM wp_comments', ['wp_comments']],
             'sensitive column in a derived table of the result' => ['SELECT * FROM (SELECT comment_author_email FROM wp_comments) d', ['wp_comments']],
             'a table whose name looks sensitive, as table and qualifier' => ['SELECT wp_email_log.id FROM wp_email_log', ['wp_email_log']],
-            'counting over a derived table' => ['SELECT COUNT(*) AS n FROM (SELECT comment_author_email FROM wp_comments) d', ['wp_comments']],
+            'window function with PARTITION BY' => [
+                'SELECT ID, ROW_NUMBER() OVER (PARTITION BY post_type ORDER BY post_date) AS n FROM wp_posts',
+                ['wp_posts'],
+            ],
+            'partition selection narrows an allowed table' => ['SELECT ID FROM wp_posts PARTITION (p0)', ['wp_posts']],
+            'counting over a derived table' =>['SELECT COUNT(*) AS n FROM (SELECT comment_author_email FROM wp_comments) d', ['wp_comments']],
         ];
     }
 
@@ -179,7 +184,6 @@ final class SqlValidatorTest extends TestCase
             'NEXTVAL' => ['SELECT NEXTVAL(s)', 'NEXTVAL'],
             'index hint' => ['SELECT ID FROM wp_posts USE INDEX (PRIMARY)', 'USE'],
             'FORCE INDEX' => ['SELECT ID FROM wp_posts FORCE INDEX (PRIMARY)', 'FORCE'],
-            'partition selection' => ['SELECT ID FROM wp_posts PARTITION (p0)', 'PARTITION'],
             'NATURAL JOIN' => ['SELECT * FROM wp_posts NATURAL JOIN wp_postmeta', 'NATURAL'],
 
             // Refused and foreign tables, however they are named.
