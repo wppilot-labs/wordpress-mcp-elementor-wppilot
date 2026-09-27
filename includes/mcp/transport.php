@@ -546,10 +546,11 @@ function force_schema_objects(array $schema): array
 /**
  * Execute a tool call under the modern revision.
  *
- * The guard order matches the legacy path exactly: safety profile, then rate
- * limit, then the ability's own permission callback, then execution. The
- * change ledger needs no wiring here because it hooks
- * `wp_before_execute_ability` / `wp_after_execute_ability` inside execute().
+ * Every control runs in wppilot_gate_ability_call(), the same pipeline the
+ * REST paths, Chat and Pro's approval replay use; then execute() runs the
+ * ability's own permission callback. The change ledger needs no wiring here
+ * because it hooks `wp_before_execute_ability` / `wp_after_execute_ability`
+ * inside execute().
  *
  * @param array<string, mixed> $params
  * @return array{status: int, body: array<string, mixed>}
@@ -566,70 +567,11 @@ function call_tool(array $params, mixed $id): array
 
     $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
 
-    if (function_exists('wppilot_safety_check_ability')) {
-        $allowed = \wppilot_safety_check_ability($ability);
-        if ($allowed instanceof WP_Error) {
-            return tool_error($allowed, $id);
-        }
-        if ($allowed === false) {
-            return tool_error(
-                new WP_Error('wppilot_safety_blocked', 'The active safety profile does not allow this operation.'),
-                $id,
-            );
-        }
-    }
-
-    // The confirmation contract lives in the safety layer, not in each ability.
-    // On the legacy path it is applied by wppilot_safety_pre_mcp_tool_call(),
-    // which is keyed to the adapter's meta-tool and therefore never fires here.
-    // Reproducing it is not optional: without it a destructive ability that
-    // relies on the profile-level gate rather than its own `confirm` field
-    // would execute unconfirmed under the modern revision only.
-    if (function_exists('wppilot_ability_requires_confirmation') && \wppilot_ability_requires_confirmation($ability)) {
-        if (($arguments['confirm'] ?? null) !== true) {
-            return tool_error(\wppilot_confirmation_required_error($ability), $id);
-        }
-    }
-
-    // `confirm` is a control field, not ability input. Abilities that declare
-    // their own `confirm` property keep it; for the rest it is removed before
-    // execute(), whose schema validation rejects unknown properties.
-    if (
-        array_key_exists('confirm', $arguments)
-        && function_exists('wppilot_ability_schema_has_property')
-        && !\wppilot_ability_schema_has_property($ability, 'confirm')
-    ) {
-        unset($arguments['confirm']);
-    }
-
-    // The require-preview rule, for the same reason the confirmation block above
-    // is reproduced here: this transport exposes no refusable filter, so every
-    // cross-cutting control has to be added to it by hand. That is now true of
-    // the safety profile, the confirmation gate, the rate limiter and this — a
-    // pattern worth remembering before adding a fifth.
-    if (function_exists('WPPilot\\Preview\\Gate\\check')) {
-        $preview_required = \WPPilot\Preview\Gate\check($ability, $arguments);
-        if ($preview_required instanceof WP_Error) {
-            return tool_error($preview_required, $id);
-        }
-    }
-
-    if (function_exists('wppilot_rate_pre_ability_execute')) {
-        $limited = \wppilot_rate_pre_ability_execute($arguments, $ability, 'mcp');
-        if ($limited instanceof WP_Error) {
-            return tool_error($limited, $id);
-        }
-        if (is_array($limited)) {
-            $arguments = $limited;
-        }
-    }
-
-    // Extension point for controls supplied by companion plugins. It runs only
-    // after Free's safety, confirmation, preview and rate gates, and exactly
-    // once on the modern transport (which does not traverse the legacy adapter
-    // or direct Ability REST filters).
+    // Safety profile, confirmation, confirm strip, then every wppilot_pre_ability_execute control:
+    // rate limit, design and preview gates, and whatever a companion plugin adds. This transport
+    // used to reproduce each of those by hand; see wppilot_gate_ability_call().
     /** @var mixed $gated */
-    $gated = apply_filters('wppilot_modern_mcp_pre_ability_execute', $arguments, $ability, 'mcp');
+    $gated = \wppilot_gate_ability_call($ability, $arguments, transport: 'mcp');
     if ($gated instanceof WP_Error) {
         return tool_error($gated, $id);
     }

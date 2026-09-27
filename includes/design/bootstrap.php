@@ -105,7 +105,6 @@ add_action('wp_abilities_api_init', __NAMESPACE__ . '\\Abilities\\Delete\\regist
 add_filter('wppilot_settings_sections', __NAMESPACE__ . '\Gate\register_setting');
 add_filter('wppilot_pre_ability_execute', __NAMESPACE__ . '\Gate\filter_pre_ability_execute', priority: 7, accepted_args: 3);
 add_filter('mcp_adapter_pre_tool_call', __NAMESPACE__ . '\Gate\filter_pre_mcp_tool_call', priority: 7, accepted_args: 2);
-add_filter('wppilot_modern_mcp_pre_ability_execute', __NAMESPACE__ . '\Gate\filter_pre_ability_execute', priority: 7, accepted_args: 3);
 
 // Priority 11, just after the skills catalogue at 10: an agent should read what
 // the site can do before it reads what the site looks like.

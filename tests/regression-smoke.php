@@ -113,8 +113,23 @@ regression_check(
 
 $transport_source = (string) file_get_contents(dirname(__DIR__) . '/includes/mcp/transport.php');
 regression_check(
-    str_contains($transport_source, "apply_filters('wppilot_modern_mcp_pre_ability_execute'"),
-    'modern MCP extension gate is missing',
+    str_contains($transport_source, "wppilot_gate_ability_call(\$ability, \$arguments, transport: 'mcp')"),
+    'modern MCP transport does not run the shared gate pipeline',
 );
+// Chat called execute() directly until 1.14.0 and so skipped the rate limit,
+// the design and preview gates and Pro's controls.
+$chat_source = (string) file_get_contents(dirname(__DIR__) . '/includes/chat/rest.php');
+regression_check(
+    str_contains($chat_source, "transport: 'chat'")
+        && !str_contains($chat_source, '$prepared[\'ability\']->execute($arguments)'),
+    'Chat executes abilities without the shared gate pipeline',
+);
+foreach (['includes/rest/shim.php', 'includes/rest/core-run-gate.php'] as $gated_path) {
+    $gated_source = (string) file_get_contents(dirname(__DIR__) . '/' . $gated_path);
+    regression_check(
+        str_contains($gated_source, "wppilot_gate_ability_call(\$ability, \$input, transport: 'rest')"),
+        "{$gated_path} does not run the shared gate pipeline",
+    );
+}
 
 fwrite(STDOUT, "Free regression smoke checks passed.\n");

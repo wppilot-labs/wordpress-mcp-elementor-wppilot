@@ -68,6 +68,11 @@ require_once dirname(__DIR__) . '/includes/abilities/registry.php';
 // MCP transport asks it which tools must be confirmed before it will run them,
 // and that answer decides what the tool list advertises.
 require_once dirname(__DIR__) . '/includes/safety.php';
+// The gate pipeline every execution path shares, and the one policy.php answer
+// it needs (which abilities the Hub cannot switch off). policy.php registers
+// nothing at file scope.
+require_once dirname(__DIR__) . '/includes/abilities/policy.php';
+require_once dirname(__DIR__) . '/includes/gate-pipeline.php';
 
 // The MCP protocol layer is deliberately free of WordPress dependencies beyond
 // the ABSPATH guard, so it loads and is exercised here directly.

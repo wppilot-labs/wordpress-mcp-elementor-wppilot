@@ -412,8 +412,20 @@ function wppilot_chat_rest_execute_tool(WP_REST_Request $request): array|WP_Erro
     wppilot_chat_save_session($session);
 
     $arguments = wppilot_chat_execution_arguments($prepared['tool_call']);
+    // Chat's approve button, or the operator's own allowlist or YOLO switch, is
+    // the human confirmation, so the model is not asked for confirm=true.
+    // Everything else still applies: the profile, the rate limit, the design and
+    // preview gates, and any control a companion plugin attaches. Chat used to
+    // call execute() directly and skip all of them.
     // @mago-expect analysis:mixed-assignment
-    $result = $prepared['ability']->execute($arguments);
+    $gated = wppilot_gate_ability_call(
+        $prepared['ability'],
+        $arguments,
+        transport: 'chat',
+        context: ['human_approved' => true],
+    );
+    // @mago-expect analysis:mixed-assignment
+    $result = $gated instanceof WP_Error ? $gated : $prepared['ability']->execute($gated);
     if (is_wp_error($result)) {
         return wppilot_chat_record_tool_error($session, $call_index, $result->get_error_message());
     }

@@ -253,6 +253,7 @@ require_once __DIR__ . '/includes/abilities/registry.php';
 require_once __DIR__ . '/includes/abilities/policy.php';
 require_once __DIR__ . '/includes/safety.php';
 require_once __DIR__ . '/includes/rate-limit.php';
+require_once __DIR__ . '/includes/gate-pipeline.php';
 require_once __DIR__ . '/includes/change-log.php';
 require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';

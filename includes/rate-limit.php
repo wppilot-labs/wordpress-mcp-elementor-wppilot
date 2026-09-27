@@ -177,9 +177,11 @@ function wppilot_rate_pre_mcp_tool_call(mixed $args, string $tool_name): mixed
  */
 function wppilot_rate_pre_ability_execute(mixed $input, WP_Ability $ability, string $transport): mixed
 {
-    // 'mcp' is the modern transport, which calls this directly and passes no
-    // other rate filter; refusing it here left modern clients unthrottled.
-    if (!in_array($transport, ['rest', 'mcp'], strict: true) || wppilot_ability_is_readonly($ability)) {
+    // 'mcp' is the modern transport and 'chat' the admin Chat; both reach this
+    // through wppilot_gate_ability_call(). 'approval' is deliberately absent: a
+    // held call was charged when the agent sent it, and charging the approver
+    // again would refuse an approval for a reason they cannot act on.
+    if (!in_array($transport, ['rest', 'mcp', 'chat'], strict: true) || wppilot_ability_is_readonly($ability)) {
         return $input;
     }
 
