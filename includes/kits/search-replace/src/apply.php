@@ -20,6 +20,8 @@ const APPLY_ABILITY = 'wppilot/search-replace-apply';
 /** Posts one apply call (or one job step) writes at most. */
 const MAX_POSTS_PER_CALL = 100;
 
+const CANCEL_ABILITY = 'wppilot/search-replace-cancel';
+
 /** The Runner job kind that applies a plan in the background. */
 const JOB_KIND = 'wppilot_kit_search_replace';
 
@@ -386,6 +388,49 @@ function job_step(array $payload, array $state): array
         'done' => $done,
         'progress' => (float) $state['progress'],
         'message' => sprintf('%d applied, %d skipped, %d remaining.', $state['applied'], $state['skipped'], $state['remaining']),
+    ];
+}
+
+/**
+ * wppilot/search-replace-cancel: stop a background apply the current user queued.
+ *
+ * The Runner re-reads the job between steps, so a step already running finishes its batch of at
+ * most MAX_POSTS_PER_CALL posts; nothing after it starts. Posts already written keep their own
+ * undoable rows, and posts not reached stay pending in the plan, so applying the plan again picks
+ * up where the job stopped.
+ *
+ * @param array<string, mixed> $input
+ * @return array<string, mixed>|WP_Error
+ */
+function cancel(array $input): array|WP_Error
+{
+    $job_id = is_string($input['job_id'] ?? null) ? $input['job_id'] : '';
+    $jobs = Runtime\host()->jobs();
+    $job = $job_id === '' ? null : $jobs->get($job_id);
+    // Someone else's job answers exactly like a missing one, so ids cannot be probed.
+    if ($job === null || ($job['kind'] ?? '') !== JOB_KIND || (int) ($job['owner'] ?? 0) !== get_current_user_id()) {
+        return new WP_Error('kit_sr_job_not_found', 'No search-replace job of yours has that id.', ['status' => 404]);
+    }
+    $was = (string) $job['status'];
+    $cancelled = $jobs->cancel($job_id);
+    // The job record is the only thing a cancel changes, and the Runner has no way back from
+    // cancelled, so the ledger row says so instead of implying an undo.
+    Runtime\host()->ledger()->record_items(CANCEL_ABILITY, [[
+        'input' => ['job_id' => $job_id],
+        'before' => null,
+        'result' => ['cancelled' => $cancelled],
+        'irreversible_reason' => 'Cancelling changes only the background job record, and a cancelled job cannot be resumed. '
+            . 'Posts it already wrote keep their own undoable rows; apply the plan again to continue.',
+    ]]);
+
+    return [
+        'job_id' => $job_id,
+        'cancelled' => $cancelled,
+        'status' => $cancelled ? 'cancelled' : $was,
+        'plan_id' => (string) ($job['payload']['plan_id'] ?? ''),
+        'message' => $cancelled
+            ? 'Cancelled. A step already running finishes its batch first; posts written so far stay written and undoable. Check search-replace-status for the plan state.'
+            : sprintf('The job had already finished (%s); nothing to cancel.', $was),
     ];
 }
 

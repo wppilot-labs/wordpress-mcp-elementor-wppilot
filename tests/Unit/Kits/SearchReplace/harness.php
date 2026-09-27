@@ -237,16 +237,21 @@ final class FakeJobs implements Jobs
         return $this->jobs[$id] ?? null;
     }
 
+    /** As the Runner: only a job that has not finished can be cancelled. */
     public function cancel(string $id): bool
     {
-        return false;
+        if (!isset($this->jobs[$id]) || in_array($this->jobs[$id]['status'], ['done', 'failed', 'cancelled'], true)) {
+            return false;
+        }
+        $this->jobs[$id]['status'] = 'cancelled';
+        return true;
     }
 
     /** Run steps until the job says it is done, at most $max steps. */
     public function run(string $id, int $max = 20): void
     {
         $job = &$this->jobs[$id];
-        for ($i = 0; $i < $max && $job['status'] !== 'done'; $i++) {
+        for ($i = 0; $i < $max && !in_array($job['status'], ['done', 'failed', 'cancelled'], true); $i++) {
             $outcome = ($this->steps[$job['kind']])($job['payload'], $job['state']);
             $job['state'] = $outcome['state'];
             $job['progress'] = $outcome['progress'] ?? $job['progress'];

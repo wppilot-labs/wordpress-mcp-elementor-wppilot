@@ -8,6 +8,7 @@ plan that a person reviewed, and every changed post can be undone on its own.
 | `wppilot/search-replace-preview` | read | Scans posts in scope and stores a plan (`plan_id`, one hour, bound to the user). Returns per-post fingerprints and diffs: match counts plus before/after snippets for each field or meta key, totals, skips with reasons, and the builder caches that will need clearing. Holds at most 500 posts per plan and scans 2,000 posts per call, continued with `after_id`. |
 | `wppilot/search-replace-apply` | write, destructive (confirm) | Writes the plan: only posts that are in the plan and whose fingerprint still matches. At most 100 posts per call, continued through the plan cursor or queued as a background job with `background: true`. |
 | `wppilot/search-replace-status` | read | Progress of a background job, and each post's state in a plan. |
+| `wppilot/search-replace-cancel` | write (job record only) | Stops a background job the user queued. A running step finishes its batch; written posts stay undoable; unreached posts stay pending in the plan. Irreversible in the ledger's sense: a cancelled job cannot be resumed, so the row says so. |
 
 ## How values are changed
 
@@ -56,7 +57,7 @@ For every other builder, and for page caches and CDNs, the result says what the 
 
 - `Ledger::record_items()` with a group, `Ledger::snapshot_budget()`, and the runtime's
   `kits/post-partial` restore strategy.
-- `Jobs` (the runtime's Runner) for `background: true`.
+- `Jobs` (the runtime's Runner) for `background: true` and `Jobs::cancel()` for search-replace-cancel.
 - `confirm_guard()`. Standalone hosts enforce `confirm: true` here. The schema declares `confirm`
   for that reason.
 
@@ -64,13 +65,17 @@ Plans and locks are stored in non-autoloaded `wppilot_kit_sr_*` options. Expired
 removed on each preview.
 
 <!-- kit-export:omit -->
+Inside WPPilot, an MCP client on the 2026-07-28 transport can also call apply as a task
+(`meta.mcp.task_support`): the task follows the background job, `tasks/cancel` cancels it, and
+`tasks/result` returns search-replace-status for the job.
+
 Inside WPPilot, the gate pipeline asks for confirmation before apply runs. The ledger is
 WPPilot's change log, and the Changes screen's "Undo this batch" undoes a whole plan by its group.
 <!-- /kit-export:omit -->
 
 ## Safety
 
-Preview and status are read-only. Apply is `destructive: true`, so it is confirmation-gated, and
+Preview and status are read-only. Cancel changes only the job record of the user's own job. Apply is `destructive: true`, so it is confirmation-gated, and
 each post it writes needs `edit_post` for the current user.
 
 <!-- kit-export:omit -->
