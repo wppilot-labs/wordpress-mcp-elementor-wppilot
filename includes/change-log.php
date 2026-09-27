@@ -796,7 +796,127 @@ function wppilot_build_core_rollback_payload(string $ability_name, array $before
     if (($before['type'] ?? null) === 'extension-files') {
         return ['reversible' => false, 'reason' => wppilot_extension_files_rollback_reason($ability_name)];
     }
+    $strategy = wppilot_get_rollback_strategy((string) ($before['type'] ?? ''));
+    if ($strategy !== null) {
+        return wppilot_build_registered_rollback_payload($strategy, $ability_name, $before, $result);
+    }
     return ['reversible' => false, 'reason' => 'No rollback strategy is registered for this change.'];
+}
+
+/**
+ * Register a restore path for a before-image type the built-ins do not know.
+ *
+ * The built-in strategies are a closed `match`, so a module that captured its own before-image
+ * (through `wppilot_capture_before_image`) could have it recorded but never undone. A registered
+ * type closes that: a before-image whose `type` names it becomes a reversible ledger row, and
+ * rollback-change hands the row's payload back to `$restore`.
+ *
+ * `$type` must contain a `/` (`kits/post-partial`, `woo-subscriptions/state`), which keeps it
+ * apart from every built-in name, present and future; a built-in can never be replaced.
+ *
+ * `$restore(array $payload, array $entry)` returns the restore details, which must include
+ * `'verified' => true` once it has re-read the target and found it matching — or a WP_Error. The
+ * ledger refuses to mark anything rolled back on less.
+ *
+ * `$build(array $before, mixed $result, string $ability_name)` is optional and turns the
+ * before-image into the stored payload, for a strategy that needs something from the result
+ * (the ID of what a create call made). It may return `['reversible' => false, 'reason' => …]`.
+ * Without it the payload is the before-image itself, under `snapshot`.
+ */
+function wppilot_register_rollback_strategy(string $type, callable $restore, ?callable $build = null): bool
+{
+    if (preg_match('#^[a-z0-9-]+(?:/[a-z0-9-]+)+$#', $type) !== 1) {
+        _doing_it_wrong(
+            __FUNCTION__,
+            esc_html(sprintf('Rollback strategy type "%s" must be lowercase and contain a "/".', $type)),
+            '1.14.0',
+        );
+        return false;
+    }
+
+    wppilot_rollback_strategy_registry($type, ['restore' => $restore, 'build' => $build]);
+    return true;
+}
+
+/**
+ * @return array{restore: callable, build: callable|null}|null
+ */
+function wppilot_get_rollback_strategy(string $type): ?array
+{
+    return $type === '' || !str_contains($type, '/') ? null : wppilot_rollback_strategy_registry($type);
+}
+
+/**
+ * @param array{restore: callable, build: callable|null}|null $set
+ * @return array{restore: callable, build: callable|null}|null
+ */
+function wppilot_rollback_strategy_registry(string $type, ?array $set = null): ?array
+{
+    /** @var array<string, array{restore: callable, build: callable|null}> $strategies */
+    static $strategies = [];
+    if ($set !== null) {
+        $strategies[$type] = $set;
+    }
+    return $strategies[$type] ?? null;
+}
+
+/**
+ * @param array{restore: callable, build: callable|null} $strategy
+ * @param array<string, mixed> $before
+ * @return array<string, mixed>
+ */
+function wppilot_build_registered_rollback_payload(
+    array $strategy,
+    string $ability_name,
+    array $before,
+    mixed $result,
+): array {
+    $type = (string) $before['type'];
+    if ($strategy['build'] === null) {
+        return ['reversible' => true, 'type' => $type, 'snapshot' => $before];
+    }
+
+    try {
+        // @mago-expect analysis:mixed-assignment -- Extension output is validated below.
+        $payload = ($strategy['build'])($before, $result, $ability_name);
+    } catch (Throwable $error) {
+        return ['reversible' => false, 'reason' => 'The rollback strategy could not prepare this change: ' . $error->getMessage()];
+    }
+    if (!is_array($payload)) {
+        return ['reversible' => false, 'reason' => 'The rollback strategy did not describe how to undo this change.'];
+    }
+    $payload = wppilot_string_keyed_array($payload);
+    if (($payload['reversible'] ?? true) === false) {
+        return ['reversible' => false, 'reason' => (string) ($payload['reason'] ?? 'This change is not reversible.')];
+    }
+    // The type is the strategy's own; a build callback cannot route the row to another restore.
+    return array_merge($payload, ['reversible' => true, 'type' => $type]);
+}
+
+/**
+ * Run a registered strategy's restore for a ledger row.
+ *
+ * @param array<string, mixed> $rollback
+ * @param array<string, mixed> $entry
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_run_registered_rollback(array $rollback, array $entry): array|WP_Error
+{
+    $strategy = wppilot_get_rollback_strategy((string) ($rollback['type'] ?? ''));
+    if ($strategy === null) {
+        return new WP_Error('wppilot_rollback_unknown', __(
+            'Unknown rollback strategy. The plugin that recorded this change may be inactive.',
+            domain: 'wppilot',
+        ));
+    }
+    // @mago-expect analysis:mixed-assignment -- Extension output is validated below.
+    $result = ($strategy['restore'])($rollback, $entry);
+    if ($result instanceof WP_Error) {
+        return $result;
+    }
+    return is_array($result)
+        ? wppilot_string_keyed_array($result)
+        : new WP_Error('wppilot_rollback_failed', __('The rollback strategy returned no result.', domain: 'wppilot'));
 }
 
 /**
@@ -1170,7 +1290,7 @@ function wppilot_rollback_change(string $id): array|WP_Error
             'restore-active-theme' => wppilot_restore_active_theme_snapshot(wppilot_string_keyed_array(
                 $rollback['snapshot'] ?? null,
             )),
-            default => new WP_Error('wppilot_rollback_unknown', __('Unknown rollback strategy.', domain: 'wppilot')),
+            default => wppilot_run_registered_rollback($rollback, $entry),
         };
     } catch (Throwable $error) {
         $result = new WP_Error('wppilot_rollback_failed', $error->getMessage());

@@ -472,6 +472,23 @@ if (!function_exists('get_current_user_id')) {
     }
 }
 
+if (!function_exists('esc_html')) {
+    function esc_html(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES);
+    }
+}
+
+if (!function_exists('_doing_it_wrong')) {
+    /**
+     * Recorded rather than raised, so a test can assert a misuse was reported.
+     */
+    function _doing_it_wrong(string $function_name, string $message, string $version): void
+    {
+        $GLOBALS['wppilot_test_doing_it_wrong'][] = [$function_name, $message, $version];
+    }
+}
+
 if (!function_exists('wp_get_current_user')) {
     /**
      * The two fields the change ledger reads off the acting user.
