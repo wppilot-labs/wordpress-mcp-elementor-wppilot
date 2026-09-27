@@ -107,6 +107,7 @@ function restore(array $payload): array|WP_Error
         $postarr['post_date_gmt'] = (string) ($fields['post_date_gmt'] ?? '');
     }
     if (count($postarr) > 1) {
+        // kit-lint: slashed — the text fields were wp_slash()ed as $postarr was built.
         $updated = wp_update_post($postarr, wp_error: true);
         if ($updated instanceof WP_Error) {
             return $updated;
