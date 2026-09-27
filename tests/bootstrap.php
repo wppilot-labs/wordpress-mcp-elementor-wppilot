@@ -104,6 +104,7 @@ require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
 // its before-image capture: that code calls WordPress functions taking arguments
 // by reference, and only a real call proves the call sites still satisfy them.
 require_once dirname(__DIR__) . '/includes/change-log.php';
+require_once dirname(__DIR__) . '/includes/change-log-table.php';
 
 // The design system's pure layers: the document parser, the token extractor,
 // the pre-flight rules, the distinctiveness comparison, the spec, and the

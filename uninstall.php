@@ -52,6 +52,7 @@ function wppilot_uninstall_tables(): array
         $wpdb->prefix . 'wppilot_chat_sessions',
         $wpdb->prefix . 'wppilot_connections',
         $wpdb->prefix . 'wppilot_tokens',
+        $wpdb->prefix . 'wppilot_changes',
         $wpdb->prefix . 'wppilot_oauth_clients',
         $wpdb->prefix . 'wppilot_oauth_auth_codes',
         $wpdb->prefix . 'wppilot_oauth_access_tokens',
@@ -92,8 +93,12 @@ function wppilot_uninstall_options(): array
         'wppilot_require_preview_before_write',
         'wppilot_preview_index',
         'wppilot_safety_policy_version',
-        // includes/change-log.php
+        // includes/change-log.php + includes/change-log-table.php
         'wppilot_change_log',
+        'wppilot_changes_schema_version',
+        'wppilot_changes_storage',
+        'wppilot_changes_migration',
+        'wppilot_changes_storage_error',
         // includes/admin/instructions.php
         'wppilot_instructions_enabled',
         'wppilot_instructions_content',
@@ -194,6 +199,8 @@ function wppilot_uninstall_cron_hooks(): array
     return [
         'wppilot_oauth_gc',
         'wppilot_gutenberg_cleanup',
+        // includes/change-log-table.php
+        'wppilot_changes_prune',
         // includes/telemetry/settings.php
         'wppilot_telemetry_ping',
     ];

@@ -255,6 +255,7 @@ require_once __DIR__ . '/includes/safety.php';
 require_once __DIR__ . '/includes/rate-limit.php';
 require_once __DIR__ . '/includes/gate-pipeline.php';
 require_once __DIR__ . '/includes/change-log.php';
+require_once __DIR__ . '/includes/change-log-table.php';
 require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';
 require_once __DIR__ . '/includes/tokens.php';
@@ -350,6 +351,7 @@ add_filter(
 // the extra argument simply never arrives and both callbacks default it.
 add_action('wp_before_execute_ability', callback: 'wppilot_change_before', priority: 10, accepted_args: 3);
 add_action('wp_after_execute_ability', callback: 'wppilot_change_after', priority: 10, accepted_args: 4);
+wppilot_changes_register_hooks();
 
 \WPPilot\Context\boot_context_admin();
 wppilot_register_wordpress_compatibility_notice();

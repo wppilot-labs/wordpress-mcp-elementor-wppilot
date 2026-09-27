@@ -17,8 +17,31 @@ const WPPILOT_CHANGE_LOG_MAX_BYTES = 4_194_304;
 
 const WPPILOT_CHANGE_SNAPSHOT_MAX_BYTES = 524_288;
 
-/** @return list<array<string, mixed>> */
+/**
+ * The ledger's recent rows, oldest first.
+ *
+ * In table storage this is the newest WPPILOT_CHANGE_LOG_MAX rows within
+ * WPPILOT_CHANGE_LOG_MAX_BYTES — the most the option ever held — so code written when this was
+ * the whole log still reads a bounded list whose last row is the newest. Anything that searches
+ * the ledger uses wppilot_query_change_log(), which reaches every row.
+ *
+ * @return list<array<string, mixed>>
+ */
 function wppilot_get_change_log(): array
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_recent();
+    }
+
+    return wppilot_change_log_option_rows();
+}
+
+/**
+ * The rows held in the option: the whole ledger before the table, and after a fallback.
+ *
+ * @return list<array<string, mixed>>
+ */
+function wppilot_change_log_option_rows(): array
 {
     /** @var mixed $stored */
     $stored = get_option(WPPILOT_CHANGE_LOG_OPTION, default_value: []);
@@ -45,9 +68,31 @@ function wppilot_store_change(array $entry): void
 }
 
 /**
- * Append rows to the ledger in one read-modify-write, under a lock.
+ * Record rows in the ledger, in order, newest last.
  *
- * The ledger is a single option, rewritten whole on every row. Two requests recording at once
+ * In table storage each row is one INSERT and nothing else is read or rewritten, so concurrent
+ * requests cannot erase each other's rows. Before the migration, and on a site that cannot create
+ * the table, the option path below is used.
+ *
+ * @param list<array<string, mixed>> $entries
+ */
+function wppilot_store_changes(array $entries): void
+{
+    if ($entries === []) {
+        return;
+    }
+    if (wppilot_change_table_active()) {
+        wppilot_change_table_store(wppilot_change_rows_before_store($entries, legacy_filter: true));
+        return;
+    }
+    // The option write below runs the option's own pre-update filter, so only the new one here.
+    wppilot_change_option_store(wppilot_change_rows_before_store($entries, legacy_filter: false));
+}
+
+/**
+ * Append rows to the option ledger in one read-modify-write, under a lock.
+ *
+ * The option is rewritten whole on every row. Two requests recording at once
  * each read the same log, append their own row and write it back, and the slower one's write
  * erases the faster one's row. A bulk write recording a hundred items one call at a time also
  * paid for a hundred full rewrites of up to 4 MB. Both are fixed here: the rows go in together,
@@ -60,13 +105,13 @@ function wppilot_store_change(array $entry): void
  *
  * @param list<array<string, mixed>> $entries
  */
-function wppilot_store_changes(array $entries): void
+function wppilot_change_option_store(array $entries): void
 {
     if ($entries === []) {
         return;
     }
     wppilot_with_change_log_lock(static function () use ($entries): void {
-        $log = array_merge(wppilot_get_change_log(), $entries);
+        $log = array_merge(wppilot_change_log_option_rows(), $entries);
         if (count($log) > WPPILOT_CHANGE_LOG_MAX) {
             $log = array_slice(array: $log, offset: -WPPILOT_CHANGE_LOG_MAX);
         }
@@ -83,6 +128,10 @@ function wppilot_store_changes(array $entries): void
 
 /**
  * Run a read-modify-write of the ledger under a MySQL named lock.
+ *
+ * Table storage needs no lock to record a row; the lock still guards the option (before the
+ * migration, and after a fallback) and the migration takes it too, so callers that wrap their own
+ * read-modify-write in it keep working either way.
  *
  * @template T
  * @param callable(): T $write
@@ -134,9 +183,67 @@ function wppilot_with_change_log_lock(callable $write): mixed
  *            credential key exactly or the label or client name as a substring; `status` is
  *            `undoable`, `rolled-back` or `not-reversible`; `since`/`until` are anything
  *            strtotime() reads, compared in UTC and inclusive.
+ * @param int $limit  Most rows to return; 0 for all. A page of the result, with $offset.
+ * @param int $offset Rows to skip from the newest.
  * @return list<array<string, mixed>>
  */
-function wppilot_query_change_log(array $filters = []): array
+function wppilot_query_change_log(array $filters = [], int $limit = 0, int $offset = 0): array
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_query($filters, $limit, $offset);
+    }
+    $rows = wppilot_query_change_log_option($filters);
+    if ($limit > 0 || $offset > 0) {
+        $rows = array_slice($rows, max(0, $offset), $limit > 0 ? $limit : null);
+    }
+
+    return $rows;
+}
+
+/**
+ * How many rows wppilot_query_change_log() would return for these filters, without loading them.
+ *
+ * @param array<string, mixed> $filters
+ */
+function wppilot_count_change_log(array $filters = []): int
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_count($filters);
+    }
+
+    return count(wppilot_query_change_log_option($filters));
+}
+
+/**
+ * How many rows each of these groups holds in the whole ledger.
+ *
+ * @param list<string> $groups
+ * @return array<string, int>
+ */
+function wppilot_change_group_sizes(array $groups): array
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_group_sizes($groups);
+    }
+    $wanted = array_fill_keys(array_filter($groups, static fn(string $group): bool => $group !== ''), true);
+    $sizes = [];
+    foreach (wppilot_change_log_option_rows() as $row) {
+        $group = $row['group'] ?? null;
+        if (is_string($group) && isset($wanted[$group])) {
+            $sizes[$group] = ($sizes[$group] ?? 0) + 1;
+        }
+    }
+
+    return $sizes;
+}
+
+/**
+ * The option-storage reader behind wppilot_query_change_log().
+ *
+ * @param array<string, mixed> $filters
+ * @return list<array<string, mixed>>
+ */
+function wppilot_query_change_log_option(array $filters): array
 {
     $kind = (string) ($filters['kind'] ?? '');
     $ability = (string) ($filters['ability'] ?? '');
@@ -148,7 +255,7 @@ function wppilot_query_change_log(array $filters = []): array
     $until = wppilot_change_filter_time((string) ($filters['until'] ?? ''), end_of_day: true);
 
     $rows = [];
-    foreach (array_reverse(wppilot_get_change_log()) as $entry) {
+    foreach (array_reverse(wppilot_change_log_option_rows()) as $entry) {
         if ($kind !== '' && (string) ($entry['kind'] ?? 'change') !== $kind) {
             continue;
         }
@@ -263,7 +370,10 @@ function wppilot_change_export_row(array $entry): array
 /** @return array<string, mixed>|null */
 function wppilot_get_change(string $id): ?array
 {
-    foreach (array_reverse(wppilot_get_change_log()) as $entry) {
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_get($id);
+    }
+    foreach (array_reverse(wppilot_change_log_option_rows()) as $entry) {
         if (($entry['id'] ?? null) === $id) {
             return $entry;
         }
@@ -274,8 +384,12 @@ function wppilot_get_change(string $id): ?array
 /** @param array<string, mixed> $replacement */
 function wppilot_replace_change(string $id, array $replacement): bool
 {
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_replace($id, $replacement);
+    }
+
     return wppilot_with_change_log_lock(static function () use ($id, $replacement): bool {
-        $log = wppilot_get_change_log();
+        $log = wppilot_change_log_option_rows();
         foreach ($log as $index => $entry) {
             if (($entry['id'] ?? null) !== $id) {
                 continue;
@@ -300,8 +414,9 @@ function wppilot_replace_change(string $id, array $replacement): bool
  * Every row carries the same `group`, so the batch can still be undone as one
  * (wppilot_rollback_group()) and the Changes screen can show it as one.
  *
- * Snapshots are whole objects, and the ledger is capped at 4 MB; a batch of heavy builder pages
- * could otherwise evict every earlier change on the site. So one call may add at most
+ * Snapshots are whole objects. Where the ledger is still the option (capped at 4 MB) a batch of
+ * heavy builder pages could otherwise evict every earlier change on the site, and in the table
+ * the images are what the table's size is made of. So one call may add at most
  * WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES of before-images. Items past the budget are still
  * recorded, but their rows say plainly that no before-image was kept. A caller that must not
  * write without one sums wppilot_snapshot_bytes() against the same constant before each write
@@ -404,10 +519,12 @@ function wppilot_snapshot_bytes(?array $snapshot): int
 function wppilot_rollback_changes(array $ids): array
 {
     $wanted = array_fill_keys($ids, true);
-    $rows = array_values(array_filter(
-        array_reverse(wppilot_get_change_log()),
-        static fn(array $entry): bool => isset($wanted[(string) ($entry['id'] ?? '')]),
-    ));
+    $rows = wppilot_change_table_active()
+        ? wppilot_change_table_get_many(array_values(array_map('strval', $ids)))
+        : array_values(array_filter(
+            array_reverse(wppilot_change_log_option_rows()),
+            static fn(array $entry): bool => isset($wanted[(string) ($entry['id'] ?? '')]),
+        ));
 
     $summary = ['rolled_back' => 0, 'failed' => 0, 'skipped' => 0, 'results' => []];
     foreach ($rows as $entry) {
@@ -450,9 +567,13 @@ function wppilot_rollback_changes(array $ids): array
 function wppilot_rollback_group(string $group): array|WP_Error
 {
     $ids = [];
-    foreach (wppilot_get_change_log() as $entry) {
-        if ($group !== '' && ($entry['group'] ?? null) === $group) {
-            $ids[] = (string) ($entry['id'] ?? '');
+    if ($group !== '' && wppilot_change_table_active()) {
+        $ids = wppilot_change_table_group_ids($group);
+    } elseif ($group !== '') {
+        foreach (wppilot_change_log_option_rows() as $entry) {
+            if (($entry['group'] ?? null) === $group) {
+                $ids[] = (string) ($entry['id'] ?? '');
+            }
         }
     }
     if ($ids === []) {
