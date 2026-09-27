@@ -526,14 +526,25 @@ function wppilot_safety_check_ability(WP_Ability $ability): bool|WP_Error
 
 function wppilot_confirmation_required_error(WP_Ability $ability): WP_Error
 {
+    // When the reason is the site owner's rule rather than the ability's risk, say so: calling an
+    // alt-text update "destructive or critical" sends the agent and the person looking for a
+    // danger that is not there.
+    $risk = wppilot_ability_risk($ability);
+    $by_rule = $risk !== 'critical' && $risk !== 'destructive';
     return new WP_Error(
         'wppilot_confirmation_required',
         sprintf(
-            /* translators: %s: ability name */
-            __(
-                'Ability "%s" is destructive or critical. Obtain explicit user approval, then retry with confirm=true inside the ability parameters.',
-                domain: 'wppilot',
-            ),
+            $by_rule
+                /* translators: %s: ability name */
+                ? __(
+                    'The site owner requires confirmation for ability "%s". Obtain explicit user approval, then retry with confirm=true inside the ability parameters.',
+                    domain: 'wppilot',
+                )
+                /* translators: %s: ability name */
+                : __(
+                    'Ability "%s" is destructive or critical. Obtain explicit user approval, then retry with confirm=true inside the ability parameters.',
+                    domain: 'wppilot',
+                ),
             $ability->get_name(),
         ),
         ['status' => 409, 'ability' => $ability->get_name(), 'risk' => wppilot_ability_risk($ability)],
