@@ -349,3 +349,20 @@ function _doing_it_wrong(string $function_name, string $message, string $version
 {
     Kit_Coexistence::$notices[] = "{$function_name}: {$message}";
 }
+
+/**
+ * An empty media library, so a read-only kit ability that scans it runs rather than fatals.
+ *
+ * @param array<string, mixed> $args
+ * @return list<int>
+ */
+function get_posts(array $args = []): array
+{
+    return [];
+}
+
+/** @param string|list<string> $mime_type */
+function wp_count_attachments(string|array $mime_type = ''): object
+{
+    return (object) ['trash' => 0];
+}

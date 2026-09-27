@@ -103,6 +103,11 @@ function static_names(array $files): array
         foreach ($constants as $name => $value) {
             // Storage keys the runtime completes at run time (OPTION_PREFIX . $id) are compared
             // as prefixes below.
+            // WordPress's own keys (_wp_attachment_image_alt, _wp_attached_file) are shared by
+            // every plugin that edits media; both copies writing them is the point, not a clash.
+            if (str_starts_with($value, '_wp_')) {
+                continue;
+            }
             if (preg_match('/OPTION|TRANSIENT|META|KEY/', $name) === 1) {
                 $names['option'][$value] = true;
             } elseif (preg_match('/HOOK|EVENT/', $name) === 1) {
@@ -272,7 +277,9 @@ function load_both(string $free, string $pro, string $export): array
             continue;
         }
         $result = ($args['execute_callback'])([]);
-        if (!is_array($result)) {
+        // A read that needs something to read (a page, an attachment) refuses an empty call with
+        // a WP_Error: a clean answer from the right copy of the code, which is what this proves.
+        if (!is_array($result) && !$result instanceof \WP_Error) {
             $problems[] = "{$name}: execute returned " . get_debug_type($result);
         }
     }
