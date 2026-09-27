@@ -120,7 +120,59 @@ function run_all(?string $method = null): array
         $results[] = check_app_passwords();
     }
 
+    $results[] = check_change_ledger();
+
     return $results;
+}
+
+/**
+ * Where the change ledger is kept.
+ *
+ * A site whose database user cannot create tables keeps the ledger in one capped option, where it
+ * holds far less history and concurrent writes can lose rows. Nothing else on the site would say
+ * so, and the remedy (a privilege) is the host's to grant.
+ *
+ * @return array{id: string, status: string, label: string, message: string, remedy: string, action: string, copy: string}
+ */
+function check_change_ledger(): array
+{
+    $label = __('Change ledger', domain: 'wppilot');
+    if (!function_exists('wppilot_change_storage_status')) {
+        return info('change_ledger', $label, __('The change ledger is not loaded.', domain: 'wppilot'));
+    }
+    $status = \wppilot_change_storage_status();
+    if ($status['storage'] === 'table') {
+        return ok('change_ledger', $label, sprintf(
+            /* translators: 1: number of recorded changes, 2: database table name */
+            __('%1$d changes recorded in the %2$s table.', domain: 'wppilot'),
+            $status['rows'],
+            $status['table'],
+        ));
+    }
+    if ($status['error'] === null) {
+        return info('change_ledger', $label, __(
+            'The change ledger is moving from its old option storage to its own table. This finishes on a later page load.',
+            domain: 'wppilot',
+        ));
+    }
+
+    return warn(
+        'change_ledger',
+        $label,
+        sprintf(
+            /* translators: 1: database table name, 2: database error message */
+            __(
+                'Changes are still kept in a single option (at most 500 rows), because the %1$s table could not be used: %2$s',
+                domain: 'wppilot',
+            ),
+            $status['table'],
+            $status['error']['message'],
+        ),
+        __(
+            'Ask your host to grant the WordPress database user the CREATE and ALTER privileges. WPPilot tries again every hour and moves the existing history across on its own.',
+            domain: 'wppilot',
+        ),
+    );
 }
 
 /** @return array{id: string, status: string, label: string, message: string, remedy: string, action: string, copy: string} */

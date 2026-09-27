@@ -135,6 +135,31 @@ interface Ledger
 }
 
 /**
+ * A ledger that counts and pages in its own storage.
+ *
+ * Optional, and separate from Ledger so implementations written before it keep compiling: a kit
+ * checks `instanceof PagedLedger` and otherwise pages what query() returns. WPPilot's ledger is a
+ * table of up to ten thousand rows with their before-images, which query() would load whole.
+ */
+interface PagedLedger
+{
+    /**
+     * One page of query(), newest first.
+     *
+     * @param array<string, mixed> $filters
+     * @return list<array<string, mixed>>
+     */
+    public function query_page(array $filters, int $limit, int $offset): array;
+
+    /**
+     * How many rows query() would return.
+     *
+     * @param array<string, mixed> $filters
+     */
+    public function count(array $filters = []): int;
+}
+
+/**
  * Background work in leased, time-boxed steps; see jobs/Runner.php.
  */
 interface Jobs

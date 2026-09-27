@@ -106,7 +106,9 @@ function wppilot_system_status(): array
             'safety_profile' => function_exists('wppilot_get_safety_profile')
                 ? wppilot_get_safety_profile()
                 : 'unknown',
-            'change_records' => function_exists('wppilot_get_change_log') ? count(wppilot_get_change_log()) : 0,
+            'change_records' => function_exists('wppilot_count_change_log') ? wppilot_count_change_log() : 0,
+            // Where the ledger lives, and why when that is still the option (no CREATE privilege).
+            'change_storage' => function_exists('wppilot_change_storage_status') ? wppilot_change_storage_status() : null,
         ],
         // Which copy of the MCP Adapter this site actually loaded. The classes are
         // global and unprefixed, so one copy serves every plugin that bundles it,

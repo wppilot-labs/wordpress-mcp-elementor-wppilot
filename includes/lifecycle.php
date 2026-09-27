@@ -85,6 +85,7 @@ function wppilot_activate_current_site(): void
     wppilot_chat_schema_install_current_site();
     wppilot_connections_schema_install();
     wppilot_tokens_schema_install();
+    wppilot_changes_install_and_migrate();
     wppilot_safety_maybe_install();
     wppilot_enable_ai_abilities_on_activate();
     wppilot_pro_upsell_on_activate();
@@ -172,6 +173,7 @@ function wppilot_deactivate_current_site(): void
     \WPPilot\Abilities\Gutenberg\unschedule_cleanup();
 
     wp_clear_scheduled_hook('wppilot_oauth_gc');
+    wp_clear_scheduled_hook(WPPILOT_CHANGES_PRUNE_HOOK);
 
     // Report the deactivation before dropping the schedule, then drop it.
     // Without the report an abandoned install reads as active until it falls

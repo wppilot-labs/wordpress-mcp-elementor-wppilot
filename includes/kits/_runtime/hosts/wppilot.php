@@ -12,6 +12,7 @@ use WP_Error;
 use WPPilot\Kits\Runtime\Host;
 use WPPilot\Kits\Runtime\Jobs;
 use WPPilot\Kits\Runtime\Ledger;
+use WPPilot\Kits\Runtime\PagedLedger;
 use WPPilot\Kits\Runtime\ProfileGate;
 use WPPilot\Kits\Runtime\Runner;
 
@@ -141,7 +142,7 @@ final class WPPilotHost implements Host, ProfileGate
     }
 }
 
-final class WPPilotLedger implements Ledger
+final class WPPilotLedger implements Ledger, PagedLedger
 {
     /** @var array<string, callable> */
     private array $captures = [];
@@ -180,6 +181,16 @@ final class WPPilotLedger implements Ledger
     public function query(array $filters = []): array
     {
         return \wppilot_query_change_log($filters);
+    }
+
+    public function query_page(array $filters, int $limit, int $offset): array
+    {
+        return \wppilot_query_change_log($filters, max(1, $limit), max(0, $offset));
+    }
+
+    public function count(array $filters = []): int
+    {
+        return \wppilot_count_change_log($filters);
     }
 
     public function export_row(array $entry): array
