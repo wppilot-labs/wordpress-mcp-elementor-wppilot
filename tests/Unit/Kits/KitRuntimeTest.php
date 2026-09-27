@@ -1,0 +1,89 @@
+<?php
+
+// SPDX-FileCopyrightText: 2026 WPPilot <dev@wppilot.co>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+declare(strict_types=1);
+
+namespace WPPilot\Tests\Unit\Kits;
+
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use WPPilot\Kits\Runtime;
+
+/**
+ * The runtime's loader decisions, before any kit code runs.
+ */
+final class KitRuntimeTest extends TestCase
+{
+    private string $dir = '';
+
+    public static function setUpBeforeClass(): void
+    {
+        require_once dirname(__DIR__, 3) . '/includes/kits/_runtime/runtime.php';
+    }
+
+    protected function setUp(): void
+    {
+        $this->dir = sys_get_temp_dir() . '/wppilot-kits-' . bin2hex(random_bytes(4));
+        mkdir($this->dir . '/good', recursive: true);
+        mkdir($this->dir . '/broken');
+        mkdir($this->dir . '/_runtime');
+        file_put_contents($this->dir . '/good/kit.json', (string) json_encode(['slug' => 'good', 'runtime' => '^1.0']));
+        file_put_contents($this->dir . '/broken/kit.json', '{"slug": "broken", "namespace": "A\B"}');
+        file_put_contents($this->dir . '/_runtime/kit.json', (string) json_encode(['slug' => 'runtime']));
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (['good', 'broken', '_runtime'] as $sub) {
+            @unlink($this->dir . '/' . $sub . '/kit.json');
+            @rmdir($this->dir . '/' . $sub);
+        }
+        @rmdir($this->dir);
+    }
+
+    #[DataProvider('constraints')]
+    public function testRuntimeConstraint(string $constraint, bool $accepted): void
+    {
+        self::assertSame($accepted, Runtime\runtime_satisfies($constraint));
+    }
+
+    /** @return array<string, array{0: string, 1: bool}> */
+    public static function constraints(): array
+    {
+        return [
+            'same major and minor' => ['^1.0', true],
+            'newer minor than the runtime' => ['^1.1', false],
+            'other major' => ['^2.0', false],
+            'no caret' => ['1.0', false],
+            'garbage' => ['latest', false],
+        ];
+    }
+
+    /**
+     * A kit.json that does not parse is reported, not silently dropped; the
+     * runtime's own folder is never mistaken for a kit.
+     */
+    public function testDiscoverReportsBrokenManifestsAndSkipsTheRuntime(): void
+    {
+        $found = Runtime\discover($this->dir);
+
+        self::assertSame(['broken', 'good'], array_column($found, 'slug'));
+        self::assertSame('kit.json is not valid JSON with a slug', Runtime\incompatibility($found[0]));
+        self::assertSame('', Runtime\incompatibility($found[1]));
+    }
+
+    public function testIncompatibilityNamesWhatIsMissing(): void
+    {
+        self::assertStringContainsString('runtime ^2.0', Runtime\incompatibility(['slug' => 'x', 'runtime' => '^2.0']));
+        self::assertStringContainsString(
+            'NoSuchPlugin',
+            Runtime\incompatibility(['slug' => 'x', 'runtime' => '^1.0', 'requires' => ['classes' => ['NoSuchPlugin']]]),
+        );
+        self::assertStringContainsString(
+            'PHP 99.0',
+            Runtime\incompatibility(['slug' => 'x', 'runtime' => '^1.0', 'requires' => ['php' => '99.0']]),
+        );
+    }
+}

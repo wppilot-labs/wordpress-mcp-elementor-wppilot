@@ -275,6 +275,9 @@ unset($wppilot_mcp_module);
 \WPPilot\Mcp\register_modern_transport();
 
 require_once __DIR__ . '/includes/abilities/bootstrap.php';
+// Portable feature kits: the runtime, WPPilot's host for it, and the kits in includes/kits/.
+require_once __DIR__ . '/includes/kits/loader.php';
+require_once __DIR__ . '/includes/kits/skills.php';
 // Self-hosted update checks, for builds distributed from wppilot.co.
 //
 // Conditional because the WordPress.org build must not contain this file at all:

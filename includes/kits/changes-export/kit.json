@@ -1,0 +1,27 @@
+{
+    "slug": "changes-export",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\ChangesExport",
+    "tier": "free",
+    "runtime": "^1.0",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9"
+    },
+    "categories": {
+        "changes": {
+            "label": "Changes",
+            "description": "The record of what agents changed, and the way back."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/export-changes",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        }
+    ],
+    "skills": ["changes-export"],
+    "tests": ["tests/Unit/Kits/ChangesExport"]
+}
