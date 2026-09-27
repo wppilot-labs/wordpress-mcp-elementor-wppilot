@@ -479,6 +479,32 @@ function check_authorization_echo(array $class, array $evidence, string $stack, 
 }
 
 /**
+ * Whether WordPress will accept an Application Password at all.
+ *
+ * The most common 401 is not a firewall: WordPress switches Application Passwords off on a site
+ * that is not served over HTTPS unless its environment type is `local`, and a security plugin can
+ * switch them off with a filter. Every probe above can pass while every Basic-auth client is still
+ * refused, so this is checked on its own and named plainly.
+ *
+ * @return array<string, mixed>
+ */
+function check_application_passwords(bool $available, bool $is_ssl, string $environment, bool $tokens_available): array
+{
+    $label = __('Application Passwords accepted', domain: 'wppilot');
+    if ($available) {
+        return check('application_passwords', 'pass', $label, __('WordPress accepts Application Passwords on this site.', domain: 'wppilot'));
+    }
+    $evidence = ['is_ssl: ' . ($is_ssl ? 'yes' : 'no'), 'WP_ENVIRONMENT_TYPE: ' . $environment];
+    $alternative = $tokens_available
+        ? ' ' . __('A WPPilot access token (Bearer) works without them.', domain: 'wppilot')
+        : '';
+    if (!$is_ssl && $environment !== 'local') {
+        return check('application_passwords', 'fail', $label, __('WordPress disables Application Passwords on a site that is not served over HTTPS, so every client using Basic auth gets 401.', domain: 'wppilot') . $alternative, $evidence, __('Serve the site over HTTPS. On a development site only, set define( "WP_ENVIRONMENT_TYPE", "local" ); in wp-config.php.', domain: 'wppilot'));
+    }
+    return check('application_passwords', 'fail', $label, __('Application Passwords are switched off by a plugin or by code (the wp_is_application_passwords_available filter), so every client using Basic auth gets 401.', domain: 'wppilot') . $alternative, $evidence, __('Find the security plugin or snippet that disables Application Passwords and allow them, or connect with a WPPilot access token.', domain: 'wppilot'));
+}
+
+/**
  * Judge the OAuth endpoint's anonymous answer: a 401 carrying a Bearer challenge that points at the
  * protected-resource metadata is how a client learns where to sign in.
  *
@@ -746,6 +772,13 @@ function run(?callable $request = null): array
     $authed_class = classify_response($authed);
     $all_headers[] = $authed_class['headers'];
     $checks[] = check_mcp_probe('mcp_with_credentials', __('MCP endpoint, with credentials', domain: 'wppilot'), $authed_class, probe_evidence('POST ' . $mcp_url . ' (Authorization: Bearer <invalid probe>)', $authed_class, $authed['error']), false, $mcp_path, $home_path);
+
+    $checks[] = check_application_passwords(
+        function_exists('wp_is_application_passwords_available') && wp_is_application_passwords_available(),
+        is_ssl(),
+        function_exists('wp_get_environment_type') ? wp_get_environment_type() : 'production',
+        function_exists('wppilot_token_hash'),
+    );
 
     // 3. Does Authorization reach PHP intact?
     $probe_id = mint_probe_id();

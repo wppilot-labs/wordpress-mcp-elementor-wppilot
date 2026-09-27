@@ -13,6 +13,7 @@ use WPPilot_Test_Rest_Request;
 use WPPilot_Test_State;
 
 use function WPPilot\Troubleshoot\Doctor\authorization_fix;
+use function WPPilot\Troubleshoot\Doctor\check_application_passwords;
 use function WPPilot\Troubleshoot\Doctor\authorization_source;
 use function WPPilot\Troubleshoot\Doctor\check_authorization_echo;
 use function WPPilot\Troubleshoot\Doctor\check_clock;
@@ -42,6 +43,25 @@ require_once dirname(__DIR__, 2) . '/includes/troubleshoot/doctor.php';
 final class ConnectionDoctorTest extends TestCase
 {
     private const MCP_PATH = '/wp-json/mcp/';
+
+    /**
+     * WordPress refuses Application Passwords on a non-HTTPS site that is not `local`, which is
+     * the commonest 401 and invisible to every network probe.
+     */
+    public function testApplicationPasswordsOffOverPlainHttpIsNamed(): void
+    {
+        $off = check_application_passwords(false, false, 'production', true);
+        self::assertSame('fail', $off['status']);
+        self::assertStringContainsString('HTTPS', $off['finding']);
+        self::assertStringContainsString('access token', $off['finding']);
+        self::assertStringContainsString('WP_ENVIRONMENT_TYPE', $off['fix']);
+
+        $filtered = check_application_passwords(false, true, 'production', false);
+        self::assertSame('fail', $filtered['status']);
+        self::assertStringContainsString('wp_is_application_passwords_available', $filtered['finding']);
+
+        self::assertSame('pass', check_application_passwords(true, false, 'local', true)['status']);
+    }
 
     protected function setUp(): void
     {
