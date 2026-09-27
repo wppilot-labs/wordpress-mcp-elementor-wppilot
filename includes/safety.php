@@ -282,9 +282,23 @@ function wppilot_ability_safety_policy(WP_Ability $ability): array
     $meta = $ability->get_meta();
     $safety = is_array($meta['safety'] ?? null) ? $meta['safety'] : [];
     $min_profile = $safety['min_profile'] ?? '';
+    $min_profile = is_string($min_profile) && wppilot_is_safety_profile($min_profile) ? $min_profile : '';
+
+    // A site owner's Abilities Hub override can only raise the floor. The ability's own
+    // min_profile is its author saying "too sensitive below this", and nothing on a settings
+    // screen should be able to quietly lower that.
+    $rules = function_exists('wppilot_get_ability_rules') ? wppilot_get_ability_rules() : [];
+    $override = (string) ($rules[$ability->get_name()]['min_profile'] ?? '');
+    if (
+        $override !== ''
+        && wppilot_is_safety_profile($override)
+        && ($min_profile === '' || wppilot_safety_profile_rank($override) > wppilot_safety_profile_rank($min_profile))
+    ) {
+        $min_profile = $override;
+    }
 
     return [
-        'min_profile' => is_string($min_profile) && wppilot_is_safety_profile($min_profile) ? $min_profile : '',
+        'min_profile' => $min_profile,
         'audit_reads' => ($safety['audit_reads'] ?? false) === true,
     ];
 }
@@ -405,7 +419,16 @@ function wppilot_safety_filter_ability_permission(
 function wppilot_ability_requires_confirmation(WP_Ability $ability): bool
 {
     $risk = wppilot_ability_risk($ability);
-    return $risk === 'critical' || $risk === 'destructive';
+    if ($risk === 'critical' || $risk === 'destructive') {
+        return true;
+    }
+
+    // The Abilities Hub lets a site owner demand confirmation for any ability, including a
+    // third-party one whose author annotated a risky write as ordinary. It can only add the
+    // requirement: a destructive ability stays confirmed whatever the rule says.
+    $rules = function_exists('wppilot_get_ability_rules') ? wppilot_get_ability_rules() : [];
+
+    return ($rules[$ability->get_name()]['require_confirmation'] ?? false) === true;
 }
 
 /**
