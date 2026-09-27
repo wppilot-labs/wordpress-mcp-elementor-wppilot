@@ -254,6 +254,7 @@ require_once __DIR__ . '/includes/abilities/policy.php';
 require_once __DIR__ . '/includes/safety.php';
 require_once __DIR__ . '/includes/rate-limit.php';
 require_once __DIR__ . '/includes/gate-pipeline.php';
+require_once __DIR__ . '/includes/confirmation.php';
 require_once __DIR__ . '/includes/change-log.php';
 require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';
@@ -268,7 +269,7 @@ add_filter('rest_post_dispatch', callback: 'wppilot_harden_rest_response', prior
 // these modules answer MCP 2026-07-28, which removed the handshake and sessions
 // entirely. The dispatcher only claims a request that carries modern per-request
 // _meta, so legacy traffic reaches the adapter untouched.
-foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $wppilot_mcp_module) {
+foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport', 'confirmation'] as $wppilot_mcp_module) {
     require_once __DIR__ . '/includes/mcp/' . $wppilot_mcp_module . '.php';
 }
 unset($wppilot_mcp_module);
@@ -320,6 +321,7 @@ require_once __DIR__ . '/includes/oauth/bootstrap.php';
 require_once __DIR__ . '/includes/troubleshoot/bootstrap.php';
 require_once __DIR__ . '/includes/admin/instructions.php';
 require_once __DIR__ . '/includes/admin/settings.php';
+require_once __DIR__ . '/includes/admin/confirm.php';
 require_once __DIR__ . '/includes/admin/dashboard.php';
 require_once __DIR__ . '/includes/preview/bootstrap.php';
 if (is_admin()) {

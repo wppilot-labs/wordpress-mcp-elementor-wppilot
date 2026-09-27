@@ -404,9 +404,13 @@ function wppilot_safety_pre_mcp_tool_call(array $args, string $tool_name): array
     }
 
     $parameters = is_array($args['parameters'] ?? null) ? $args['parameters'] : [];
-    if (wppilot_ability_requires_confirmation($ability) && ($parameters['confirm'] ?? null) !== true) {
-        return wppilot_confirmation_required_error($ability);
+    // The legacy era has no per-request capabilities and no input_required, so in `human` mode a
+    // legacy client is always given the wp-admin approval link.
+    $confirmed = wppilot_confirm_ability_call($ability, $parameters, transport: 'mcp');
+    if ($confirmed instanceof WP_Error) {
+        return $confirmed;
     }
+    wppilot_confirmation_note($ability->get_name(), $confirmed);
 
     if (
         array_key_exists(key: 'confirm', array: $parameters)

@@ -256,6 +256,7 @@ function wppilot_change_export_row(array $entry): array
         'status' => wppilot_change_status($entry),
         'rollback_reason' => (string) ($rollback['reason'] ?? ''),
         'rolled_back_at' => (string) ($entry['rolled_back_at'] ?? ''),
+        'confirmation' => is_array($entry['confirmation'] ?? null) ? (string) ($entry['confirmation']['method'] ?? '') : '',
         'input' => is_array($entry['input'] ?? null) ? $entry['input'] : [],
     ];
 }
@@ -326,6 +327,8 @@ function wppilot_ledger_record_items(string $ability_name, array $items, ?string
     $ability = function_exists('wp_get_ability') ? wp_get_ability($ability_name) : null;
     $risk = $ability instanceof WP_Ability ? wppilot_ability_risk($ability) : 'write';
     $budget = WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES;
+    // Read, not cleared: the call's own after-hook still runs and clears it.
+    $confirmation = wppilot_change_confirmation($ability_name, clear: false);
     $rows = [];
     $ids = [];
     $without = 0;
@@ -367,6 +370,7 @@ function wppilot_ledger_record_items(string $ability_name, array $items, ?string
                 : wppilot_build_rollback_payload($ability_name, $before, $item['result'] ?? null),
             'rolled_back' => false,
             'design' => [],
+            'confirmation' => $confirmation,
             'bulk_item' => wppilot_string_keyed_array($item['item'] ?? []),
         ];
     }
@@ -595,7 +599,24 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result,
         // point: a site owner who is not ready to refuse writes can still audit
         // where the direction slipped.
         'design' => wppilot_change_design_findings($ability_name),
+        'confirmation' => wppilot_change_confirmation($ability_name, clear: true),
     ]);
+}
+
+/**
+ * How the write being recorded was confirmed: `argument`, `elicitation`, `approval-url`, `chat`,
+ * `approval-queue` or `not-required`, plus who approved it for an approval-url call. Empty when the
+ * call reached execute() without passing the gate pipeline, such as an ability another ability ran.
+ *
+ * @return array{method?: string, approved_by?: int}
+ */
+function wppilot_change_confirmation(string $ability_name, bool $clear): array
+{
+    if (!function_exists('wppilot_confirmation_note')) {
+        return [];
+    }
+
+    return wppilot_confirmation_note($ability_name, method: null, clear: $clear) ?? [];
 }
 
 /**

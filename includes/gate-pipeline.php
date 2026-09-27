@@ -27,6 +27,8 @@ if (!defined('ABSPATH')) {
  * 2. Confirmation. A destructive or critical ability needs `confirm: true`, unless the caller says
  *    a human already approved this exact call in wp-admin (`human_approved`) — Chat's approve
  *    button and Pro's approval queue. A model can set `confirm` itself; it cannot set that context.
+ *    In the `human` confirmation mode `confirm` stops counting, and the call needs an elicitation
+ *    answer or a wp-admin approval instead (wppilot_confirm_ability_call()).
  * 3. Confirm strip. `confirm` is a transport control, not ability input, and is removed unless the
  *    ability declares its own property of that name, because schema validation rejects unknown
  *    members.
@@ -39,7 +41,8 @@ if (!defined('ABSPATH')) {
  * @param string                     $transport `rest`, `mcp`, `chat` or `approval`. Filters use it to
  *                                              decide what applies; the approval queue, for one, only
  *                                              holds `rest` and `mcp` calls.
- * @param array{human_approved?: bool} $context
+ * @param array{human_approved?: bool, elicitation?: array{supported?: bool, state?: string, response?: mixed}} $context
+ *        `elicitation` is set by the modern MCP transport only; see wppilot_confirm_ability_call().
  * @return mixed The input to pass to execute(), or a WP_Error explaining the refusal.
  */
 function wppilot_gate_ability_call(WP_Ability $ability, mixed $input, string $transport, array $context = []): mixed
@@ -49,14 +52,15 @@ function wppilot_gate_ability_call(WP_Ability $ability, mixed $input, string $tr
         return $allowed;
     }
 
-    $values = is_array($input) ? $input : [];
-    if (
-        ($context['human_approved'] ?? false) !== true
-        && wppilot_ability_requires_confirmation($ability)
-        && ($values['confirm'] ?? null) !== true
-    ) {
-        return wppilot_confirmation_required_error($ability);
+    // In the default `argument` mode this is the old contract exactly; in `human` mode `confirm`
+    // is no longer enough, and a person must approve through elicitation or a wp-admin link.
+    // See includes/confirmation.php.
+    $confirmed = wppilot_confirm_ability_call($ability, $input, $transport, $context);
+    if ($confirmed instanceof WP_Error) {
+        return $confirmed;
     }
+    // Handed to the ledger, which records how each write was confirmed.
+    wppilot_confirmation_note($ability->get_name(), $confirmed);
 
     if (
         is_array($input)
