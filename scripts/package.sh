@@ -115,6 +115,14 @@ for entry in * .[!.]*; do
   cp -R "$entry" "$BUILD/wppilot/"
 done
 
+# A kit folder (includes/kits/<slug>/) is built to be copied whole into other plugins, so a
+# kit may keep its own tests/ beside its code. Those are development files like tests/ at the
+# root, and a test double shipped in a release is code running on a customer's site that
+# nobody meant to put there.
+if [ -d "$BUILD/wppilot/includes/kits" ]; then
+  find "$BUILD/wppilot/includes/kits" -mindepth 2 -maxdepth 2 -type d -name tests -prune -exec rm -rf {} +
+fi
+
 verify_tree "$BUILD/wppilot" "release build"
 make_zip "$ROOT/build/wppilot.zip" "$BUILD" wppilot
 echo "  build/wppilot.zip"
