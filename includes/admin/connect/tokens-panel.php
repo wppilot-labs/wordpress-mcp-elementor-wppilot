@@ -183,7 +183,7 @@ function wppilot_handle_revoke_token(): void
 
     wppilot_token_revoke($token_id, get_current_user_id());
 
-    wp_safe_redirect(admin_url('admin.php?page=wppilot-connect&wppilot_result=token_revoked'));
+    wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=token_revoked'));
     exit();
 }
 
@@ -213,7 +213,7 @@ function wppilot_handle_update_token(): void
     $updated = wppilot_token_update_policy($token_id, get_current_user_id(), $name, $policy['scope'], $policy['ceiling']);
     $result = $updated === true ? 'token_updated' : 'token_update_failed';
 
-    wp_safe_redirect(admin_url('admin.php?page=wppilot-connect&wppilot_result=' . $result));
+    wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=' . $result));
     exit();
 }
 

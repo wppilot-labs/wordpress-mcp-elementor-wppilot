@@ -132,7 +132,7 @@ function wppilot_handle_revoke_password(): void
     $user_id = get_current_user_id();
     WP_Application_Passwords::delete_application_password($user_id, $uuid);
 
-    wp_safe_redirect(admin_url('admin.php?page=wppilot-connect&wppilot_result=revoked'));
+    wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=revoked'));
     exit();
 }
 

@@ -40,8 +40,10 @@ $datetime_format = \wppilot_get_datetime_format();
 $active_group = (string) ($filters['group'] ?? '');
 
 ?>
+<?php \wppilot_render_admin_header(); ?>
 <div class="wrap wppilot-wrap wppilot-changes">
-    <?php \wppilot_render_admin_header(esc_html__('What agents changed, and the way back', domain: 'wppilot')); ?>
+    <h1><?php echo esc_html(\wppilot_nav_label(PAGE_SLUG, fallback: __('Changes', domain: 'wppilot'))); ?></h1>
+    <p class="wppilot-lede"><?php esc_html_e('Everything an agent changed through WPPilot, newest first, with the way back where one exists.', domain: 'wppilot'); ?></p>
 
     <div class="wppilot-panel">
         <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>" class="wppilot-changes__filters">

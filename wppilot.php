@@ -153,7 +153,7 @@ function wppilot_render_mcp_dependency_notice(): void
     $page = $_GET['page'] ?? null;
     if (
         is_string($page)
-        && in_array($page, ['wppilot-connect', 'wppilot-abilities', 'wppilot-chat', 'wppilot-sandbox'], strict: true)
+        && in_array($page, ['wppilot-connect', WPPILOT_SETUP_PAGE, 'wppilot-abilities', 'wppilot-chat', 'wppilot-sandbox'], strict: true)
     ) {
         return;
     }
@@ -331,6 +331,7 @@ require_once __DIR__ . '/includes/admin/instructions.php';
 require_once __DIR__ . '/includes/admin/settings.php';
 require_once __DIR__ . '/includes/admin/confirm.php';
 require_once __DIR__ . '/includes/admin/dashboard.php';
+require_once __DIR__ . '/includes/admin/home.php';
 require_once __DIR__ . '/includes/preview/bootstrap.php';
 if (is_admin()) {
     // admin-post.php counts as admin, so the screen's undo and download handlers load too.
@@ -454,11 +455,16 @@ function wppilot_register_admin_bar_toggle(\WP_Admin_Bar $wp_admin_bar): void
 
     $wp_admin_bar->add_node([
         'id' => 'wppilot-mcp-status',
-        'title' => match (true) {
-            $active => esc_html__('WPPilot ON', domain: 'wppilot'),
-            $configured_enabled => esc_html__('WPPilot ERROR', domain: 'wppilot'),
-            default => esc_html__('WPPilot', domain: 'wppilot'),
-        },
+        // A dot carries the state; the label stays "WPPilot". A red block reading
+        // "WPPilot ON" sat in the toolbar of every screen of a healthy site and
+        // looked like an alarm.
+        'title' => '<span class="wppilot-ab-dot" aria-hidden="true"></span>'
+            . esc_html__('WPPilot', domain: 'wppilot')
+            . '<span class="screen-reader-text"> ' . match (true) {
+                $active => esc_html__('(agents can act)', domain: 'wppilot'),
+                $configured_enabled => esc_html__('(agents blocked by an error)', domain: 'wppilot'),
+                default => esc_html__('(agents off)', domain: 'wppilot'),
+            } . '</span>',
         'href' => admin_url('admin.php?page=wppilot-connect'),
         'meta' => [
             'class' => match (true) {
@@ -473,9 +479,9 @@ function wppilot_register_admin_bar_toggle(\WP_Admin_Bar $wp_admin_bar): void
         'id' => 'wppilot-mcp-status-label',
         'parent' => 'wppilot-mcp-status',
         'title' => match (true) {
-            $active => esc_html__('AI Abilities: On', domain: 'wppilot'),
-            $configured_enabled => esc_html__('AI Abilities: Error', domain: 'wppilot'),
-            default => esc_html__('AI Abilities: Off', domain: 'wppilot'),
+            $active => esc_html__('Agents can act on this site', domain: 'wppilot'),
+            $configured_enabled => esc_html__('Agents blocked: see Diagnostics', domain: 'wppilot'),
+            default => esc_html__('Agents are off', domain: 'wppilot'),
         },
     ]);
 
@@ -483,8 +489,8 @@ function wppilot_register_admin_bar_toggle(\WP_Admin_Bar $wp_admin_bar): void
         $wp_admin_bar->add_node([
             'id' => 'wppilot-mcp-unavailable',
             'parent' => 'wppilot-mcp-status',
-            'title' => esc_html__('AI Abilities unavailable', domain: 'wppilot'),
-            'href' => admin_url('admin.php?page=wppilot-connect'),
+            'title' => esc_html__('Agent access unavailable', domain: 'wppilot'),
+            'href' => admin_url('admin.php?page=wppilot-troubleshoot'),
         ]);
     }
 
@@ -493,8 +499,8 @@ function wppilot_register_admin_bar_toggle(\WP_Admin_Bar $wp_admin_bar): void
             'id' => 'wppilot-mcp-toggle',
             'parent' => 'wppilot-mcp-status',
             'title' => $configured_enabled
-                ? esc_html__('Turn Off AI Abilities', domain: 'wppilot')
-                : esc_html__('Turn On AI Abilities', domain: 'wppilot'),
+                ? esc_html__('Turn off agent access', domain: 'wppilot')
+                : esc_html__('Turn on agent access', domain: 'wppilot'),
             'href' => $toggle_url,
             'meta' => [
                 'class' => $configured_enabled ? 'wppilot-mcp-toggle-off' : 'wppilot-mcp-toggle-on',
@@ -505,8 +511,15 @@ function wppilot_register_admin_bar_toggle(\WP_Admin_Bar $wp_admin_bar): void
     $wp_admin_bar->add_node([
         'id' => 'wppilot-mcp-config',
         'parent' => 'wppilot-mcp-status',
-        'title' => esc_html__('Configuration', domain: 'wppilot'),
+        'title' => esc_html__('Dashboard', domain: 'wppilot'),
         'href' => admin_url('admin.php?page=wppilot-connect'),
+    ]);
+
+    $wp_admin_bar->add_node([
+        'id' => 'wppilot-mcp-changes',
+        'parent' => 'wppilot-mcp-status',
+        'title' => esc_html__('Recent changes', domain: 'wppilot'),
+        'href' => admin_url('admin.php?page=wppilot-changes'),
     ]);
 }
 
@@ -528,13 +541,22 @@ function wppilot_render_admin_bar_toggle_assets(): void
         : __('AI agents will be able to execute PHP code and access the filesystem. Continue?', domain: 'wppilot');
     ?>
     <style>
-    #wp-admin-bar-wppilot-mcp-status.wppilot-mcp-on > .ab-item {
-        background: #c00 !important;
-        color: #fff !important;
+    #wp-admin-bar-wppilot-mcp-status > .ab-item .wppilot-ab-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin: 0 7px 1px 0;
+        border-radius: 50%;
+        background: #8c8f94;
+        vertical-align: middle;
     }
-    #wp-admin-bar-wppilot-mcp-status.wppilot-mcp-error > .ab-item {
-        background: #996800 !important;
-        color: #fff !important;
+    #wp-admin-bar-wppilot-mcp-status.wppilot-mcp-on > .ab-item .wppilot-ab-dot {
+        background: #32d583;
+        box-shadow: 0 0 0 3px rgba(50, 213, 131, 0.2);
+    }
+    #wp-admin-bar-wppilot-mcp-status.wppilot-mcp-error > .ab-item .wppilot-ab-dot {
+        background: #fdb022;
+        box-shadow: 0 0 0 3px rgba(253, 176, 34, 0.22);
     }
     #wp-admin-bar-wppilot-mcp-status-label > .ab-item {
         cursor: default;
@@ -597,7 +619,7 @@ add_filter(
 // emitted by WPPilot or WPPilot Pro. Cheap and side-effect free, unlike iterating $wp_filter
 // with Reflection (which causes memory blow-ups when Query Monitor captures every remove_action).
 add_action('admin_head', static function () {
-    if (($_GET['page'] ?? null) !== 'wppilot-connect') {
+    if (!in_array($_GET['page'] ?? null, ['wppilot-connect', WPPILOT_SETUP_PAGE], strict: true)) {
         return;
     }
     ?>
@@ -618,7 +640,7 @@ add_action('admin_init', static function () {
     if ($page === 'wppilot-sandbox') {
         wppilot_handle_sandbox_actions();
     }
-    if ($page === 'wppilot-connect') {
+    if ($page === WPPILOT_SETUP_PAGE || $page === 'wppilot-connect') {
         wppilot_handle_revoke_password();
         wppilot_handle_revoke_token();
         wppilot_handle_update_token();
@@ -687,7 +709,7 @@ add_action(
             menu_title: 'WPPilot',
             capability: wppilot_manage_capability(),
             menu_slug: 'wppilot-connect',
-            callback: 'wppilot_render_connect_page',
+            callback: 'wppilot_render_home_page',
             // Use a native admin icon at menu scale. The detailed WPPilot mark
             // remains reserved for plugin screens and larger brand surfaces.
             icon_url: 'dashicons-rest-api',
@@ -701,6 +723,18 @@ add_action(
             menu_title: wppilot_nav_label('wppilot-connect'),
             capability: wppilot_manage_capability(),
             menu_slug: 'wppilot-connect',
+            callback: 'wppilot_render_home_page',
+        );
+
+        // The setup wizard, endpoints and credentials. It was the home screen until
+        // the dashboard replaced it; someone checking on a connected site should not
+        // have to scroll past a three-step wizard to see what agents did today.
+        add_submenu_page(
+            parent_slug: 'wppilot-connect',
+            page_title: wppilot_nav_label('wppilot-setup'),
+            menu_title: wppilot_nav_label('wppilot-setup'),
+            capability: wppilot_manage_capability(),
+            menu_slug: WPPILOT_SETUP_PAGE,
             callback: 'wppilot_render_connect_page',
         );
     },

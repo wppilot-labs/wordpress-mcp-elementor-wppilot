@@ -28,8 +28,10 @@ $resolved = array_values(array_filter(
 ));
 
 ?>
+<?php \wppilot_render_admin_header(); ?>
 <div class="wrap wppilot-wrap">
-    <?php \wppilot_render_admin_header(esc_html__('Changes an agent has proposed but not made', domain: 'wppilot')); ?>
+    <h1><?php echo esc_html(\wppilot_nav_label(PAGE_SLUG, fallback: __('Preview', domain: 'wppilot'))); ?></h1>
+    <p class="wppilot-lede"><?php esc_html_e('Changes an agent has proposed but not made. Nothing here is written until you apply it.', domain: 'wppilot'); ?></p>
 
     <div class="wppilot-panel">
         <h2><?php esc_html_e('Waiting for review', domain: 'wppilot'); ?></h2>

@@ -1,7 +1,7 @@
 ---
 slug: plumbing
 industry: Plumbing & emergency repair
-sector: Home & trade
+sector: Trades & home services
 business: RapidFlow Plumbing
 title: RapidFlow Plumbing — 24/7 plumbing & emergency repair landing page
 description: A plumbing company whose page exists to get a phone call in the next 60 seconds, with flat prices and an emergency process spelled out.

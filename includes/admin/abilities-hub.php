@@ -696,17 +696,9 @@ function wppilot_render_settings_page()
         <div class="wrap-title">
             <div>
                 <h1><?php echo esc_html(wppilot_nav_label('wppilot-abilities')); ?></h1>
-                <p class="description"><?php printf(
-                    /* translators: %s: link to the Configuration page */
-                    esc_html__(
-                        'Manage every ability exposed to AI agents. This lists abilities registered by WPPilot and any other plugin that uses the WordPress Abilities API, grouped by provider. Disabled abilities are removed from registry discovery and MCP execution while AI Abilities are enabled on the %s page.',
-                        domain: 'wppilot',
-                    ),
-                    '<a href="'
-                    . esc_url(admin_url('admin.php?page=wppilot-connect'))
-                    . '">'
-                    . esc_html__('Configuration', domain: 'wppilot')
-                    . '</a>',
+                <p class="wppilot-lede"><?php esc_html_e(
+                    'Choose which abilities agents can call. Switched-off abilities disappear from discovery and cannot run. Covers WPPilot and any other plugin that uses the WordPress Abilities API.',
+                    domain: 'wppilot',
                 ); ?></p>
             </div>
         </div>

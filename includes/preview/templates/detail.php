@@ -31,8 +31,9 @@ $warnings = is_array($record['warnings'] ?? null) ? $record['warnings'] : [];
 $is_pending = $status === Store\STATUS_PENDING;
 
 ?>
+<?php \wppilot_render_admin_header(); ?>
 <div class="wrap wppilot-wrap">
-    <?php \wppilot_render_admin_header(esc_html__('Review a proposed change', domain: 'wppilot')); ?>
+    <h1><?php esc_html_e('Review a proposed change', domain: 'wppilot'); ?></h1>
 
     <p>
         <a href="<?php echo esc_url(add_query_arg(['page' => PAGE_SLUG], admin_url('admin.php'))); ?>">

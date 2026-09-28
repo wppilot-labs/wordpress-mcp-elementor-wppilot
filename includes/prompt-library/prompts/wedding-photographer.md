@@ -1,7 +1,7 @@
 ---
 slug: wedding-photographer
 industry: Wedding photographer
-sector: Creative
+sector: Creative & media
 business: Ada Moreno Photography
 title: Ada Moreno Photography — wedding photographer landing page
 description: A solo wedding photographer whose page must sell on the photographs alone, with collections priced in one table and an inquiry form.

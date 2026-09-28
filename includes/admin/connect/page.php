@@ -62,9 +62,9 @@ function wppilot_render_connect_page(): void
 
     <?php wppilot_render_admin_header(); ?>
     <div class="wrap">
-        <h1><?php echo esc_html(wppilot_nav_label('wppilot-connect')); ?></h1>
+        <h1><?php echo esc_html(wppilot_nav_label(WPPILOT_SETUP_PAGE)); ?></h1>
         <p class="wppilot-lede"><?php esc_html_e(
-            'What this site is exposing to AI agents right now, which clients have used it, and how to connect another.',
+            'Pick how the client signs in, paste one line into it, and check that it arrived. Credentials, endpoints and every client that has connected are below.',
             domain: 'wppilot',
         ); ?></p>
 
@@ -79,8 +79,6 @@ function wppilot_render_connect_page(): void
          * reach the only thing that could change that, and the panels are most
          * informative once a client has actually connected.
          */ ?>
-        <h2 class="wppilot-section-break"><?php esc_html_e('Connect a client', domain: 'wppilot'); ?></h2>
-
         <?php wppilot_render_mcp_dependency_inline_notice($mcp_dependency_error); ?>
 
         <?php wppilot_render_authorization_header_warning(); ?>
@@ -152,22 +150,13 @@ function wppilot_render_connect_page(): void
             </div>
         <?php endif; ?>
 
+        <?php /*
+         * The off switch and the safety profile used to close this page as a
+         * fourth step, numbered after the three that connect a client. They are
+         * settings for a connection that already exists, and they live on the
+         * Settings screen, which the header's status pill links to from here.
+         */ ?>
         <?php wppilot_render_dashboard_sections(); ?>
-
-        <?php // Renders only while Pro is inactive; see includes/admin/pro-upsell.php. ?>
-        <?php wppilot_render_pro_upsell_card(); ?>
-
-        <?php if ($mcp_ready): ?>
-            <?php /*
-             * Last on the page, deliberately. It is the off switch and the
-             * safety profile — settings for a connection that already exists,
-             * not a step in making one — so it sits after both the setup and the
-             * readout rather than between them.
-             */ ?>
-            <div class="wppilot-connect-section">
-                <?php wppilot_render_enable_toggle(); ?>
-            </div>
-        <?php endif; ?>
 
         <?php if (!$mcp_ready && wppilot_get_mcp_passwords() !== []): ?>
             <?php wppilot_render_manage_passwords_section(context: 'disabled'); ?>
@@ -609,7 +598,7 @@ function wppilot_render_config_section(string $rest_url, string $username, strin
     ?>
     <h2 class="wppilot-step-heading">
         <span class="wppilot-step-badge">2</span>
-        <?php esc_html_e('Connect Your AI Client', domain: 'wppilot'); ?>
+        <?php esc_html_e('Connect your AI client', domain: 'wppilot'); ?>
     </h2>
 
     <div class="wppilot-client-tabs" style="gap:8px; margin-top:16px; margin-bottom:0;">
@@ -1321,8 +1310,8 @@ function wppilot_render_verify_step(): void
             ); ?>
         </p>
         <p class="description" style="margin:0;">
-            <a href="<?php echo esc_url(admin_url('admin.php?page=wppilot-connect')); ?>"><?php esc_html_e(
-                'See requests and credentials on the Overview',
+            <a href="#wppilot-clients"><?php esc_html_e(
+                'See each client and its credentials below',
                 domain: 'wppilot',
             ); ?></a>
         </p>

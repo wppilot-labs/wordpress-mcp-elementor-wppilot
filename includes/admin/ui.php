@@ -62,22 +62,20 @@ function wppilot_get_datetime_format($fallback = 'Y-m-d H:i:s')
 }
 
 /**
- * Render the WPPilot masthead.
+ * Render the WPPilot header: the brand bar and the section navigation under it.
  *
  * Styling lives in includes/assets/admin.css, which every WPPilot screen loads.
  *
- * One logo serves every screen; the section is named by the engraved legend
- * beside it. Design and Chat used to ship their own wordmark SVGs that differed
- * only by the word after "WPPILOT", which meant three files to keep in step.
+ * The right-hand readout is whether agents can currently act on this site. It
+ * is the single most consequential fact about WPPilot's state, so it is on every
+ * screen, and it links to the switch that changes it.
  *
- * The right-hand readout is the instrument lamp: whether agents can currently
- * act on this site. It is the single most consequential fact about WPPilot's
- * state, and it belongs on every screen rather than only on Configuration.
- *
- * @param string $legend Section name shown beside the logo.
+ * @param string $legend Kept for callers that still pass a section name; the
+ *                       section row under the bar now names the screen.
  */
 function wppilot_render_admin_header(string $legend = ''): void
 {
+    unset($legend);
     $armed = wppilot_is_enabled() && wppilot_get_mcp_dependency_error() === null;
     $blocked = wppilot_is_enabled() && wppilot_get_mcp_dependency_error() !== null;
 
@@ -89,27 +87,45 @@ function wppilot_render_admin_header(string $legend = ''): void
         default => 'wppilot-masthead__status--idle',
     };
     $state_text = match (true) {
-        $armed => __('AI abilities live', domain: 'wppilot'),
-        $blocked => __('AI abilities unavailable', domain: 'wppilot'),
-        default => __('AI abilities off', domain: 'wppilot'),
+        $armed => __('Agents can act', domain: 'wppilot'),
+        $blocked => __('Agents blocked', domain: 'wppilot'),
+        default => __('Agents off', domain: 'wppilot'),
     };
+    $pro_active = function_exists('wppilot_pro_is_active') && wppilot_pro_is_active();
     ?>
     <div class="wppilot-masthead">
         <div class="wppilot-masthead__inner">
         <div class="wppilot-masthead__mark">
-            <img
-                src="<?php echo esc_url((string) WPPILOT_PLUGIN_URL . 'assets/wppilot_logo.svg'); ?>"
-                alt="WPPilot"
-                width="182"
-                height="32"
-            >
-            <span class="wppilot-masthead__legend"><?php echo
-                esc_html($legend !== '' ? $legend : __('MCP server', domain: 'wppilot'))
-            ; ?></span>
+            <a class="wppilot-masthead__brand" href="<?php echo esc_url(admin_url('admin.php?page=wppilot-connect')); ?>">
+                <img
+                    src="<?php echo esc_url((string) WPPILOT_PLUGIN_URL . 'assets/wppilot_logo-ink.svg'); ?>"
+                    alt="<?php esc_attr_e('WPPilot dashboard', domain: 'wppilot'); ?>"
+                    width="93"
+                    height="30"
+                >
+            </a>
+            <span class="wppilot-masthead__legend" title="<?php echo esc_attr(home_url()); ?>"><?php
+                echo esc_html(get_bloginfo('name') !== '' ? get_bloginfo('name') : (string) wp_parse_url(home_url(), PHP_URL_HOST));
+            ?></span>
+            <span class="wppilot-masthead__version"><?php echo esc_html('v' . (string) WPPILOT_VERSION); ?></span>
         </div>
-        <div class="wppilot-masthead__status <?php echo esc_attr($state_class); ?>">
-            <span class="wppilot-masthead__lamp" aria-hidden="true"></span>
-            <span><?php echo esc_html($state_text); ?></span>
+        <div class="wppilot-masthead__actions">
+            <a
+                class="wppilot-masthead__status <?php echo esc_attr($state_class); ?>"
+                href="<?php echo esc_url(admin_url('admin.php?page=wppilot-settings')); ?>"
+                title="<?php esc_attr_e('Turn agent access on or off in Settings', domain: 'wppilot'); ?>"
+            >
+                <span class="wppilot-masthead__lamp" aria-hidden="true"></span>
+                <span><?php echo esc_html($state_text); ?></span>
+            </a>
+            <a class="wppilot-masthead__link" href="https://wppilot.co/docs/" target="_blank" rel="noopener noreferrer"><?php
+                esc_html_e('Docs', domain: 'wppilot');
+            ?></a>
+            <?php if (!$pro_active && defined('WPPILOT_PRO_URL')): ?>
+                <a class="wppilot-masthead__link wppilot-masthead__link--upgrade" href="<?php
+                    echo esc_url((string) constant('WPPILOT_PRO_URL') . '?utm_source=plugin&utm_medium=header');
+                ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Get Pro', domain: 'wppilot'); ?></a>
+            <?php endif; ?>
         </div>
         </div>
     </div>
@@ -119,59 +135,180 @@ function wppilot_render_admin_header(string $legend = ''): void
 }
 
 /**
- * Product navigation for the WPPilot screens.
+ * Product navigation for the WPPilot screens: one row of sections, and under the
+ * page title a short row of the screens inside the current section.
  *
  * Built from the registered submenu rather than a hardcoded list, so it cannot
  * drift when a screen is added, removed, or capability-gated — Pro's Memory tab
  * appears here only because Pro registered it.
- *
- * The WordPress submenu stays as it is; this is in-product navigation for
- * people who are already inside WPPilot and think of it as one tool.
  */
 function wppilot_render_admin_tabs(): void
 {
-    $tabs = wppilot_admin_tabs();
+    $sections = wppilot_admin_sections();
+    if (count($sections) < 2) {
+        return;
+    }
+
+    $current = wppilot_admin_current_section();
+    ?>
+    <nav class="wppilot-tabs" aria-label="<?php esc_attr_e('WPPilot sections', domain: 'wppilot'); ?>">
+        <div class="wppilot-tabs__row">
+        <?php foreach ($sections as $key => $section) {
+            $is_current = $key === $current;
+            $badge = wppilot_admin_section_badge($key);
+            ?>
+            <a
+                class="wppilot-tabs__section<?php echo $is_current ? ' is-current' : ''; ?>"
+                href="<?php echo esc_url(admin_url('admin.php?page=' . $section['tabs'][0]['slug'])); ?>"
+                <?php echo $is_current ? 'aria-current="true"' : ''; ?>
+            ><?php echo esc_html($section['heading']); ?><?php if ($badge > 0): ?><span class="wppilot-tabs__badge" title="<?php
+                esc_attr_e('Waiting for a decision', domain: 'wppilot');
+            ?>"><?php echo esc_html((string) $badge); ?></span><?php endif; ?></a>
+        <?php
+        } ?>
+        </div>
+    </nav>
+    <?php
+
+    wppilot_render_admin_subtabs($sections[$current]['tabs'] ?? []);
+}
+
+/**
+ * The screens inside one section, as a segmented control under the page title.
+ *
+ * Every screen prints its own <h1>, and threading a call into sixteen templates
+ * would scatter the navigation across the codebase, so the control is printed
+ * here and a few lines of script lift it to just under the title. Without
+ * script it stays above the title, which still works.
+ *
+ * @param list<array{slug: string, label: string}> $tabs
+ */
+function wppilot_render_admin_subtabs(array $tabs): void
+{
     if (count($tabs) < 2) {
         return;
     }
 
-    // Thirteen siblings on one rail read as a list to be searched. Grouped, the
-    // rail says what each screen is for before you read any single label.
-    $groups = wppilot_nav_groups();
-    /** @var array<string, list<array{slug: string, label: string}>> $bucketed */
-    $bucketed = [];
-    foreach ($tabs as $tab) {
-        $bucketed[wppilot_nav_group($tab['slug'])][] = $tab;
-    }
-
     $current = is_string($_GET['page'] ?? null) ? sanitize_key((string) $_GET['page']) : '';
     ?>
-    <nav class="wppilot-tabs" aria-label="<?php esc_attr_e('WPPilot sections', domain: 'wppilot'); ?>">
-        <?php foreach ($groups as $key => $heading) {
-            $group_tabs = $bucketed[$key] ?? [];
-            if ($group_tabs === []) {
-                continue;
-            }
+    <div class="wrap wppilot-subtabs-wrap">
+    <nav class="wppilot-subtabs" aria-label="<?php esc_attr_e('Screens in this section', domain: 'wppilot'); ?>">
+        <?php foreach ($tabs as $tab) {
+            $is_current = $tab['slug'] === $current;
             ?>
-            <div class="wppilot-tabs__group">
-                <span class="wppilot-tabs__heading"><?php echo esc_html($heading); ?></span>
-                <span class="wppilot-tabs__items">
-                    <?php foreach ($group_tabs as $tab) {
-                        $is_current = $tab['slug'] === $current;
-                        ?>
-                        <a
-                            class="wppilot-tabs__tab<?php echo $is_current ? ' is-current' : ''; ?>"
-                            href="<?php echo esc_url(admin_url('admin.php?page=' . $tab['slug'])); ?>"
-                            <?php echo $is_current ? 'aria-current="page"' : ''; ?>
-                        ><?php echo esc_html($tab['label']); ?></a>
-                    <?php
-                    } ?>
-                </span>
-            </div>
+            <a
+                class="wppilot-subtabs__tab<?php echo $is_current ? ' is-current' : ''; ?>"
+                href="<?php echo esc_url(admin_url('admin.php?page=' . $tab['slug'])); ?>"
+                <?php echo $is_current ? 'aria-current="page"' : ''; ?>
+            ><?php echo esc_html($tab['label']); ?></a>
         <?php
         } ?>
     </nav>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var holder = document.querySelector('.wppilot-subtabs-wrap');
+        var nav = holder && holder.querySelector('.wppilot-subtabs');
+        var h1 = document.querySelector('#wpbody-content .wrap:not(.wppilot-subtabs-wrap) h1');
+        if (!nav || !h1) { return; }
+        var row = document.createElement('div');
+        row.className = 'wppilot-subtabs-row';
+        row.appendChild(nav);
+        // A title that shares a row with buttons is inline; the control needs its own line,
+        // after the title's row of actions rather than wedged between them.
+        var anchor = h1;
+        while (anchor.nextElementSibling && anchor.nextElementSibling.matches('.page-title-action, a.button, button, .wppilot-title-actions')) {
+            anchor = anchor.nextElementSibling;
+        }
+        var next = anchor.nextElementSibling;
+        if (next && next.matches('p.wppilot-lede, p.description, .wppilot-lede')) {
+            anchor = next;
+        }
+        anchor.insertAdjacentElement('afterend', row);
+        holder.parentNode.removeChild(holder);
+    });
+    </script>
     <?php
+}
+
+/**
+ * The current screen's section key.
+ */
+function wppilot_admin_current_section(): string
+{
+    $page = is_string($_GET['page'] ?? null) ? sanitize_key((string) $_GET['page']) : '';
+
+    return wppilot_nav_group($page);
+}
+
+/**
+ * Count shown beside a section when something there is waiting on a person.
+ *
+ * Only approvals qualify: a held agent write does nothing until someone decides,
+ * so it is the one thing worth pulling attention from every screen.
+ */
+function wppilot_admin_section_badge(string $section): int
+{
+    if ($section !== 'activity') {
+        return 0;
+    }
+
+    return wppilot_admin_pending_approvals();
+}
+
+/**
+ * Agent writes held for a decision, or 0 without Pro's approval queue.
+ */
+function wppilot_admin_pending_approvals(): int
+{
+    static $count = null;
+    if ($count !== null) {
+        return $count;
+    }
+
+    $count = 0;
+    $counter = 'WPPilot\\Pro\\Approval\\count_pending';
+    if (function_exists($counter)) {
+        try {
+            $count = (int) $counter();
+        } catch (\Throwable) {
+            $count = 0;
+        }
+    }
+
+    return $count;
+}
+
+/**
+ * The sections the current user can open, each with its screens in order.
+ *
+ * @return array<string, array{heading: string, tabs: non-empty-list<array{slug: string, label: string}>}>
+ */
+function wppilot_admin_sections(): array
+{
+    /** @var array<string, list<array{slug: string, label: string, rank: int}>> $bucketed */
+    $bucketed = [];
+    foreach (wppilot_admin_tabs() as $index => $tab) {
+        $bucketed[wppilot_nav_group($tab['slug'])][] = $tab + ['rank' => wppilot_nav_rank($tab['slug']) * 100 + $index];
+    }
+
+    $sections = [];
+    foreach (wppilot_nav_groups() as $key => $heading) {
+        $group_tabs = $bucketed[$key] ?? [];
+        if ($group_tabs === []) {
+            continue;
+        }
+        usort($group_tabs, static fn(array $a, array $b): int => $a['rank'] <=> $b['rank']);
+        $sections[$key] = [
+            'heading' => $heading,
+            'tabs' => array_map(
+                static fn(array $t): array => ['slug' => $t['slug'], 'label' => $t['label']],
+                $group_tabs,
+            ),
+        ];
+    }
+
+    return $sections;
 }
 
 /**

@@ -49,7 +49,7 @@ function register_nav(mixed $map): mixed
         return $map;
     }
 
-    $map[PromptLibrary\PAGE] = ['label' => __('Prompts', domain: 'wppilot'), 'group' => 'agent'];
+    $map[PromptLibrary\PAGE] = ['label' => __('Prompts', domain: 'wppilot'), 'group' => 'studio'];
 
     return $map;
 }
@@ -86,14 +86,10 @@ function render(): void
     ?>
     <div class="wrap">
         <h1><?php echo esc_html(\wppilot_nav_label(PromptLibrary\PAGE, __('Prompts', domain: 'wppilot'))); ?></h1>
-        <p class="wppilot-lede"><?php esc_html_e(
-            'A complete landing-page brief for each kind of business: palette, type, a design signature that makes the page its own, the sections it must carry, and the facts to use verbatim. Choose the builder, copy the brief, paste it at your agent.',
-            domain: 'wppilot',
-        ); ?></p>
         <?php // These are a shortcut, not the interface. Nobody should read this
               // screen and conclude their own wording will not work. ?>
-        <p class="description" style="margin:-6px 0 18px;max-width:70ch;"><?php esc_html_e(
-            'You do not have to use any of these. Your agent asks this site what it can do before it starts and loads the right skill on its own, so asking in your own words works just as well. A brief this specific is what stops every business getting the same centred hero with three cards under it.',
+        <p class="wppilot-lede"><?php esc_html_e(
+            'Landing-page briefs for each kind of business: palette, type, sections and a design signature. Pick your builder, copy a brief and paste it to your agent. Asking in your own words works just as well.',
             domain: 'wppilot',
         ); ?></p>
 
@@ -131,39 +127,61 @@ function render(): void
                         echo esc_html($label); ?></option>
                 <?php } ?>
             </select>
-            <span class="description"><?php esc_html_e(
-                'Written into the first line of every brief, so the agent builds with that editor\'s own elements.',
-                domain: 'wppilot',
-            ); ?></span>
         </div>
 
-        <nav class="wppilot-client-tabs wppilot-prompt-sectors" aria-label="<?php esc_attr_e('Sectors', domain: 'wppilot'); ?>">
+        <?php
+        /*
+         * One industry at a time. Every sector printed in a column came to 94,000
+         * pixels and 35,000 words once Pro's briefs were in; the chips were anchors
+         * into that scroll. They are now a filter, the first industry is open, and
+         * the search box still looks across all of them.
+         */
+        $first_sector = (string) array_key_first($sectors);
+        ?>
+        <nav class="wppilot-client-tabs wppilot-prompt-sectors" aria-label="<?php esc_attr_e('Industries', domain: 'wppilot'); ?>">
             <?php foreach ($sectors as $sector => $sector_briefs) { ?>
-                <a class="wppilot-client-tab" href="#<?php echo esc_attr('wppilot-sector-' . sanitize_title($sector)); ?>">
-                    <?php echo esc_html($sector); ?>
+                <button
+                    type="button"
+                    class="wppilot-client-tab<?php echo $sector === $first_sector ? ' active' : ''; ?>"
+                    data-sector="<?php echo esc_attr(sanitize_title((string) $sector)); ?>"
+                    aria-pressed="<?php echo $sector === $first_sector ? 'true' : 'false'; ?>"
+                >
+                    <?php echo esc_html((string) $sector); ?>
                     <span class="wppilot-prompt-count"><?php echo esc_html((string) count($sector_briefs)); ?></span>
-                </a>
+                </button>
             <?php } ?>
         </nav>
-        <p class="description" style="margin:6px 0 18px;"><?php
-        printf(
-            /* translators: %d: number of briefs included with the free plugin */
-            esc_html(_n(
-                single: '%d brief for a simple single-page site, each for a different industry.',
-                plural: '%d briefs for simple single-page sites, each for a different industry.',
-                number: $free_count,
-                domain: 'wppilot',
-            )),
-            $free_count,
-        );
+        <p class="description wppilot-prompt-summary"><?php
+        $total = count($briefs);
+        if ($licensed || $free_count === $total) {
+            printf(
+                /* translators: 1: number of briefs, 2: number of industries */
+                esc_html__('%1$d briefs across %2$d industries.', domain: 'wppilot'),
+                (int) $total,
+                count($sectors),
+            );
+        } else {
+            printf(
+                /* translators: 1: briefs included free, 2: further briefs that come with Pro */
+                esc_html__('%1$d briefs are free; %2$d more come with WPPilot Pro and are marked with a lock.', domain: 'wppilot'),
+                (int) $free_count,
+                (int) ($total - $free_count),
+            );
+        }
         ?></p>
 
         <?php foreach ($sectors as $sector => $sector_briefs) { ?>
-            <section class="wppilot-panel wppilot-prompt-sector" id="<?php echo esc_attr('wppilot-sector-' . sanitize_title($sector)); ?>">
-                <h2 class="wppilot-setting-group__title"><?php echo esc_html($sector); ?></h2>
+            <section
+                class="wppilot-prompt-sector"
+                data-sector="<?php echo esc_attr(sanitize_title((string) $sector)); ?>"
+                <?php echo $sector === $first_sector ? '' : 'hidden'; ?>
+            >
+                <h2 class="wppilot-prompt-sector__title"><?php echo esc_html((string) $sector); ?></h2>
+                <div class="wppilot-prompt-grid">
                 <?php foreach ($sector_briefs as $brief) {
                     render_brief($brief, $default_builder, $licensed);
                 } ?>
+                </div>
             </section>
         <?php } ?>
     </div>
@@ -268,6 +286,11 @@ function render(): void
             return (head ? head.innerText : card.innerText).toLowerCase();
         });
 
+        var chips = Array.prototype.slice.call(document.querySelectorAll('.wppilot-prompt-sectors [data-sector]'));
+        var activeSector = chips.length ? chips[0].getAttribute('data-sector') : '';
+
+        // A search looks across every industry; with the box empty, only the
+        // chosen industry is shown.
         function applyFilter() {
             var term = (filterInput.value || '').trim().toLowerCase();
             var shown = 0;
@@ -278,17 +301,31 @@ function render(): void
                 if (match) { shown++; }
             });
 
-            // A sector heading with nothing under it reads as an empty category
-            // rather than as a filtered one.
             document.querySelectorAll('.wppilot-prompt-sector').forEach(function (section) {
                 var visible = section.querySelectorAll('.wppilot-prompt:not([hidden])').length;
-                section.hidden = visible === 0;
+                section.hidden = term === ''
+                    ? section.getAttribute('data-sector') !== activeSector
+                    : visible === 0;
+            });
+
+            chips.forEach(function (chip) {
+                var on = term === '' && chip.getAttribute('data-sector') === activeSector;
+                chip.classList.toggle('active', on);
+                chip.setAttribute('aria-pressed', on ? 'true' : 'false');
             });
 
             filterCount.textContent = term === ''
                 ? ''
                 : shown + ' of ' + cards.length;
         }
+
+        chips.forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                activeSector = chip.getAttribute('data-sector');
+                if (filterInput) { filterInput.value = ''; }
+                applyFilter();
+            });
+        });
 
         if (filterInput) {
             filterInput.addEventListener('input', applyFilter);
@@ -349,11 +386,7 @@ function render_brief(array $brief, string $builder, bool $licensed): void
                 </p>
                 <h3 class="wppilot-prompt__title"><?php echo esc_html($title); ?></h3>
                 <?php if ($description !== '') { ?>
-                    <p class="description" style="margin:2px 0 0;"><?php echo esc_html($description); ?></p>
-                <?php } ?>
-                <?php if ($signature !== '') { ?>
-                    <p class="wppilot-prompt__signature"><strong><?php esc_html_e('Signature:', domain: 'wppilot'); ?></strong> <?php
-                        echo esc_html($signature); ?></p>
+                    <p class="description wppilot-prompt__description"><?php echo esc_html($description); ?></p>
                 <?php } ?>
             </div>
             <?php if (!$is_locked) { ?>
@@ -385,6 +418,10 @@ function render_brief(array $brief, string $builder, bool $licensed): void
             ?>
             <details class="wppilot-prompt__details">
                 <summary class="wppilot-prompt__summary"><?php esc_html_e('Read the brief', domain: 'wppilot'); ?></summary>
+                <?php if ($signature !== '') { ?>
+                    <p class="wppilot-prompt__signature"><strong><?php esc_html_e('Signature:', domain: 'wppilot'); ?></strong> <?php
+                        echo esc_html($signature); ?></p>
+                <?php } ?>
                 <pre class="wppilot-prompt__body" id="<?php echo esc_attr($id); ?>"><span class="wppilot-prompt__builder"><?php
                     echo esc_html($builder_line); ?></span><?php echo esc_html($rest); ?></pre>
             </details>

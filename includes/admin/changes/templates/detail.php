@@ -30,8 +30,9 @@ $pretty = static fn(mixed $value): string => (string) wp_json_encode(
 );
 
 ?>
+<?php \wppilot_render_admin_header(); ?>
 <div class="wrap wppilot-wrap wppilot-changes">
-    <?php \wppilot_render_admin_header(esc_html__('What agents changed, and the way back', domain: 'wppilot')); ?>
+    <h1><?php esc_html_e('Change details', domain: 'wppilot'); ?></h1>
 
     <p><a href="<?php echo esc_url(list_url()); ?>">&larr; <?php esc_html_e('All changes', domain: 'wppilot'); ?></a></p>
 
