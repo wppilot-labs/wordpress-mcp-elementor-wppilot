@@ -128,7 +128,8 @@ function resolve_token_identity(mixed $user, string $auth): mixed
 
     $identity = \wppilot_token_authenticate(bearer_secret($auth));
     if ($identity === null) {
-        record_authentication_error('Invalid, expired, or revoked WPPilot access token.');
+        $reason = function_exists('wppilot_token_refusal') ? \wppilot_token_refusal() : '';
+        record_authentication_error($reason !== '' ? $reason : 'Invalid, expired, or revoked WPPilot access token.');
         return $user;
     }
 
@@ -242,6 +243,25 @@ function validate_bearer_credential(string $auth, ?ResourceServer $server = null
 function reject_invalid_bearer(mixed $result): mixed
 {
     $error = request_authentication_error();
+    // A plugin that reads the current user during plugins_loaded (Beaver Builder does, through
+    // get_user_locale) settles "nobody" before this middleware is registered, and WordPress caches
+    // that answer. A valid credential was later rescued by any plugin that re-resolved the user,
+    // but a bad one was never looked at: the client got core's generic 401 with no
+    // WWW-Authenticate invalid_token, and an expired token never said it had expired. So a Bearer
+    // credential nothing has judged yet is judged here, at REST authentication.
+    if (
+        $error === null
+        && request_oauth_identity() === null
+        && get_current_user_id() === 0
+        && has_bearer_scheme(get_authorization_header())
+    ) {
+        /** @var mixed $resolved */
+        $resolved = resolve_bearer_identity(0);
+        if (is_int($resolved) && $resolved > 0 && get_current_user_id() === 0) {
+            wp_set_current_user($resolved);
+        }
+        $error = request_authentication_error();
+    }
     if ($error === null) {
         return $result;
     }

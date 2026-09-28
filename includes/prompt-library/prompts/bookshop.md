@@ -1,7 +1,7 @@
 ---
 slug: bookshop
 industry: Independent bookshop
-sector: Retail
+sector: Retail & ecommerce
 business: Lantern & Quill Books
 title: Lantern & Quill Books — independent bookshop landing page
 description: An independent bookshop that sells on staff picks, events and special orders, with no photograph in the hero at all.

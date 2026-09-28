@@ -1,0 +1,45 @@
+{
+    "slug": "search-replace",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\SearchReplace",
+    "tier": "free",
+    "runtime": "^1.0",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9"
+    },
+    "categories": {
+        "wordpress": {
+            "label": "WordPress",
+            "description": "Typed WordPress operations on content, taxonomies, media and settings."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/search-replace-preview",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/search-replace-apply",
+            "readonly": false,
+            "destructive": true,
+            "ledger": "items"
+        },
+        {
+            "name": "wppilot/search-replace-status",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/search-replace-cancel",
+            "readonly": false,
+            "destructive": false,
+            "ledger": "irreversible:changes only the background job record, which cannot be resumed once cancelled"
+        }
+    ],
+    "skills": ["search-replace"],
+    "tests": ["tests/Unit/Kits/SearchReplace"]
+}

@@ -172,6 +172,20 @@ function handle_modern(WP_REST_Request $request, array $body): array
 
     $params = is_array($body['params'] ?? null) ? $body['params'] : [];
 
+    // Tasks and MCP Apps; see extensions.php.
+    $extension = function_exists('WPPilot\Mcp\dispatch_extensions') ? dispatch_extensions($method, $params, $id) : null;
+    if ($extension !== null) {
+        return $extension;
+    }
+
+    // Resources and the Skills extension (SEP-2640) are served by their own module.
+    $skills = function_exists('WPPilot\Mcp\SkillResources\dispatch')
+        ? SkillResources\dispatch($method, $params, $id)
+        : null;
+    if ($skills !== null) {
+        return $skills;
+    }
+
     return match ($method) {
         'server/discover' => success(build_discover_result(
             runtime_capabilities(),
@@ -250,13 +264,14 @@ function list_tools(): array
             continue;
         }
 
-        $tools[] = [
+        $tool = [
             'name' => tool_name($ability->get_name()),
             'title' => (string) $ability->get_label(),
             'description' => (string) $ability->get_description(),
             'inputSchema' => normalize_schema(advertise_confirmation($ability, $ability->get_input_schema())),
             'outputSchema' => normalize_schema($ability->get_output_schema()),
         ];
+        $tools[] = function_exists('WPPilot\Mcp\decorate_tool') ? decorate_tool($tool, $meta) : $tool;
     }
 
     return sort_tools_deterministically($tools);
@@ -546,10 +561,11 @@ function force_schema_objects(array $schema): array
 /**
  * Execute a tool call under the modern revision.
  *
- * The guard order matches the legacy path exactly: safety profile, then rate
- * limit, then the ability's own permission callback, then execution. The
- * change ledger needs no wiring here because it hooks
- * `wp_before_execute_ability` / `wp_after_execute_ability` inside execute().
+ * Every control runs in wppilot_gate_ability_call(), the same pipeline the
+ * REST paths, Chat and Pro's approval replay use; then execute() runs the
+ * ability's own permission callback. The change ledger needs no wiring here
+ * because it hooks `wp_before_execute_ability` / `wp_after_execute_ability`
+ * inside execute().
  *
  * @param array<string, mixed> $params
  * @return array{status: int, body: array<string, mixed>}
@@ -566,72 +582,15 @@ function call_tool(array $params, mixed $id): array
 
     $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
 
-    if (function_exists('wppilot_safety_check_ability')) {
-        $allowed = \wppilot_safety_check_ability($ability);
-        if ($allowed instanceof WP_Error) {
-            return tool_error($allowed, $id);
-        }
-        if ($allowed === false) {
-            return tool_error(
-                new WP_Error('wppilot_safety_blocked', 'The active safety profile does not allow this operation.'),
-                $id,
-            );
-        }
-    }
-
-    // The confirmation contract lives in the safety layer, not in each ability.
-    // On the legacy path it is applied by wppilot_safety_pre_mcp_tool_call(),
-    // which is keyed to the adapter's meta-tool and therefore never fires here.
-    // Reproducing it is not optional: without it a destructive ability that
-    // relies on the profile-level gate rather than its own `confirm` field
-    // would execute unconfirmed under the modern revision only.
-    if (function_exists('wppilot_ability_requires_confirmation') && \wppilot_ability_requires_confirmation($ability)) {
-        if (($arguments['confirm'] ?? null) !== true) {
-            return tool_error(\wppilot_confirmation_required_error($ability), $id);
-        }
-    }
-
-    // `confirm` is a control field, not ability input. Abilities that declare
-    // their own `confirm` property keep it; for the rest it is removed before
-    // execute(), whose schema validation rejects unknown properties.
-    if (
-        array_key_exists('confirm', $arguments)
-        && function_exists('wppilot_ability_schema_has_property')
-        && !\wppilot_ability_schema_has_property($ability, 'confirm')
-    ) {
-        unset($arguments['confirm']);
-    }
-
-    // The require-preview rule, for the same reason the confirmation block above
-    // is reproduced here: this transport exposes no refusable filter, so every
-    // cross-cutting control has to be added to it by hand. That is now true of
-    // the safety profile, the confirmation gate, the rate limiter and this — a
-    // pattern worth remembering before adding a fifth.
-    if (function_exists('WPPilot\\Preview\\Gate\\check')) {
-        $preview_required = \WPPilot\Preview\Gate\check($ability, $arguments);
-        if ($preview_required instanceof WP_Error) {
-            return tool_error($preview_required, $id);
-        }
-    }
-
-    if (function_exists('wppilot_rate_pre_ability_execute')) {
-        $limited = \wppilot_rate_pre_ability_execute($arguments, $ability, 'mcp');
-        if ($limited instanceof WP_Error) {
-            return tool_error($limited, $id);
-        }
-        if (is_array($limited)) {
-            $arguments = $limited;
-        }
-    }
-
-    // Extension point for controls supplied by companion plugins. It runs only
-    // after Free's safety, confirmation, preview and rate gates, and exactly
-    // once on the modern transport (which does not traverse the legacy adapter
-    // or direct Ability REST filters).
+    // Safety profile, confirmation, confirm strip, then every wppilot_pre_ability_execute control:
+    // rate limit, design and preview gates, and whatever a companion plugin adds. This transport
+    // used to reproduce each of those by hand; see wppilot_gate_ability_call().
     /** @var mixed $gated */
-    $gated = apply_filters('wppilot_modern_mcp_pre_ability_execute', $arguments, $ability, 'mcp');
+    $gated = \wppilot_gate_ability_call($ability, $arguments, transport: 'mcp', context: confirmation_context($params));
     if ($gated instanceof WP_Error) {
-        return tool_error($gated, $id);
+        // A destructive call awaiting the user's approval goes back as input_required; see confirmation.php.
+        $input_required = input_required_payload($gated);
+        return $input_required !== null ? input_required_response($input_required, $id) : tool_error($gated, $id);
     }
     if (is_array($gated)) {
         $arguments = $gated;
@@ -649,11 +608,121 @@ function call_tool(array $params, mixed $id): array
         return tool_error($result, $id);
     }
 
-    return success([
-        'content' => [['type' => 'text', 'text' => encode_result($result)]],
+    return success(tool_result($result), $id, 'tools/call');
+}
+
+/**
+ * The result key under which an ability hands the client content that is not text.
+ *
+ * An ability result is JSON, and an image inside JSON is a base64 string the model reads as
+ * text: a 1024px preview costs a hundred thousand tokens and shows the model nothing. MCP has
+ * an `image` content block for exactly this, but an ability cannot build MCP content itself:
+ * the same result also goes out over REST and Chat, which have no content blocks. So an ability
+ * that wants the model to see an image returns
+ *
+ *     '_mcp_content' => [['type' => 'image', 'data' => <base64>, 'mimeType' => 'image/jpeg']]
+ *
+ * beside its ordinary fields. The MCP transports lift those items out into content blocks and
+ * leave the rest as the structured result; REST and Chat return the whole array as JSON, key and
+ * all. Only images are recognised, in the four formats every vision model accepts; an item that
+ * is not one is dropped rather than passed through as text.
+ */
+const RESULT_CONTENT_KEY = '_mcp_content';
+
+/** @var list<string> */
+const RESULT_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
+/**
+ * A successful tools/call result: the JSON text block, the structured result, and any image
+ * blocks the ability returned under RESULT_CONTENT_KEY.
+ *
+ * @return array{content: list<array<string, string>>, structuredContent: mixed, isError: false}
+ */
+function tool_result(mixed $result): array
+{
+    $images = [];
+    if (is_array($result) && array_key_exists(RESULT_CONTENT_KEY, $result)) {
+        $images = image_content($result[RESULT_CONTENT_KEY]);
+        // Out of the text block and the structured result alike: the image is already in the
+        // content, and a second base64 copy would be read as text at full token cost.
+        unset($result[RESULT_CONTENT_KEY]);
+    }
+
+    return [
+        'content' => array_merge([['type' => 'text', 'text' => encode_result($result)]], $images),
         'structuredContent' => $result,
         'isError' => false,
-    ], $id, 'tools/call');
+    ];
+}
+
+/**
+ * The valid image items of a RESULT_CONTENT_KEY value, as MCP image content blocks.
+ *
+ * @return list<array{type: string, data: string, mimeType: string}>
+ */
+function image_content(mixed $items): array
+{
+    $blocks = [];
+    foreach (is_array($items) ? $items : [] as $item) {
+        if (
+            !is_array($item)
+            || ($item['type'] ?? null) !== 'image'
+            || !is_string($item['data'] ?? null)
+            || $item['data'] === ''
+            || !in_array($item['mimeType'] ?? null, RESULT_IMAGE_MIME_TYPES, strict: true)
+            // A client that cannot decode the block fails the whole result, not just the image.
+            || base64_decode($item['data'], strict: true) === false
+        ) {
+            continue;
+        }
+        $blocks[] = ['type' => 'image', 'data' => $item['data'], 'mimeType' => (string) $item['mimeType']];
+    }
+
+    return $blocks;
+}
+
+/**
+ * Hand the legacy adapter an image result it knows how to send.
+ *
+ * The bundled adapter builds an `image` block only from a result shaped
+ * `['type' => 'image', 'results' => <raw bytes>, 'mimeType' => …]`, and then sends that block
+ * alone. A legacy client reaches abilities through execute-ability, whose result wraps the
+ * ability's as `['success' => true, 'data' => …]`, so without this the preview would arrive as a
+ * base64 string inside JSON. The ability's other fields do not survive the adapter's image path;
+ * abilities that use RESULT_CONTENT_KEY keep everything an agent needs elsewhere (the attachment
+ * id it asked with, the alt text another ability lists), so the image is the part worth keeping.
+ *
+ * Filters mcp_adapter_tool_call_result. A copy of the adapter without that filter, or without
+ * the image branch, returns the JSON unchanged, which is still correct, only expensive.
+ *
+ * @return mixed The result, or the adapter's image shape when it carried a valid image.
+ */
+function legacy_image_result(mixed $result): mixed
+{
+    if (!is_array($result)) {
+        return $result;
+    }
+    $wrapped = ($result['success'] ?? null) === true && is_array($result['data'] ?? null);
+    $payload = $wrapped ? $result['data'] : $result;
+    if (!array_key_exists(RESULT_CONTENT_KEY, $payload)) {
+        return $result;
+    }
+    $image = image_content($payload[RESULT_CONTENT_KEY])[0] ?? null;
+    if ($image === null) {
+        // Nothing a client could show; drop the key so it is not sent as text either.
+        unset($payload[RESULT_CONTENT_KEY]);
+        if (!$wrapped) {
+            return $payload;
+        }
+        $result['data'] = $payload;
+        return $result;
+    }
+
+    return [
+        'type' => 'image',
+        'results' => (string) base64_decode($image['data'], strict: true),
+        'mimeType' => $image['mimeType'],
+    ];
 }
 
 /**
@@ -781,4 +850,7 @@ function register_modern_transport(): void
     add_filter('rest_pre_dispatch', __NAMESPACE__ . '\\pre_dispatch', DISPATCH_PRIORITY, 3);
     // Priority 30 so the connection recorder at 20 still sees the response it expects.
     add_filter('rest_post_dispatch', __NAMESPACE__ . '\\repair_legacy_tool_schemas', 30, 3);
+    // After WPPilot's other result filters (wppilot.php, at 10), which read the `success` /
+    // `data` shape this replaces.
+    add_filter('mcp_adapter_tool_call_result', __NAMESPACE__ . '\\legacy_image_result', 30, 1);
 }

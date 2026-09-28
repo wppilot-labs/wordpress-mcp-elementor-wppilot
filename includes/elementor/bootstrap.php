@@ -179,5 +179,37 @@ function boot(): void
     load();
 }
 
+/**
+ * Before-image for the free Elementor writes, so an agent's Elementor edit can be undone without Pro.
+ *
+ * Every one of these writes the page's element tree into post meta, and the ledger had no capture
+ * for them: on a site without Pro, an edit was recorded as "No supported before-image" and could
+ * not be undone. A whole-post snapshot restores _elementor_data, its page settings and the CSS
+ * meta Elementor derives from them. It runs late and only fills a gap, so Pro's own Elementor
+ * capture, which knows more about the document, still wins when Pro is active.
+ *
+ * @param mixed $before
+ * @param mixed $input
+ * @return mixed
+ */
+function capture_before_image(mixed $before, string $ability_name, mixed $input): mixed
+{
+    if ($before !== null || !in_array($ability_name, [
+        'wppilot/elementor-add-element',
+        'wppilot/elementor-delete-element',
+        'wppilot/elementor-duplicate-element',
+        'wppilot/elementor-edit-element',
+        'wppilot/elementor-move-element',
+        'wppilot/elementor-reorder-children',
+        'wppilot/elementor-set-content',
+        'wppilot/elementor-set-page-settings',
+    ], strict: true)) {
+        return $before;
+    }
+    $post_id = is_array($input) ? (int) ($input['post_id'] ?? 0) : 0;
+    return $post_id > 0 && function_exists('wppilot_snapshot_post') ? \wppilot_snapshot_post($post_id) : $before;
+}
+
+add_filter('wppilot_capture_before_image', __NAMESPACE__ . '\\capture_before_image', 99, 3);
 add_action('wp_abilities_api_categories_init', __NAMESPACE__ . '\\register_category', priority: 20);
 add_action('wp_abilities_api_init', __NAMESPACE__ . '\\boot', priority: 5);

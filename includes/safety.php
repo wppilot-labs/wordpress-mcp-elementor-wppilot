@@ -84,6 +84,27 @@ function wppilot_get_safety_profile(): string
     return wppilot_is_safety_profile($profile) ? $profile : 'production';
 }
 
+/**
+ * The profile that governs this request: the site's, lowered by the access token's ceiling.
+ *
+ * Only ever stricter than the site profile. A token capped at Read Only on a
+ * Production Safe site reads, and a token capped at Production Safe on a Read Only
+ * site still only reads. Requests that no access token authenticated (wp-admin,
+ * Chat, application passwords, OAuth, WP-CLI) get the site profile unchanged.
+ *
+ * Display code keeps calling wppilot_get_safety_profile(): the setting the site
+ * owner chose is what the screens show; this is what enforcement asks.
+ */
+function wppilot_effective_safety_profile(): string
+{
+    $site = wppilot_get_safety_profile();
+    $ceiling = function_exists('wppilot_agent_profile_ceiling') ? wppilot_agent_profile_ceiling() : '';
+
+    return $ceiling !== '' && wppilot_safety_profile_rank($ceiling) < wppilot_safety_profile_rank($site)
+        ? $ceiling
+        : $site;
+}
+
 function wppilot_update_safety_profile(string $profile): bool
 {
     $profile = sanitize_key($profile);
@@ -243,13 +264,81 @@ function wppilot_ability_name_is_destructive(string $name): bool
     return false;
 }
 
+/**
+ * The ability's own safety policy, `meta.safety`.
+ *
+ * Neutral on purpose: the key is not WPPilot-branded, so a portable kit exported into another
+ * plugin keeps the same policy without the exporter having to rewrite it.
+ *
+ * - `min_profile`: the least permissive profile the ability may run under. A read that is still
+ *   too sensitive for Production Safe (a raw SQL SELECT) declares `developer`. Its risk stays
+ *   `read`, so it is never confirmation-gated; it is simply absent below that profile.
+ * - `audit_reads`: record each call in the change log even though it changes nothing.
+ *
+ * @return array{min_profile: string, audit_reads: bool}
+ */
+function wppilot_ability_safety_policy(WP_Ability $ability): array
+{
+    $meta = $ability->get_meta();
+    $safety = is_array($meta['safety'] ?? null) ? $meta['safety'] : [];
+    $min_profile = $safety['min_profile'] ?? '';
+    $min_profile = is_string($min_profile) && wppilot_is_safety_profile($min_profile) ? $min_profile : '';
+
+    // A site owner's Abilities Hub override can only raise the floor. The ability's own
+    // min_profile is its author saying "too sensitive below this", and nothing on a settings
+    // screen should be able to quietly lower that.
+    $rules = function_exists('wppilot_get_ability_rules') ? wppilot_get_ability_rules() : [];
+    $override = (string) ($rules[$ability->get_name()]['min_profile'] ?? '');
+    if (
+        $override !== ''
+        && wppilot_is_safety_profile($override)
+        && ($min_profile === '' || wppilot_safety_profile_rank($override) > wppilot_safety_profile_rank($min_profile))
+    ) {
+        $min_profile = $override;
+    }
+
+    return [
+        'min_profile' => $min_profile,
+        'audit_reads' => ($safety['audit_reads'] ?? false) === true,
+    ];
+}
+
+/**
+ * Order the profiles from least to most permissive, so `min_profile` can be compared.
+ */
+function wppilot_safety_profile_rank(string $profile): int
+{
+    return match ($profile) {
+        'readonly' => 0,
+        'developer' => 2,
+        default => 1,
+    };
+}
+
 function wppilot_safety_profile_allows_ability(WP_Ability $ability): bool
 {
     if (wppilot_ability_is_hub_protected($ability->get_name())) {
         return true;
     }
 
-    return match (wppilot_get_safety_profile()) {
+    // An access token's scope is part of the same answer, so discovery (tools/list, the
+    // adapter's discover meta-tool, the registry policy) never advertises what the token's
+    // next call would be refused.
+    if (function_exists('wppilot_agent_scope_error') && wppilot_agent_scope_error($ability) !== null) {
+        return false;
+    }
+
+    $profile = wppilot_effective_safety_profile();
+
+    // Checked before the risk class, because a read-only ability otherwise always passes: the
+    // `readonly` annotation short-circuits wppilot_ability_risk() to `read` before it ever looks
+    // at a critical category, which left no way to keep a sensitive read off Production Safe.
+    $min_profile = wppilot_ability_safety_policy($ability)['min_profile'];
+    if ($min_profile !== '' && wppilot_safety_profile_rank($profile) < wppilot_safety_profile_rank($min_profile)) {
+        return false;
+    }
+
+    return match ($profile) {
         'developer' => true,
         'readonly' => wppilot_ability_is_readonly($ability),
         default => wppilot_ability_risk($ability) !== 'critical',
@@ -306,6 +395,11 @@ function wppilot_safety_filter_ability_permission(
         );
     }
 
+    $scope_error = function_exists('wppilot_agent_scope_error') ? wppilot_agent_scope_error($ability) : null;
+    if ($scope_error !== null) {
+        return $scope_error;
+    }
+
     if (!wppilot_safety_profile_allows_ability($ability)) {
         return new WP_Error(
             'wppilot_safety_profile_blocked',
@@ -313,7 +407,7 @@ function wppilot_safety_filter_ability_permission(
                 /* translators: 1: ability name, 2: active safety profile */
                 __('The ability "%1$s" is not allowed by the active WPPilot safety profile (%2$s).', domain: 'wppilot'),
                 $ability_name,
-                wppilot_get_safety_profile(),
+                wppilot_effective_safety_profile(),
             ),
             ['status' => 403],
         );
@@ -325,7 +419,16 @@ function wppilot_safety_filter_ability_permission(
 function wppilot_ability_requires_confirmation(WP_Ability $ability): bool
 {
     $risk = wppilot_ability_risk($ability);
-    return $risk === 'critical' || $risk === 'destructive';
+    if ($risk === 'critical' || $risk === 'destructive') {
+        return true;
+    }
+
+    // The Abilities Hub lets a site owner demand confirmation for any ability, including a
+    // third-party one whose author annotated a risky write as ordinary. It can only add the
+    // requirement: a destructive ability stays confirmed whatever the rule says.
+    $rules = function_exists('wppilot_get_ability_rules') ? wppilot_get_ability_rules() : [];
+
+    return ($rules[$ability->get_name()]['require_confirmation'] ?? false) === true;
 }
 
 /**
@@ -356,9 +459,13 @@ function wppilot_safety_pre_mcp_tool_call(array $args, string $tool_name): array
     }
 
     $parameters = is_array($args['parameters'] ?? null) ? $args['parameters'] : [];
-    if (wppilot_ability_requires_confirmation($ability) && ($parameters['confirm'] ?? null) !== true) {
-        return wppilot_confirmation_required_error($ability);
+    // The legacy era has no per-request capabilities and no input_required, so in `human` mode a
+    // legacy client is always given the wp-admin approval link.
+    $confirmed = wppilot_confirm_ability_call($ability, $parameters, transport: 'mcp');
+    if ($confirmed instanceof WP_Error) {
+        return $confirmed;
     }
+    wppilot_confirmation_note($ability->get_name(), $confirmed);
 
     if (
         array_key_exists(key: 'confirm', array: $parameters)
@@ -373,12 +480,35 @@ function wppilot_safety_pre_mcp_tool_call(array $args, string $tool_name): array
 
 function wppilot_safety_check_ability(WP_Ability $ability): bool|WP_Error
 {
+    // Scope first, so a token that may not call this at all is told that, rather than that
+    // the profile blocks it, which would send its owner to the wrong setting.
+    $scope_error = function_exists('wppilot_agent_scope_error') ? wppilot_agent_scope_error($ability) : null;
+    if ($scope_error !== null) {
+        return $scope_error;
+    }
+
     if (wppilot_safety_profile_allows_ability($ability)) {
         return true;
     }
 
-    $profile = wppilot_get_safety_profile();
+    $profile = wppilot_effective_safety_profile();
     $profiles = wppilot_safety_profiles();
+    if ($profile !== wppilot_get_safety_profile()) {
+        return new WP_Error(
+            'wppilot_safety_profile_blocked',
+            sprintf(
+                /* translators: 1: ability name, 2: safety profile label */
+                __(
+                    'Ability "%1$s" is blocked: the access token behind this request is capped at the %2$s safety profile. The site owner sets that cap on the token; do not retry.',
+                    domain: 'wppilot',
+                ),
+                $ability->get_name(),
+                $profiles[$profile]['label'],
+            ),
+            ['status' => 403, 'ability' => $ability->get_name(), 'profile' => $profile, 'ceiling' => true],
+        );
+    }
+
     return new WP_Error(
         'wppilot_safety_profile_blocked',
         sprintf(
@@ -396,14 +526,25 @@ function wppilot_safety_check_ability(WP_Ability $ability): bool|WP_Error
 
 function wppilot_confirmation_required_error(WP_Ability $ability): WP_Error
 {
+    // When the reason is the site owner's rule rather than the ability's risk, say so: calling an
+    // alt-text update "destructive or critical" sends the agent and the person looking for a
+    // danger that is not there.
+    $risk = wppilot_ability_risk($ability);
+    $by_rule = $risk !== 'critical' && $risk !== 'destructive';
     return new WP_Error(
         'wppilot_confirmation_required',
         sprintf(
-            /* translators: %s: ability name */
-            __(
-                'Ability "%s" is destructive or critical. Obtain explicit user approval, then retry with confirm=true inside the ability parameters.',
-                domain: 'wppilot',
-            ),
+            $by_rule
+                /* translators: %s: ability name */
+                ? __(
+                    'The site owner requires confirmation for ability "%s". Obtain explicit user approval, then retry with confirm=true inside the ability parameters.',
+                    domain: 'wppilot',
+                )
+                /* translators: %s: ability name */
+                : __(
+                    'Ability "%s" is destructive or critical. Obtain explicit user approval, then retry with confirm=true inside the ability parameters.',
+                    domain: 'wppilot',
+                ),
             $ability->get_name(),
         ),
         ['status' => 409, 'ability' => $ability->get_name(), 'risk' => wppilot_ability_risk($ability)],
@@ -415,30 +556,4 @@ function wppilot_ability_schema_has_property(WP_Ability $ability, string $proper
     $schema = $ability->get_input_schema();
     $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
     return array_key_exists($property, $properties);
-}
-
-/**
- * Validate and prepare a direct REST ability invocation.
- */
-function wppilot_safety_prepare_rest_input(WP_Ability $ability, mixed $input): mixed
-{
-    $allowed = wppilot_safety_check_ability($ability);
-    if ($allowed instanceof WP_Error) {
-        return $allowed;
-    }
-
-    $values = is_array($input) ? $input : [];
-    if (wppilot_ability_requires_confirmation($ability) && ($values['confirm'] ?? null) !== true) {
-        return wppilot_confirmation_required_error($ability);
-    }
-
-    if (
-        is_array($input)
-        && array_key_exists(key: 'confirm', array: $input)
-        && !wppilot_ability_schema_has_property($ability, property: 'confirm')
-    ) {
-        unset($input['confirm']);
-    }
-
-    return $input;
 }

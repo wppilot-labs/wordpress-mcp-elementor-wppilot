@@ -62,20 +62,10 @@ function wppilot_gate_core_rest_run(mixed $result, WP_REST_Request $request, str
     // @mago-expect analysis:mixed-assignment -- Ability input is opaque until the ability validates it.
     $input = $request->get_param('input');
 
-    if (function_exists('wppilot_safety_prepare_rest_input')) {
-        // @mago-expect analysis:mixed-assignment -- The safety layer preserves the declared ability input type.
-        $input = wppilot_safety_prepare_rest_input($ability, $input);
-        if ($input instanceof WP_Error) {
-            return wppilot_core_rest_run_confirmation_hint($input, $ability);
-        }
-    }
-
-    /** This filter is documented in includes/rest/shim.php */
     // @mago-expect analysis:mixed-assignment -- Filters preserve the Ability's declared input type or return WP_Error.
-    // @mago-expect lint:literal-named-argument -- WordPress filter arguments after value are variadic.
-    $input = apply_filters('wppilot_pre_ability_execute', $input, $ability, 'rest');
+    $input = wppilot_gate_ability_call($ability, $input, transport: 'rest');
     if ($input instanceof WP_Error) {
-        return $input;
+        return wppilot_core_rest_run_confirmation_hint($input, $ability);
     }
 
     // @mago-expect analysis:mixed-assignment

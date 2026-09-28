@@ -33,6 +33,7 @@ define('WPPILOT_MCP_ADAPTER_CLASS', 'WP\\MCP\\Core\\McpAdapter');
 
 require_once __DIR__ . '/doubles/wordpress.php';
 
+
 // Which copy of the adapter won. Pure path and classmap reading; it registers
 // nothing and touches WordPress only through wp_normalize_path().
 require_once dirname(__DIR__) . '/includes/mcp/adapter-origin.php';
@@ -68,10 +69,16 @@ require_once dirname(__DIR__) . '/includes/abilities/registry.php';
 // MCP transport asks it which tools must be confirmed before it will run them,
 // and that answer decides what the tool list advertises.
 require_once dirname(__DIR__) . '/includes/safety.php';
+// The gate pipeline every execution path shares, and the one policy.php answer
+// it needs (which abilities the Hub cannot switch off). policy.php registers
+// nothing at file scope.
+require_once dirname(__DIR__) . '/includes/abilities/policy.php';
+require_once dirname(__DIR__) . '/includes/gate-pipeline.php';
+require_once dirname(__DIR__) . '/includes/confirmation.php';
 
 // The MCP protocol layer is deliberately free of WordPress dependencies beyond
 // the ABSPATH guard, so it loads and is exercised here directly.
-foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport'] as $module) {
+foreach (['protocol', 'errors', 'headers', 'results', 'discover', 'transport', 'confirmation'] as $module) {
     require_once dirname(__DIR__) . '/includes/mcp/' . $module . '.php';
 }
 
@@ -98,6 +105,14 @@ require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
 // its before-image capture: that code calls WordPress functions taking arguments
 // by reference, and only a real call proves the call sites still satisfy them.
 require_once dirname(__DIR__) . '/includes/change-log.php';
+require_once dirname(__DIR__) . '/includes/change-log-table.php';
+
+// Agent identities (a token's scope and profile ceiling) and the declarative
+// ledger map for third-party abilities. Both reach WordPress only from inside
+// their functions; the map registers its two rollback strategies and one filter
+// at load, which is what the tests assert against.
+require_once dirname(__DIR__) . '/includes/agent-identities.php';
+require_once dirname(__DIR__) . '/includes/ledger-map.php';
 
 // The design system's pure layers: the document parser, the token extractor,
 // the pre-flight rules, the distinctiveness comparison, the spec, and the

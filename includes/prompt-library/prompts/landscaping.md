@@ -1,7 +1,7 @@
 ---
 slug: landscaping
 industry: Landscaping & lawn care
-sector: Home & trade
+sector: Trades & home services
 business: Greenline Landscaping
 title: Greenline Landscaping — landscaping & lawn care landing page
 description: A residential landscaping company selling design-and-install projects and seasonal care plans, with before-and-after proof and an estimate form.

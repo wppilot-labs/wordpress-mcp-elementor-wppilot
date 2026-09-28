@@ -101,7 +101,7 @@ rather than appearing as a white screen.
 
 ## What is registered on a fresh install
 
-141 abilities, plus one MCP prompt per saved skill. They are grouped into a
+168 abilities, plus one MCP prompt per saved skill. They are grouped into a
 single **WordPress** category on the Abilities screen and can be switched off
 individually: content, taxonomies, media, comments, menus, revisions, user
 reads, allowlisted site settings, the plugin and theme lifecycle, Gutenberg

@@ -255,6 +255,8 @@ if (!class_exists('WP_Post')) {
 
         public string $post_excerpt = '';
 
+        public string $post_mime_type = '';
+
         public string $post_modified_gmt = '';
 
         public int $post_author = 0;
@@ -415,9 +417,94 @@ if (!function_exists('get_post_meta')) {
             return $meta;
         }
 
-        $values = $meta[$key] ?? [];
+        // Stored as the postmeta table holds it; read back unserialized, as WordPress does.
+        $values = array_map('maybe_unserialize', $meta[$key] ?? []);
 
         return $single ? ($values[0] ?? '') : $values;
+    }
+}
+
+if (!function_exists('is_serialized')) {
+    function is_serialized(mixed $data, bool $strict = true): bool
+    {
+        if (!is_string($data)) {
+            return false;
+        }
+        $data = trim($data);
+        if ($data === 'N;' || $data === 'b:0;') {
+            return true;
+        }
+        if (preg_match('/^[aOsibdC]:/', $data) !== 1) {
+            return false;
+        }
+        return @unserialize($data, ['allowed_classes' => false]) !== false;
+    }
+}
+
+if (!function_exists('maybe_serialize')) {
+    /**
+     * As core: arrays and objects are serialized, and so is a string that is already serialized,
+     * so it comes back from maybe_unserialize() as the same string.
+     */
+    function maybe_serialize(mixed $data): mixed
+    {
+        if (is_array($data) || is_object($data)) {
+            return serialize($data);
+        }
+        return is_serialized($data, false) ? serialize($data) : $data;
+    }
+}
+
+if (!function_exists('maybe_unserialize')) {
+    function maybe_unserialize(mixed $data): mixed
+    {
+        return is_serialized($data) ? @unserialize(trim((string) $data)) : $data;
+    }
+}
+
+if (!function_exists('get_posts')) {
+    /**
+     * The posts in WPPilot_Test_State::$posts that match the arguments WPPilot and its kits pass:
+     * post_type, post_status, post_mime_type (a prefix such as `image`), paging, ID order and
+     * `fields => ids`. No posts stored means no posts returned.
+     *
+     * @param array<string, mixed> $args
+     * @return list<WP_Post|int>
+     */
+    function get_posts(array $args = []): array
+    {
+        $types = (array) ($args['post_type'] ?? 'post');
+        $statuses = (array) ($args['post_status'] ?? 'publish');
+        $mime = (string) ($args['post_mime_type'] ?? '');
+        $matches = [];
+        foreach (WPPilot_Test_State::$posts as $post) {
+            if (!in_array('any', $types, true) && !in_array($post->post_type, $types, true)) {
+                continue;
+            }
+            if (!in_array('any', $statuses, true) && !in_array($post->post_status, $statuses, true)) {
+                continue;
+            }
+            if ($mime !== '' && !str_starts_with($post->post_mime_type, $mime)) {
+                continue;
+            }
+            $matches[] = $post;
+        }
+        usort($matches, static fn(WP_Post $a, WP_Post $b): int => $a->ID <=> $b->ID);
+        if (strtoupper((string) ($args['order'] ?? 'DESC')) === 'DESC') {
+            $matches = array_reverse($matches);
+        }
+        $per_page = (int) ($args['posts_per_page'] ?? 5);
+        if ($per_page > 0) {
+            $matches = array_slice($matches, (max(1, (int) ($args['paged'] ?? 1)) - 1) * $per_page, $per_page);
+        }
+        return ($args['fields'] ?? '') === 'ids' ? array_map(static fn(WP_Post $post): int => $post->ID, $matches) : $matches;
+    }
+}
+
+if (!function_exists('wp_cache_delete')) {
+    function wp_cache_delete(int|string $key, string $group = ''): bool
+    {
+        return true;
     }
 }
 
@@ -469,6 +556,52 @@ if (!function_exists('get_current_user_id')) {
     function get_current_user_id(): int
     {
         return WPPilot_Test_State::$current_user_id;
+    }
+}
+
+if (!function_exists('wp_unslash')) {
+    function wp_unslash(mixed $value): mixed
+    {
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
+if (!function_exists('sanitize_text_field')) {
+    /**
+     * Core's result for plain single-line text: tags stripped, whitespace collapsed.
+     */
+    function sanitize_text_field(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', strip_tags($text)));
+    }
+}
+
+if (!function_exists('esc_html')) {
+    function esc_html(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES);
+    }
+}
+
+if (!function_exists('_doing_it_wrong')) {
+    /**
+     * Recorded rather than raised, so a test can assert a misuse was reported.
+     */
+    function _doing_it_wrong(string $function_name, string $message, string $version): void
+    {
+        $GLOBALS['wppilot_test_doing_it_wrong'][] = [$function_name, $message, $version];
+    }
+}
+
+if (!function_exists('wp_get_current_user')) {
+    /**
+     * The two fields the change ledger reads off the acting user.
+     */
+    function wp_get_current_user(): object
+    {
+        $id = WPPilot_Test_State::$current_user_id;
+
+        return (object) ['ID' => $id, 'user_login' => $id > 0 ? 'user' . $id : ''];
     }
 }
 

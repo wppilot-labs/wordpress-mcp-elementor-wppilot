@@ -57,7 +57,15 @@ wp_register_ability('wppilot/preview-ability', [
     'permission_callback' => 'wppilot_permission_callback',
     'meta' => [
         'show_in_rest' => true,
-        'mcp' => ['public' => true],
+        'mcp' => [
+            'public' => true,
+            // Links the MCP Apps preview card (includes/mcp/apps.php, Apps\preview_tool_meta()), which a
+            // host that supports the extension renders beside the result, with an Apply button.
+            '_meta' => [
+                'ui' => ['resourceUri' => 'ui://wppilot/preview-card'],
+                'ui/resourceUri' => 'ui://wppilot/preview-card',
+            ],
+        ],
         'annotations' => [
             'instructions' => 'Call this before a write the user has not explicitly approved, especially a delete. '
                 . 'It writes nothing: it computes the before and after state and returns the difference. Show the '

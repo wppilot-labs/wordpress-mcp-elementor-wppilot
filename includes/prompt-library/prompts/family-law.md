@@ -1,7 +1,7 @@
 ---
 slug: family-law
 industry: Family law firm
-sector: Professional services
+sector: Legal & finance
 business: Whitlock & Reyes Family Law
 title: Whitlock & Reyes Family Law — boutique family law firm landing page
 description: A two-attorney family law practice that needs to feel steady and humane, with practice areas as a numbered index and flat fees where possible.

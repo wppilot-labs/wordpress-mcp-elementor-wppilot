@@ -8,11 +8,19 @@ declare(strict_types=1);
 // phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- Every state-changing request on this screen verifies a nonce via check_admin_referer() before acting; the sniff cannot trace that across function boundaries. Reads are type-checked, whitelist-compared, and escaped on output.
 
 /**
- * Per-ability enable/disable rules.
+ * Per-ability rules: enable/disable, and the governance overrides.
  *
  * The Abilities Hub writes rules here; the policy filter applies them at
  * execution time. Some abilities are hub-protected and cannot be turned
  * off, or the agent would lose the means to turn anything back on.
+ *
+ * Besides `disabled`, a rule may carry `require_confirmation` (the gate pipeline
+ * then demands a confirmed call even for an ability its author annotated as an
+ * ordinary write) and `min_profile` (the ability is refused below that safety
+ * profile). Both only ever tighten: see wppilot_ability_requires_confirmation()
+ * and wppilot_ability_safety_policy(). They apply to any registered ability,
+ * third-party ones included, which is the point: a builder's own abilities pass
+ * through the same pipeline as WPPilot's.
  */
 
 if (!defined('ABSPATH')) {
@@ -22,7 +30,7 @@ if (!defined('ABSPATH')) {
 /**
  * Return the persisted per-ability hub rules.
  *
- * @return array<string, array{disabled: bool}>
+ * @return array<string, array{disabled: bool, require_confirmation: bool, min_profile: string}>
  */
 function wppilot_get_ability_rules(): array
 {
@@ -38,18 +46,38 @@ function wppilot_get_ability_rules(): array
         if (!is_string($ability_name) || !is_array($rule) || !wppilot_is_valid_ability_name($ability_name)) {
             continue;
         }
-        $rules[$ability_name] = [
-            'disabled' => in_array($rule['disabled'] ?? false, [true, '1', 1], strict: true),
-        ];
+        $rules[$ability_name] = wppilot_normalize_ability_rule($rule);
     }
 
     return $rules;
 }
 
 /**
+ * One rule in its canonical shape. Unknown profiles are dropped, not guessed at.
+ *
+ * @param array<mixed> $rule
+ * @return array{disabled: bool, require_confirmation: bool, min_profile: string}
+ */
+function wppilot_normalize_ability_rule(array $rule): array
+{
+    $min_profile = is_string($rule['min_profile'] ?? null) ? $rule['min_profile'] : '';
+
+    return [
+        'disabled' => in_array($rule['disabled'] ?? false, [true, '1', 1], strict: true),
+        'require_confirmation' => in_array($rule['require_confirmation'] ?? false, [true, '1', 1], strict: true),
+        'min_profile' => function_exists('wppilot_is_safety_profile') && wppilot_is_safety_profile($min_profile)
+            ? $min_profile
+            : '',
+    ];
+}
+
+/**
  * Persist the per-ability hub rules.
  *
- * @param array<string, array{disabled?: bool}> $rules
+ * Only rules that change something are kept, so an ability returned to its
+ * defaults leaves no row behind.
+ *
+ * @param array<string, array{disabled?: bool, require_confirmation?: bool, min_profile?: string}> $rules
  */
 function wppilot_update_ability_rules(array $rules): void
 {
@@ -58,13 +86,44 @@ function wppilot_update_ability_rules(array $rules): void
         if (!wppilot_is_valid_ability_name($ability_name)) {
             continue;
         }
-        if (!($rule['disabled'] ?? false)) {
+        $rule = wppilot_normalize_ability_rule($rule);
+        if (!$rule['disabled'] && !$rule['require_confirmation'] && $rule['min_profile'] === '') {
             continue;
         }
-        $clean[$ability_name] = ['disabled' => true];
+        $clean[$ability_name] = array_filter($rule, static fn(mixed $value): bool => $value !== false && $value !== '');
     }
 
     update_option('wppilot_ability_rules', $clean, autoload: false);
+}
+
+/**
+ * Set an ability's governance overrides, leaving its enable/disable state alone.
+ *
+ * Hub-protected abilities are left untouched: they are the discovery meta-tools,
+ * and gating them would stop an agent finding anything at all.
+ *
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
+ * @return array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}>
+ */
+function wppilot_set_ability_governance_rule(
+    array $rules,
+    string $ability_name,
+    bool $require_confirmation,
+    string $min_profile,
+): array {
+    if (wppilot_ability_is_hub_protected($ability_name)) {
+        return $rules;
+    }
+
+    $rules[$ability_name] ??= ['disabled' => false];
+    $rules[$ability_name]['require_confirmation'] = $require_confirmation;
+    $rules[$ability_name]['min_profile'] = function_exists('wppilot_is_safety_profile')
+        && wppilot_is_safety_profile($min_profile)
+        && $min_profile !== 'readonly'
+            ? $min_profile
+            : '';
+
+    return $rules;
 }
 
 function wppilot_is_valid_ability_name(string $ability_name): bool
@@ -157,7 +216,7 @@ function wppilot_apply_ability_policy(): void
 }
 
 /**
- * @param array<string, array{disabled: bool}> $rules
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
  */
 function wppilot_apply_ability_policy_rule(WP_Ability $ability, array $rules): void
 {

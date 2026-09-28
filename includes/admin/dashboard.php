@@ -22,6 +22,9 @@ if (!defined('ABSPATH')) {
 
 const WPPILOT_DASHBOARD_PAGE = 'wppilot-dashboard';
 
+/** The setup wizard, credentials and endpoints; the home slug is the Dashboard. */
+const WPPILOT_SETUP_PAGE = 'wppilot-setup';
+
 const WPPILOT_FORGET_CLIENT_NONCE = 'wppilot_forget_client';
 
 /**
@@ -293,47 +296,23 @@ function wppilot_render_dashboard_sections(): void
         );
     }
 
-    wppilot_dashboard_connection();
+    // The home screen now carries the headline numbers, Pro and the recent work, so
+    // this keeps what someone setting up or auditing a connection comes here for:
+    // who has connected, with which credential, at which address.
     wppilot_dashboard_clients();
-    wppilot_dashboard_pro();
-    wppilot_dashboard_reach();
+    wppilot_dashboard_connection();
 }
 
 /**
- * Connection: whether anything is live, under which profile, and when a
- * client last used each transport.
+ * Credentials and endpoints: the access tokens, the addresses a client calls,
+ * and when each transport was last used.
  */
 function wppilot_dashboard_connection(): void
 {
-    $armed = wppilot_is_enabled() && wppilot_get_mcp_dependency_error() === null;
-    $exposure = wppilot_dashboard_exposure();
     $last_seen = wppilot_dashboard_last_seen();
-    $clients = wppilot_dashboard_oauth_clients();
-    $profiles = wppilot_safety_profiles();
-    $profile = wppilot_get_safety_profile();
     ?>
-        <section class="wppilot-panel <?php echo $armed ? 'is-armed' : ''; ?>">
-            <h2 class="wppilot-setting-group__title"><?php esc_html_e('Connection', domain: 'wppilot'); ?></h2>
-            <div class="wppilot-stats">
-                <?php
-
-                wppilot_dashboard_stat(
-                    __('Status', domain: 'wppilot'),
-                    $armed ? __('Live', domain: 'wppilot') : __('Off', domain: 'wppilot'),
-                    $armed ? 'armed' : 'idle',
-                );
-                wppilot_dashboard_stat(
-                    __('Safety profile', domain: 'wppilot'),
-                    (string) ($profiles[$profile]['label'] ?? $profile),
-                );
-                wppilot_dashboard_stat(__('Abilities exposed', domain: 'wppilot'), (string) $exposure['total']);
-                wppilot_dashboard_stat(
-                    __('AI clients connected', domain: 'wppilot'),
-                    (string) count(wppilot_dashboard_client_activity()),
-                );
-                wppilot_dashboard_stat(__('Registered OAuth clients', domain: 'wppilot'), (string) count($clients));
-                ?>
-            </div>
+        <section class="wppilot-panel">
+            <h2 class="wppilot-setting-group__title"><?php esc_html_e('Credentials and endpoints', domain: 'wppilot'); ?></h2>
 
             <?php wppilot_dashboard_access_tokens(); ?>
 
@@ -389,7 +368,7 @@ function wppilot_dashboard_connection(): void
 function wppilot_dashboard_access_tokens(): void
 {
     $tokens = function_exists('wppilot_tokens_for_user') ? wppilot_tokens_for_user(get_current_user_id()) : [];
-    $connect_url = admin_url('admin.php?page=wppilot-connect#wppilot-token-method');
+    $connect_url = admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '#wppilot-token-method');
     $dt_format = wppilot_get_datetime_format('Y-m-d H:i');
 
     // Expired rows are still listed on the Connect screen so they can be cleared
@@ -659,7 +638,7 @@ function wppilot_dashboard_clients(): void
 {
     $activity = wppilot_dashboard_client_activity();
     ?>
-        <section class="wppilot-panel <?php echo $activity !== [] ? 'is-ready' : ''; ?>">
+        <section class="wppilot-panel" id="wppilot-clients">
             <h2 class="wppilot-setting-group__title"><?php esc_html_e('AI clients', domain: 'wppilot'); ?></h2>
 
             <?php if ($activity === []) { ?>
@@ -978,133 +957,8 @@ function wppilot_dashboard_endpoint_rows(): array
     return $rows;
 }
 
-/**
- * What WPPilot Pro is contributing, when it is licensed and running.
- *
- * Rendered only when Pro answers. The section names the integrations that
- * matched software actually installed on this site, because "7 of 39" on its
- * own is a number, while "Elementor, WooCommerce, ACF" is a receipt — and the
- * ones that did not match are worth showing too, since they are what the licence
- * would cover if the customer installed them later.
- */
-function wppilot_dashboard_pro(): void
-{
-    $pro = wppilot_dashboard_pro_status();
-    if ($pro === null) {
-        return;
-    }
-
-    $active = $pro['active_integrations'];
-    ?>
-        <section class="wppilot-panel is-ready">
-            <h2 class="wppilot-setting-group__title"><?php esc_html_e('WPPilot Pro', domain: 'wppilot'); ?></h2>
-
-            <div class="wppilot-stats">
-                <?php
-
-                wppilot_dashboard_stat(
-                    __('Integrations active', domain: 'wppilot'),
-                    sprintf(
-                        /* translators: 1: integrations matched on this site, 2: integrations Pro supports in total */
-                        __('%1$d of %2$d', domain: 'wppilot'),
-                        count($active),
-                        $pro['total_integrations'],
-                    ),
-                );
-                wppilot_dashboard_stat(
-                    __('Abilities from Pro', domain: 'wppilot'),
-                    number_format_i18n($pro['abilities']),
-                );
-                if ($pro['version'] !== '') {
-                    wppilot_dashboard_stat(__('Pro version', domain: 'wppilot'), $pro['version']);
-                }
-                ?>
-            </div>
-
-            <?php if ($active !== []) { ?>
-                <p class="wppilot-legend"><?php esc_html_e('Matched on this site', domain: 'wppilot'); ?></p>
-                <div class="wppilot-clients wppilot-clients--idle">
-                    <?php foreach ($active as $label) { ?>
-                        <span class="wppilot-client-chip is-matched"><?php echo esc_html($label); ?></span>
-                    <?php } ?>
-                </div>
-            <?php } else { ?>
-                <p class="description"><?php esc_html_e(
-                    'None of the plugins or themes Pro specializes in are active here yet. Its abilities appear automatically as soon as one is.',
-                    domain: 'wppilot',
-                ); ?></p>
-            <?php } ?>
-
-            <?php if ($pro['inactive_integrations'] !== []) { ?>
-                <p class="wppilot-legend"><?php esc_html_e('Also covered by your licence', domain: 'wppilot'); ?></p>
-                <div class="wppilot-clients wppilot-clients--idle">
-                    <?php foreach ($pro['inactive_integrations'] as $label) { ?>
-                        <span class="wppilot-client-chip"><?php echo esc_html($label); ?></span>
-                    <?php } ?>
-                </div>
-            <?php } ?>
-        </section>
-    <?php
-}
-
-/**
- * What agents can reach, grouped by ability category.
- */
-function wppilot_dashboard_reach(): void
-{
-    $exposure = wppilot_dashboard_exposure();
-    ?>
-        <section class="wppilot-panel">
-            <h2 class="wppilot-setting-group__title"><?php esc_html_e(
-                'What agents can reach',
-                domain: 'wppilot',
-            ); ?></h2>
-            <?php if ($exposure['by_category'] === []) { ?>
-                <p class="description"><?php esc_html_e(
-                    'No abilities are registered. Turn on AI abilities in Settings.',
-                    domain: 'wppilot',
-                ); ?></p>
-            <?php } else { ?>
-                <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th><?php esc_html_e('Category', domain: 'wppilot'); ?></th>
-                            <th><?php esc_html_e('Abilities', domain: 'wppilot'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($exposure['by_category'] as $category => $count) { ?>
-                            <tr>
-                                <td><code><?php echo esc_html((string) $category); ?></code></td>
-                                <td class="wppilot-mono"><?php echo esc_html((string) $count); ?></td>
-                            </tr>
-                        <?php } ?>
-                    </tbody>
-                </table>
-            <?php } ?>
-        </section>
-    <?php
-}
-
-/**
- * One figure in the connection strip.
- */
-function wppilot_dashboard_stat(string $label, string $value, string $state = ''): void
-{ ?>
-    <div class="wppilot-stat">
-        <span class="wppilot-stat__label"><?php echo esc_html($label); ?></span>
-        <span class="wppilot-stat__value<?php echo $state !== '' ? ' is-' . esc_attr($state) : ''; ?>"><?php
-
-        echo esc_html($value); ?></span>
-    </div>
-    <?php }
-
-// The Overview screen no longer registers a menu entry of its own.
-//
-// It is rendered by the `wppilot-connect` page, which is the parent slug every
-// other WPPilot screen hangs off. Keeping one screen means one place to look;
-// keeping that slug means the fourteen registrations pointing at it, and any
-// link a user saved, keep working.
+// The old `wppilot-dashboard` screen is gone; the home screen is the
+// `wppilot-connect` page, the parent slug every other WPPilot screen hangs off.
 //
 // Requests to the old dashboard URL are forwarded rather than 404ed, because it
 // was a real page people could have bookmarked.

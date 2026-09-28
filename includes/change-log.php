@@ -17,8 +17,31 @@ const WPPILOT_CHANGE_LOG_MAX_BYTES = 4_194_304;
 
 const WPPILOT_CHANGE_SNAPSHOT_MAX_BYTES = 524_288;
 
-/** @return list<array<string, mixed>> */
+/**
+ * The ledger's recent rows, oldest first.
+ *
+ * In table storage this is the newest WPPILOT_CHANGE_LOG_MAX rows within
+ * WPPILOT_CHANGE_LOG_MAX_BYTES — the most the option ever held — so code written when this was
+ * the whole log still reads a bounded list whose last row is the newest. Anything that searches
+ * the ledger uses wppilot_query_change_log(), which reaches every row.
+ *
+ * @return list<array<string, mixed>>
+ */
 function wppilot_get_change_log(): array
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_recent();
+    }
+
+    return wppilot_change_log_option_rows();
+}
+
+/**
+ * The rows held in the option: the whole ledger before the table, and after a fallback.
+ *
+ * @return list<array<string, mixed>>
+ */
+function wppilot_change_log_option_rows(): array
 {
     /** @var mixed $stored */
     $stored = get_option(WPPILOT_CHANGE_LOG_OPTION, default_value: []);
@@ -35,28 +58,323 @@ function wppilot_get_change_log(): array
     return $log;
 }
 
+/** Snapshot bytes one bulk call may add to the ledger: a quarter of its cap. */
+const WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES = 1_048_576;
+
 /** @param array<string, mixed> $entry */
 function wppilot_store_change(array $entry): void
 {
-    $log = wppilot_get_change_log();
-    $log[] = $entry;
-    if (count($log) > WPPILOT_CHANGE_LOG_MAX) {
-        $log = array_slice(array: $log, offset: -WPPILOT_CHANGE_LOG_MAX);
+    wppilot_store_changes([$entry]);
+}
+
+/**
+ * Record rows in the ledger, in order, newest last.
+ *
+ * In table storage each row is one INSERT and nothing else is read or rewritten, so concurrent
+ * requests cannot erase each other's rows. Before the migration, and on a site that cannot create
+ * the table, the option path below is used.
+ *
+ * @param list<array<string, mixed>> $entries
+ */
+function wppilot_store_changes(array $entries): void
+{
+    if ($entries === []) {
+        return;
     }
-    while (count($log) > 1) {
-        $encoded = wp_json_encode($log);
-        if (is_string($encoded) && strlen($encoded) <= WPPILOT_CHANGE_LOG_MAX_BYTES) {
-            break;
+    if (wppilot_change_table_active()) {
+        wppilot_change_table_store(wppilot_change_rows_before_store($entries, legacy_filter: true));
+        return;
+    }
+    // The option write below runs the option's own pre-update filter, so only the new one here.
+    wppilot_change_option_store(wppilot_change_rows_before_store($entries, legacy_filter: false));
+}
+
+/**
+ * Append rows to the option ledger in one read-modify-write, under a lock.
+ *
+ * The option is rewritten whole on every row. Two requests recording at once
+ * each read the same log, append their own row and write it back, and the slower one's write
+ * erases the faster one's row. A bulk write recording a hundred items one call at a time also
+ * paid for a hundred full rewrites of up to 4 MB. Both are fixed here: the rows go in together,
+ * and the read and write happen under a database lock with the option cache dropped first, so
+ * a row another request wrote a moment ago is seen.
+ *
+ * When the lock cannot be had within a few seconds the rows are still written: losing a
+ * concurrent row is the old behaviour, and refusing to record a write that already happened
+ * would be worse.
+ *
+ * @param list<array<string, mixed>> $entries
+ */
+function wppilot_change_option_store(array $entries): void
+{
+    if ($entries === []) {
+        return;
+    }
+    wppilot_with_change_log_lock(static function () use ($entries): void {
+        $log = array_merge(wppilot_change_log_option_rows(), $entries);
+        if (count($log) > WPPILOT_CHANGE_LOG_MAX) {
+            $log = array_slice(array: $log, offset: -WPPILOT_CHANGE_LOG_MAX);
         }
-        array_shift($log);
+        while (count($log) > 1) {
+            $encoded = wp_json_encode($log);
+            if (is_string($encoded) && strlen($encoded) <= WPPILOT_CHANGE_LOG_MAX_BYTES) {
+                break;
+            }
+            array_shift($log);
+        }
+        update_option(WPPILOT_CHANGE_LOG_OPTION, $log, autoload: false);
+    });
+}
+
+/**
+ * Run a read-modify-write of the ledger under a MySQL named lock.
+ *
+ * Table storage needs no lock to record a row; the lock still guards the option (before the
+ * migration, and after a fallback) and the migration takes it too, so callers that wrap their own
+ * read-modify-write in it keep working either way.
+ *
+ * @template T
+ * @param callable(): T $write
+ * @return T
+ */
+function wppilot_with_change_log_lock(callable $write): mixed
+{
+    global $wpdb;
+
+    $lock = null;
+    if (is_object($wpdb) && method_exists($wpdb, 'get_var') && method_exists($wpdb, 'prepare')) {
+        $lock = $wpdb->prefix . 'wppilot_change_log';
+        $acquired = (string) $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, %d)', $lock, 5)) === '1';
+        if (!$acquired) {
+            $lock = null;
+        }
     }
-    update_option(WPPILOT_CHANGE_LOG_OPTION, $log, autoload: false);
+    // An autoload=no option is still cached after its first read, and a persistent object cache
+    // shares that copy across requests; reading it would re-introduce the lost-row race.
+    if (function_exists('wp_cache_delete')) {
+        wp_cache_delete(WPPILOT_CHANGE_LOG_OPTION, 'options');
+    }
+
+    try {
+        return $write();
+    } finally {
+        if ($lock !== null) {
+            $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock));
+        }
+    }
+}
+
+/**
+ * Ledger rows matching a filter, newest first.
+ *
+ * One reader for every place the ledger is searched — the Changes screen, its download and the
+ * export ability — so a filter cannot mean one thing on screen and another in the file.
+ *
+ * @param array{
+ *     kind?: string,
+ *     ability?: string,
+ *     user_id?: int,
+ *     agent?: string,
+ *     group?: string,
+ *     status?: string,
+ *     since?: string,
+ *     until?: string,
+ * } $filters `kind` is `change` or `audit-read`; `ability` matches a prefix; `agent` matches the
+ *            credential key exactly or the label or client name as a substring; `status` is
+ *            `undoable`, `rolled-back` or `not-reversible`; `since`/`until` are anything
+ *            strtotime() reads, compared in UTC and inclusive.
+ * @param int $limit  Most rows to return; 0 for all. A page of the result, with $offset.
+ * @param int $offset Rows to skip from the newest.
+ * @return list<array<string, mixed>>
+ */
+function wppilot_query_change_log(array $filters = [], int $limit = 0, int $offset = 0): array
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_query($filters, $limit, $offset);
+    }
+    $rows = wppilot_query_change_log_option($filters);
+    if ($limit > 0 || $offset > 0) {
+        $rows = array_slice($rows, max(0, $offset), $limit > 0 ? $limit : null);
+    }
+
+    return $rows;
+}
+
+/**
+ * How many rows wppilot_query_change_log() would return for these filters, without loading them.
+ *
+ * @param array<string, mixed> $filters
+ */
+function wppilot_count_change_log(array $filters = []): int
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_count($filters);
+    }
+
+    return count(wppilot_query_change_log_option($filters));
+}
+
+/**
+ * How many rows each of these groups holds in the whole ledger.
+ *
+ * @param list<string> $groups
+ * @return array<string, int>
+ */
+function wppilot_change_group_sizes(array $groups): array
+{
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_group_sizes($groups);
+    }
+    $wanted = array_fill_keys(array_filter($groups, static fn(string $group): bool => $group !== ''), true);
+    $sizes = [];
+    foreach (wppilot_change_log_option_rows() as $row) {
+        $group = $row['group'] ?? null;
+        if (is_string($group) && isset($wanted[$group])) {
+            $sizes[$group] = ($sizes[$group] ?? 0) + 1;
+        }
+    }
+
+    return $sizes;
+}
+
+/**
+ * The option-storage reader behind wppilot_query_change_log().
+ *
+ * @param array<string, mixed> $filters
+ * @return list<array<string, mixed>>
+ */
+function wppilot_query_change_log_option(array $filters): array
+{
+    $kind = (string) ($filters['kind'] ?? '');
+    $ability = (string) ($filters['ability'] ?? '');
+    $user_id = (int) ($filters['user_id'] ?? 0);
+    $agent = strtolower(trim((string) ($filters['agent'] ?? '')));
+    $group = (string) ($filters['group'] ?? '');
+    $status = (string) ($filters['status'] ?? '');
+    $since = wppilot_change_filter_time((string) ($filters['since'] ?? ''), end_of_day: false);
+    $until = wppilot_change_filter_time((string) ($filters['until'] ?? ''), end_of_day: true);
+
+    $rows = [];
+    foreach (array_reverse(wppilot_change_log_option_rows()) as $entry) {
+        if ($kind !== '' && (string) ($entry['kind'] ?? 'change') !== $kind) {
+            continue;
+        }
+        if ($ability !== '' && !str_starts_with((string) ($entry['ability'] ?? ''), $ability)) {
+            continue;
+        }
+        $user = is_array($entry['user'] ?? null) ? $entry['user'] : [];
+        if ($user_id > 0 && (int) ($user['id'] ?? 0) !== $user_id) {
+            continue;
+        }
+        if ($agent !== '' && !wppilot_change_agent_matches($entry, $agent)) {
+            continue;
+        }
+        if ($group !== '' && ($entry['group'] ?? null) !== $group) {
+            continue;
+        }
+        if ($status !== '' && wppilot_change_status($entry) !== $status) {
+            continue;
+        }
+        $recorded = strtotime((string) ($entry['recorded_at'] ?? ''));
+        if (($since !== null || $until !== null) && $recorded === false) {
+            continue;
+        }
+        if (($since !== null && $recorded < $since) || ($until !== null && $recorded > $until)) {
+            continue;
+        }
+        $rows[] = $entry;
+    }
+
+    return $rows;
+}
+
+/**
+ * `undoable`, `rolled-back` or `not-reversible`.
+ *
+ * @param array<string, mixed> $entry
+ */
+function wppilot_change_status(array $entry): string
+{
+    if (($entry['rolled_back'] ?? false) === true) {
+        return 'rolled-back';
+    }
+    $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
+    return ($rollback['reversible'] ?? false) === true ? 'undoable' : 'not-reversible';
+}
+
+/** @param array<string, mixed> $entry */
+function wppilot_change_agent_matches(array $entry, string $needle): bool
+{
+    $agent = is_array($entry['agent'] ?? null) ? $entry['agent'] : [];
+    if ($needle === strtolower((string) ($agent['credential'] ?? ''))) {
+        return true;
+    }
+    foreach (['label', 'client'] as $field) {
+        $value = strtolower((string) ($agent[$field] ?? ''));
+        if ($value !== '' && str_contains($value, $needle)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function wppilot_change_filter_time(string $value, bool $end_of_day): ?int
+{
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+    // A bare date means the whole day, so "until 2026-09-27" includes that afternoon.
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+        $value .= $end_of_day ? ' 23:59:59' : ' 00:00:00';
+    }
+    $time = strtotime($value . (preg_match('/(Z|[+-]\d{2}:?\d{2}|UTC)$/i', $value) === 1 ? '' : ' UTC'));
+    return $time === false ? null : $time;
+}
+
+/**
+ * One ledger row as it leaves the site in an export.
+ *
+ * Flat, and without the rollback snapshot: a before-image is a full copy of a post, its meta and
+ * its terms, which is the site's content rather than a record of what happened to it. Input is
+ * already redacted at write time and is passed through as stored.
+ *
+ * @param array<string, mixed> $entry
+ * @return array<string, mixed>
+ */
+function wppilot_change_export_row(array $entry): array
+{
+    $user = is_array($entry['user'] ?? null) ? $entry['user'] : [];
+    $agent = is_array($entry['agent'] ?? null) ? $entry['agent'] : [];
+    $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
+
+    return [
+        'id' => (string) ($entry['id'] ?? ''),
+        'recorded_at' => (string) ($entry['recorded_at'] ?? ''),
+        'kind' => (string) ($entry['kind'] ?? 'change'),
+        'ability' => (string) ($entry['ability'] ?? ''),
+        'risk' => (string) ($entry['risk'] ?? ''),
+        'user_id' => (int) ($user['id'] ?? 0),
+        'user_login' => (string) ($user['login'] ?? ''),
+        'agent_method' => (string) ($agent['method'] ?? ''),
+        'agent_label' => (string) ($agent['label'] ?? ''),
+        'agent_client' => (string) ($agent['client'] ?? ''),
+        'group' => (string) ($entry['group'] ?? ''),
+        'status' => wppilot_change_status($entry),
+        'rollback_reason' => (string) ($rollback['reason'] ?? ''),
+        'rolled_back_at' => (string) ($entry['rolled_back_at'] ?? ''),
+        'confirmation' => is_array($entry['confirmation'] ?? null) ? (string) ($entry['confirmation']['method'] ?? '') : '',
+        'input' => is_array($entry['input'] ?? null) ? $entry['input'] : [],
+    ];
 }
 
 /** @return array<string, mixed>|null */
 function wppilot_get_change(string $id): ?array
 {
-    foreach (array_reverse(wppilot_get_change_log()) as $entry) {
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_get($id);
+    }
+    foreach (array_reverse(wppilot_change_log_option_rows()) as $entry) {
         if (($entry['id'] ?? null) === $id) {
             return $entry;
         }
@@ -67,16 +385,206 @@ function wppilot_get_change(string $id): ?array
 /** @param array<string, mixed> $replacement */
 function wppilot_replace_change(string $id, array $replacement): bool
 {
-    $log = wppilot_get_change_log();
-    foreach ($log as $index => $entry) {
-        if (($entry['id'] ?? null) !== $id) {
+    if (wppilot_change_table_active()) {
+        return wppilot_change_table_replace($id, $replacement);
+    }
+
+    return wppilot_with_change_log_lock(static function () use ($id, $replacement): bool {
+        $log = wppilot_change_log_option_rows();
+        foreach ($log as $index => $entry) {
+            if (($entry['id'] ?? null) !== $id) {
+                continue;
+            }
+            $log[$index] = $replacement;
+            update_option(WPPILOT_CHANGE_LOG_OPTION, $log, autoload: false);
+            return true;
+        }
+        return false;
+    });
+}
+
+/**
+ * Record one ledger row per item of a bulk write, and drop the call's own row.
+ *
+ * The ledger records one row per ability call, holding one before-image. A bulk write touches up
+ * to a hundred targets, and one row can neither hold a hundred snapshots nor undo one target
+ * without the rest — so an agent that got three titles wrong in a batch of eighty had to roll
+ * back all eighty or none. Each item gets its own row instead, and the aggregate row the ledger
+ * opened for the call, which could only have said "no before-image", is discarded.
+ *
+ * Every row carries the same `group`, so the batch can still be undone as one
+ * (wppilot_rollback_group()) and the Changes screen can show it as one.
+ *
+ * Snapshots are whole objects. Where the ledger is still the option (capped at 4 MB) a batch of
+ * heavy builder pages could otherwise evict every earlier change on the site, and in the table
+ * the images are what the table's size is made of. So one call may add at most
+ * WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES of before-images. Items past the budget are still
+ * recorded, but their rows say plainly that no before-image was kept. A caller that must not
+ * write without one sums wppilot_snapshot_bytes() against the same constant before each write
+ * and stops there.
+ *
+ * @param list<array{
+ *     input: array<string, mixed>,
+ *     before: array<string, mixed>|null,
+ *     result: mixed,
+ *     item?: array<string, mixed>,
+ *     irreversible_reason?: string|null,
+ * }> $items
+ * @return array{group: string, change_ids: list<string>, without_before_image: int}
+ */
+function wppilot_ledger_record_items(string $ability_name, array $items, ?string $group = null): array
+{
+    wppilot_change_pending($ability_name, value: null, clear: true);
+
+    $group = $group !== null && $group !== '' ? $group : wp_generate_uuid4();
+    $user = wp_get_current_user();
+    $agent = function_exists('wppilot_current_agent') ? wppilot_current_agent() : [];
+    $ability = function_exists('wp_get_ability') ? wp_get_ability($ability_name) : null;
+    $risk = $ability instanceof WP_Ability ? wppilot_ability_risk($ability) : 'write';
+    $budget = WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES;
+    // Read, not cleared: the call's own after-hook still runs and clears it.
+    $confirmation = wppilot_change_confirmation($ability_name, clear: false);
+    $rows = [];
+    $ids = [];
+    $without = 0;
+
+    foreach ($items as $item) {
+        $before = $item['before'] ?? null;
+        $reason = $item['irreversible_reason'] ?? null;
+        if ($reason === null && $before !== null) {
+            $bytes = wppilot_snapshot_bytes($before);
+            if ($bytes > $budget) {
+                $before = null;
+                $reason = 'No before-image was kept: this batch reached the 1 MB snapshot budget for one call.';
+            } else {
+                $budget -= $bytes;
+            }
+        }
+        if ($reason !== null || $before === null) {
+            $without++;
+        }
+
+        $id = wp_generate_uuid4();
+        $ids[] = $id;
+        $input = wppilot_string_keyed_array($item['input'] ?? []);
+        $rows[] = [
+            'id' => $id,
+            'kind' => 'change',
+            'group' => $group,
+            'ability' => $ability_name,
+            'risk' => $risk,
+            'recorded_at' => gmdate('c'),
+            'duration_ms' => 0,
+            'user' => ['id' => (int) $user->ID, 'login' => (string) $user->user_login],
+            'agent' => $agent,
+            'input' => wppilot_redact_for_log($input),
+            'input_sha256' => hash('sha256', (string) wp_json_encode($input)),
+            'result' => wppilot_result_summary($item['result'] ?? null),
+            'rollback' => $reason !== null
+                ? ['reversible' => false, 'reason' => $reason]
+                : wppilot_build_rollback_payload($ability_name, $before, $item['result'] ?? null),
+            'rolled_back' => false,
+            'design' => [],
+            'confirmation' => $confirmation,
+            'bulk_item' => wppilot_string_keyed_array($item['item'] ?? []),
+        ];
+    }
+
+    wppilot_store_changes($rows);
+
+    return ['group' => $group, 'change_ids' => $ids, 'without_before_image' => $without];
+}
+
+/**
+ * Size of a before-image as the ledger will store it.
+ *
+ * @param array<string, mixed>|null $snapshot
+ */
+function wppilot_snapshot_bytes(?array $snapshot): int
+{
+    if ($snapshot === null) {
+        return 0;
+    }
+    $encoded = wp_json_encode($snapshot);
+    return is_string($encoded) ? strlen($encoded) : 0;
+}
+
+/**
+ * Undo several changes, newest first, and report each one.
+ *
+ * Newest first because two rows can touch the same target: undoing the older one first would
+ * restore a state the newer one then "restores" over, and its verification would fail against a
+ * target that no longer looks like its after-state. A row that fails does not stop the rest; the
+ * result says which did not come back and why.
+ *
+ * @param list<string> $ids
+ * @return array{rolled_back: int, failed: int, skipped: int, results: list<array<string, mixed>>}
+ */
+function wppilot_rollback_changes(array $ids): array
+{
+    $wanted = array_fill_keys($ids, true);
+    $rows = wppilot_change_table_active()
+        ? wppilot_change_table_get_many(array_values(array_map('strval', $ids)))
+        : array_values(array_filter(
+            array_reverse(wppilot_change_log_option_rows()),
+            static fn(array $entry): bool => isset($wanted[(string) ($entry['id'] ?? '')]),
+        ));
+
+    $summary = ['rolled_back' => 0, 'failed' => 0, 'skipped' => 0, 'results' => []];
+    foreach ($rows as $entry) {
+        $id = (string) ($entry['id'] ?? '');
+        $rollback = is_array($entry['rollback'] ?? null) ? $entry['rollback'] : [];
+        if (($entry['rolled_back'] ?? false) === true || ($rollback['reversible'] ?? false) !== true) {
+            $summary['skipped']++;
+            $summary['results'][] = [
+                'change_id' => $id,
+                'status' => 'skipped',
+                'reason' => ($entry['rolled_back'] ?? false) === true
+                    ? 'Already rolled back.'
+                    : (string) ($rollback['reason'] ?? 'Not reversible.'),
+            ];
             continue;
         }
-        $log[$index] = $replacement;
-        update_option(WPPILOT_CHANGE_LOG_OPTION, $log, autoload: false);
-        return true;
+        $result = wppilot_rollback_change($id);
+        if ($result instanceof WP_Error) {
+            $summary['failed']++;
+            $summary['results'][] = [
+                'change_id' => $id,
+                'status' => 'failed',
+                'code' => $result->get_error_code(),
+                'reason' => $result->get_error_message(),
+            ];
+            continue;
+        }
+        $summary['rolled_back']++;
+        $summary['results'][] = ['change_id' => $id, 'status' => 'rolled_back'];
     }
-    return false;
+
+    return $summary;
+}
+
+/**
+ * Undo every change recorded under one group (one bulk call).
+ *
+ * @return array{rolled_back: int, failed: int, skipped: int, results: list<array<string, mixed>>}|WP_Error
+ */
+function wppilot_rollback_group(string $group): array|WP_Error
+{
+    $ids = [];
+    if ($group !== '' && wppilot_change_table_active()) {
+        $ids = wppilot_change_table_group_ids($group);
+    } elseif ($group !== '') {
+        foreach (wppilot_change_log_option_rows() as $entry) {
+            if (($entry['group'] ?? null) === $group) {
+                $ids[] = (string) ($entry['id'] ?? '');
+            }
+        }
+    }
+    if ($ids === []) {
+        return new WP_Error('wppilot_change_group_not_found', __('No changes were recorded under that group.', domain: 'wppilot'));
+    }
+
+    return wppilot_rollback_changes($ids);
 }
 
 /**
@@ -121,10 +629,21 @@ function wppilot_change_before(string $ability_name, mixed $input, mixed $abilit
         return;
     }
     $ability = wppilot_change_resolve_ability($ability_name, $ability);
+    $values = wppilot_string_keyed_array($input);
     if ($ability instanceof WP_Ability && wppilot_ability_is_readonly($ability)) {
+        // A read changes nothing, so it is normally not recorded. A read that is sensitive in its
+        // own right (a raw SQL SELECT) opts in through meta.safety.audit_reads, so the site owner
+        // can see who ran what. The input is kept, redacted as for any write; the result never is.
+        if (wppilot_ability_safety_policy($ability)['audit_reads']) {
+            wppilot_change_pending($ability_name, [
+                'started_at' => microtime(true),
+                'input_summary' => wppilot_redact_for_log($values),
+                'input_sha256' => hash('sha256', (string) wp_json_encode($values)),
+                'audit_read' => true,
+            ]);
+        }
         return;
     }
-    $values = wppilot_string_keyed_array($input);
     wppilot_change_pending($ability_name, [
         'started_at' => microtime(true),
         'input_summary' => wppilot_redact_for_log($values),
@@ -163,15 +682,21 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result,
         return;
     }
     wppilot_change_pending($ability_name, value: null, clear: true);
+    $audit_read = ($pending['audit_read'] ?? false) === true;
     // @mago-expect analysis:mixed-assignment -- Pending data is internal and normalized below.
     $before_value = $pending['before'] ?? null;
     $before = is_array($before_value) ? wppilot_string_keyed_array($before_value) : null;
-    $rollback = wppilot_build_rollback_payload($ability_name, $before, $result);
+    $rollback = $audit_read
+        ? ['reversible' => false, 'reason' => 'A read-only call, recorded for audit. Nothing changed, so there is nothing to undo.']
+        : wppilot_build_rollback_payload($ability_name, $before, $result);
     $ability = wppilot_change_resolve_ability($ability_name, $ability);
     $risk = $ability instanceof WP_Ability ? wppilot_ability_risk($ability) : 'write';
     $user = wp_get_current_user();
 
     wppilot_store_change([
+        // 'audit-read' rows are a record of access, not of a change; the Changes screen and the
+        // export filter on it, and nothing offers to undo one.
+        'kind' => $audit_read ? 'audit-read' : 'change',
         'id' => wp_generate_uuid4(),
         'ability' => $ability_name,
         'risk' => $risk,
@@ -187,7 +712,7 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result,
         'agent' => function_exists('wppilot_current_agent') ? wppilot_current_agent() : [],
         'input' => $pending['input_summary'] ?? [],
         'input_sha256' => (string) ($pending['input_sha256'] ?? ''),
-        'result' => wppilot_result_summary($result),
+        'result' => $audit_read ? wppilot_audit_read_summary($result) : wppilot_result_summary($result),
         'rollback' => $rollback,
         'rolled_back' => false,
         // What the design gate saw, when it saw anything. In warn mode the write
@@ -195,7 +720,24 @@ function wppilot_change_after(string $ability_name, mixed $input, mixed $result,
         // point: a site owner who is not ready to refuse writes can still audit
         // where the direction slipped.
         'design' => wppilot_change_design_findings($ability_name),
+        'confirmation' => wppilot_change_confirmation($ability_name, clear: true),
     ]);
+}
+
+/**
+ * How the write being recorded was confirmed: `argument`, `elicitation`, `approval-url`, `chat`,
+ * `approval-queue` or `not-required`, plus who approved it for an approval-url call. Empty when the
+ * call reached execute() without passing the gate pipeline, such as an ability another ability ran.
+ *
+ * @return array{method?: string, approved_by?: int}
+ */
+function wppilot_change_confirmation(string $ability_name, bool $clear): array
+{
+    if (!function_exists('wppilot_confirmation_note')) {
+        return [];
+    }
+
+    return wppilot_confirmation_note($ability_name, method: null, clear: $clear) ?? [];
 }
 
 /**
@@ -779,7 +1321,127 @@ function wppilot_build_core_rollback_payload(string $ability_name, array $before
     if (($before['type'] ?? null) === 'extension-files') {
         return ['reversible' => false, 'reason' => wppilot_extension_files_rollback_reason($ability_name)];
     }
+    $strategy = wppilot_get_rollback_strategy((string) ($before['type'] ?? ''));
+    if ($strategy !== null) {
+        return wppilot_build_registered_rollback_payload($strategy, $ability_name, $before, $result);
+    }
     return ['reversible' => false, 'reason' => 'No rollback strategy is registered for this change.'];
+}
+
+/**
+ * Register a restore path for a before-image type the built-ins do not know.
+ *
+ * The built-in strategies are a closed `match`, so a module that captured its own before-image
+ * (through `wppilot_capture_before_image`) could have it recorded but never undone. A registered
+ * type closes that: a before-image whose `type` names it becomes a reversible ledger row, and
+ * rollback-change hands the row's payload back to `$restore`.
+ *
+ * `$type` must contain a `/` (`kits/post-partial`, `woo-subscriptions/state`), which keeps it
+ * apart from every built-in name, present and future; a built-in can never be replaced.
+ *
+ * `$restore(array $payload, array $entry)` returns the restore details, which must include
+ * `'verified' => true` once it has re-read the target and found it matching — or a WP_Error. The
+ * ledger refuses to mark anything rolled back on less.
+ *
+ * `$build(array $before, mixed $result, string $ability_name)` is optional and turns the
+ * before-image into the stored payload, for a strategy that needs something from the result
+ * (the ID of what a create call made). It may return `['reversible' => false, 'reason' => …]`.
+ * Without it the payload is the before-image itself, under `snapshot`.
+ */
+function wppilot_register_rollback_strategy(string $type, callable $restore, ?callable $build = null): bool
+{
+    if (preg_match('#^[a-z0-9-]+(?:/[a-z0-9-]+)+$#', $type) !== 1) {
+        _doing_it_wrong(
+            __FUNCTION__,
+            esc_html(sprintf('Rollback strategy type "%s" must be lowercase and contain a "/".', $type)),
+            '1.14.0',
+        );
+        return false;
+    }
+
+    wppilot_rollback_strategy_registry($type, ['restore' => $restore, 'build' => $build]);
+    return true;
+}
+
+/**
+ * @return array{restore: callable, build: callable|null}|null
+ */
+function wppilot_get_rollback_strategy(string $type): ?array
+{
+    return $type === '' || !str_contains($type, '/') ? null : wppilot_rollback_strategy_registry($type);
+}
+
+/**
+ * @param array{restore: callable, build: callable|null}|null $set
+ * @return array{restore: callable, build: callable|null}|null
+ */
+function wppilot_rollback_strategy_registry(string $type, ?array $set = null): ?array
+{
+    /** @var array<string, array{restore: callable, build: callable|null}> $strategies */
+    static $strategies = [];
+    if ($set !== null) {
+        $strategies[$type] = $set;
+    }
+    return $strategies[$type] ?? null;
+}
+
+/**
+ * @param array{restore: callable, build: callable|null} $strategy
+ * @param array<string, mixed> $before
+ * @return array<string, mixed>
+ */
+function wppilot_build_registered_rollback_payload(
+    array $strategy,
+    string $ability_name,
+    array $before,
+    mixed $result,
+): array {
+    $type = (string) $before['type'];
+    if ($strategy['build'] === null) {
+        return ['reversible' => true, 'type' => $type, 'snapshot' => $before];
+    }
+
+    try {
+        // @mago-expect analysis:mixed-assignment -- Extension output is validated below.
+        $payload = ($strategy['build'])($before, $result, $ability_name);
+    } catch (Throwable $error) {
+        return ['reversible' => false, 'reason' => 'The rollback strategy could not prepare this change: ' . $error->getMessage()];
+    }
+    if (!is_array($payload)) {
+        return ['reversible' => false, 'reason' => 'The rollback strategy did not describe how to undo this change.'];
+    }
+    $payload = wppilot_string_keyed_array($payload);
+    if (($payload['reversible'] ?? true) === false) {
+        return ['reversible' => false, 'reason' => (string) ($payload['reason'] ?? 'This change is not reversible.')];
+    }
+    // The type is the strategy's own; a build callback cannot route the row to another restore.
+    return array_merge($payload, ['reversible' => true, 'type' => $type]);
+}
+
+/**
+ * Run a registered strategy's restore for a ledger row.
+ *
+ * @param array<string, mixed> $rollback
+ * @param array<string, mixed> $entry
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_run_registered_rollback(array $rollback, array $entry): array|WP_Error
+{
+    $strategy = wppilot_get_rollback_strategy((string) ($rollback['type'] ?? ''));
+    if ($strategy === null) {
+        return new WP_Error('wppilot_rollback_unknown', __(
+            'Unknown rollback strategy. The plugin that recorded this change may be inactive.',
+            domain: 'wppilot',
+        ));
+    }
+    // @mago-expect analysis:mixed-assignment -- Extension output is validated below.
+    $result = ($strategy['restore'])($rollback, $entry);
+    if ($result instanceof WP_Error) {
+        return $result;
+    }
+    return is_array($result)
+        ? wppilot_string_keyed_array($result)
+        : new WP_Error('wppilot_rollback_failed', __('The rollback strategy returned no result.', domain: 'wppilot'));
 }
 
 /**
@@ -1153,7 +1815,7 @@ function wppilot_rollback_change(string $id): array|WP_Error
             'restore-active-theme' => wppilot_restore_active_theme_snapshot(wppilot_string_keyed_array(
                 $rollback['snapshot'] ?? null,
             )),
-            default => new WP_Error('wppilot_rollback_unknown', __('Unknown rollback strategy.', domain: 'wppilot')),
+            default => wppilot_run_registered_rollback($rollback, $entry),
         };
     } catch (Throwable $error) {
         $result = new WP_Error('wppilot_rollback_failed', $error->getMessage());
@@ -1164,9 +1826,15 @@ function wppilot_rollback_change(string $id): array|WP_Error
         return $result;
     }
     if (($result['verified'] ?? false) !== true) {
+        $mismatched = is_array($result['mismatched'] ?? null) ? array_slice($result['mismatched'], 0, 12) : [];
         return new WP_Error(
             'wppilot_rollback_unverified',
-            __('Rollback ran but the observed state did not match the before-image.', domain: 'wppilot'),
+            __('Rollback ran but the observed state did not match the before-image.', domain: 'wppilot')
+                . ($mismatched !== [] ? ' ' . sprintf(
+                    /* translators: %s: comma-separated field names */
+                    __('Still different: %s.', domain: 'wppilot'),
+                    implode(', ', array_map('strval', $mismatched)),
+                ) : ''),
             $result,
         );
     }
@@ -1232,6 +1900,13 @@ function wppilot_restore_post_snapshot(array $snapshot): array|WP_Error
             $postarr[$key] = wp_slash((string) $postarr[$key]);
         }
     }
+    // A draft that was never scheduled has a floating date (post_date_gmt of zeroes), and
+    // wp_update_post() moves a floating date to "now" unless edit_date says the date is
+    // deliberate. Without it every undo of a draft change more than a second old restored the
+    // content, then failed its own verification on post_date.
+    if (array_key_exists('post_date', $postarr)) {
+        $postarr['edit_date'] = true;
+    }
     // @mago-expect analysis:possibly-invalid-argument -- Keys are restricted to WP's post update allowlist above.
     $updated = wp_update_post($postarr, wp_error: true);
     if (is_wp_error($updated)) {
@@ -1267,15 +1942,55 @@ function wppilot_restore_post_snapshot(array $snapshot): array|WP_Error
             append: false,
         );
     }
+    // Both sides use the current, order-independent fingerprint: rows recorded before 1.15.0 carry
+    // one that depended on meta order, so it is recomputed from the stored snapshot itself.
     $observed = wppilot_snapshot_post($post_id);
-    $expected = (string) ($snapshot['fingerprint'] ?? '');
-    $actual = is_array($observed) ? (string) ($observed['fingerprint'] ?? '') : '';
-    return [
+    $expected = wppilot_post_snapshot_fingerprint($snapshot);
+    $actual = is_array($observed) && ($observed['type'] ?? '') === 'post' ? wppilot_post_snapshot_fingerprint($observed) : '';
+    $verified = $expected !== '' && hash_equals($expected, $actual);
+    $result = [
         'post_id' => $post_id,
         'expected_fingerprint' => $expected,
         'observed_fingerprint' => $actual,
-        'verified' => $expected !== '' && hash_equals($expected, $actual),
+        'verified' => $verified,
     ];
+    if (!$verified && is_array($observed)) {
+        // Which fields still differ, by name only: "did not match" alone gives a person nothing to
+        // look at, and values would copy site content into the change log.
+        $result['mismatched'] = wppilot_post_snapshot_mismatch($snapshot, $observed);
+    }
+    return $result;
+}
+
+/**
+ * The post fields, meta keys and taxonomies that differ between two post snapshots.
+ *
+ * @param array<string, mixed> $expected
+ * @param array<string, mixed> $observed
+ * @return list<string>
+ */
+function wppilot_post_snapshot_mismatch(array $expected, array $observed): array
+{
+    $names = [];
+    foreach (['post', 'meta', 'terms'] as $part) {
+        $a = is_array($expected[$part] ?? null) ? $expected[$part] : [];
+        $b = is_array($observed[$part] ?? null) ? $observed[$part] : [];
+        foreach (array_unique(array_merge(array_keys($a), array_keys($b))) as $key) {
+            if ($part === 'post' && in_array($key, WPPILOT_VOLATILE_POST_FIELDS, strict: true)) {
+                continue;
+            }
+            $left = $a[$key] ?? null;
+            $right = $b[$key] ?? null;
+            if ($part === 'terms' && is_array($left) && is_array($right)) {
+                sort($left);
+                sort($right);
+            }
+            if (wp_json_encode($left) !== wp_json_encode($right)) {
+                $names[] = $part . '.' . $key;
+            }
+        }
+    }
+    return $names;
 }
 
 /** @param array<string, mixed> $snapshot @return array<string, mixed> */
@@ -1403,10 +2118,25 @@ function wppilot_post_snapshot_fingerprint(array $snapshot): string
     foreach (WPPILOT_VOLATILE_POST_FIELDS as $volatile) {
         unset($post[$volatile]);
     }
+    // Canonical order. get_post_meta() returns keys in meta_id order, and a restore deletes and
+    // re-adds keys while the ones it leaves alone (_edit_lock and friends) keep their old ids, so
+    // the same data came back in a different order and hashed differently: a WooCommerce product
+    // restored exactly still reported "did not match the before-image". The values of one key keep
+    // their order, which is meaningful.
+    $meta = is_array($snapshot['meta'] ?? null) ? $snapshot['meta'] : [];
+    ksort($meta, SORT_STRING);
+    $terms = is_array($snapshot['terms'] ?? null) ? $snapshot['terms'] : [];
+    ksort($terms, SORT_STRING);
+    foreach ($terms as $taxonomy => $ids) {
+        if (is_array($ids)) {
+            sort($ids);
+            $terms[$taxonomy] = $ids;
+        }
+    }
     return wppilot_snapshot_fingerprint([
         'post' => $post,
-        'meta' => $snapshot['meta'] ?? [],
-        'terms' => $snapshot['terms'] ?? [],
+        'meta' => $meta,
+        'terms' => $terms,
     ]);
 }
 
@@ -1433,6 +2163,35 @@ function wppilot_result_summary(mixed $result): array
     return [
         'type' => gettype($result),
         'value' => is_scalar($result) ? mb_substr((string) $result, start: 0, length: 200) : null,
+    ];
+}
+
+/**
+ * What an audited read returned, without any of it.
+ *
+ * The point of auditing a SELECT is to know it ran, not to copy the rows it read into an option
+ * any administrator can open: those rows can be exactly the data the audit exists to watch. So
+ * only the shape survives — the top-level keys and how many rows each list held.
+ *
+ * @return array<string, mixed>
+ */
+function wppilot_audit_read_summary(mixed $result): array
+{
+    if (!is_array($result)) {
+        return ['type' => gettype($result)];
+    }
+
+    $counts = [];
+    foreach (array_slice(array: $result, offset: 0, length: 50, preserve_keys: true) as $key => $value) {
+        if (is_array($value)) {
+            $counts[(string) $key] = count($value);
+        }
+    }
+
+    return [
+        'type' => 'array',
+        'keys' => array_slice(array: array_map('strval', array_keys($result)), offset: 0, length: 50),
+        'row_counts' => $counts,
     ];
 }
 

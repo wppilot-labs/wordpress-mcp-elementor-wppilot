@@ -1,7 +1,7 @@
 ---
 slug: pet-grooming
 industry: Pet grooming salon
-sector: Pets
+sector: Pets & animals
 business: Wagford Grooming Co.
 title: Wagford Grooming Co. — dog grooming salon landing page
 description: A friendly dog grooming salon that prices by size, sells add-ons, and books online; the one brief in the set that is allowed to be playful and round.

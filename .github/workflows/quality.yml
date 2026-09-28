@@ -13,6 +13,13 @@ name: Quality
 # `package` runs the real release script. The script already refuses to seal an
 # archive containing a file that does not parse; this makes that gate run on
 # every push instead of only on the machine that happens to cut the release.
+#
+# `phpunit` runs the unit suite and the regression smoke test, which until now
+# only ran on whichever machine had a scratch copy with the dev tools in it.
+#
+# `kits` holds the portable feature kits in includes/kits to the promise that
+# they can be copied into another plugin: the boundary lint, an export, and the
+# coexistence test that loads WPPilot's copy and the exported one side by side.
 
 on:
   push:
@@ -91,6 +98,10 @@ jobs:
 
       - run: php scripts/check-doc-consistency.php
 
+      # The documents are held to product-facts.json; this holds product-facts.json
+      # to the code, so a new ability cannot leave every document one short.
+      - run: php scripts/check-ability-count.php
+
       # A duplicate function declaration is a fatal on activation and nothing
       # else here can see it: php -l parses one file at a time, and the unit
       # suite loads only the modules it exercises.
@@ -124,3 +135,77 @@ jobs:
           name: wppilot-zip
           path: build/wppilot.zip
           if-no-files-found: error
+
+  phpunit:
+    name: PHPUnit on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # PHPUnit 11 needs 8.2; the 8.0 promise is kept by `lint` and `kits`.
+        php: ['8.2', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      # vendor/ is tracked, and production-only, because it ships in the release
+      # archive. The dev tools are installed over it in this runner's checkout
+      # and nowhere else: nothing in this job commits or uploads vendor/.
+      # dump-autoload --dev is not redundant: jetpack-autoloader's install-time
+      # dump leaves PHPUnit's own classes out of the classmap.
+      - name: Install development dependencies
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          composer dump-autoload --dev
+
+      - run: vendor/bin/phpunit --no-coverage
+
+      - run: php tests/regression-smoke.php
+
+  kits:
+    name: Kits on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.0 is the oldest runtime a kit promises. The coexistence test executes
+        # the runtime and every kit, so running it there catches an 8.1 library
+        # call that parses fine and fatals only when reached.
+        php: ['8.0', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Kit boundary lint
+        run: php scripts/check-kit-boundaries.php
+
+      - name: Parse includes/kits
+        run: |
+          failed=0
+          while IFS= read -r file; do
+            php -l "$file" > /dev/null 2>&1 || { php -l "$file" || true; failed=1; }
+          done < <(find includes/kits -name '*.php')
+          exit "$failed"
+
+      # The exporter lints every file it emits with this same PHP, and refuses
+      # leftovers, clashing declarations and over-long names.
+      - name: Export a kit twice, byte-identically
+        run: |
+          set -euo pipefail
+          for run in 1 2; do
+            php scripts/export-kit.php --kits=changes-export --namespace='KitDemo\Kits' \
+              --prefix=kitdemo --text-domain=kit-demo --out="$RUNNER_TEMP/export-$run/kits"
+          done
+          diff -r "$RUNNER_TEMP/export-1" "$RUNNER_TEMP/export-2"
+
+      - name: Kit coexistence with an exported copy
+        run: php scripts/test-kit-coexistence.php

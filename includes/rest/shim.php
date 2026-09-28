@@ -106,28 +106,10 @@ function wppilot_rest_run_ability(WP_REST_Request $request): mixed
         return $input;
     }
 
-    if (function_exists('wppilot_safety_prepare_rest_input')) {
-        // @mago-expect analysis:mixed-assignment -- The safety layer preserves the declared ability input type.
-        $input = wppilot_safety_prepare_rest_input($ability, $input);
-        if ($input instanceof WP_Error) {
-            return $input;
-        }
-    }
-
-    /**
-     * Give transport-neutral execution controls one final chance to refuse or
-     * transform the call. The MCP Adapter has its own pre-tool filter because
-     * it receives an adapter envelope; this hook is the equivalent boundary
-     * for direct Ability REST execution. Rate limiting and Pro's approval
-     * queue both attach here, so changing transport cannot bypass either.
-     *
-     * @param mixed      $input     Validated Ability input.
-     * @param WP_Ability $ability   Ability about to execute.
-     * @param string     $transport Execution transport identifier.
-     */
+    // Safety profile, confirmation, confirm strip and every wppilot_pre_ability_execute control;
+    // see wppilot_gate_ability_call().
     // @mago-expect analysis:mixed-assignment -- Filters preserve the Ability's declared input type or return WP_Error.
-    // @mago-expect lint:literal-named-argument -- WordPress filter arguments after value are variadic.
-    $input = apply_filters('wppilot_pre_ability_execute', $input, $ability, 'rest');
+    $input = wppilot_gate_ability_call($ability, $input, transport: 'rest');
     if ($input instanceof WP_Error) {
         return $input;
     }

@@ -25,9 +25,10 @@ if (!defined('ABSPATH')) {
  *
  * Scope is named honestly in the setting label. It covers the MCP and REST
  * transports, which are the ones a remote agent uses. The built-in Chat screen
- * calls WP_Ability::execute() directly with no filter in between, and gating it
- * properly means rendering diffs inside the Chat UI — a separate feature, not a
- * line in this file. Chat has its own approval step in the meantime.
+ * has passed through the same gate pipeline since 1.14.0, but this rule stands
+ * aside for it: gating Chat properly means rendering diffs inside the Chat UI —
+ * a separate feature, not a line in this file — and until then Chat's own
+ * approval card is the review a person sees before the write.
  */
 
 const OPTION = 'wppilot_require_preview_before_write';
@@ -101,6 +102,9 @@ function check(WP_Ability $ability, mixed $input): ?WP_Error
  */
 function filter_pre_ability_execute(mixed $input, WP_Ability $ability, string $transport): mixed
 {
+    if ($transport === 'chat') {
+        return $input;
+    }
     $error = check($ability, $input);
     return $error ?? $input;
 }

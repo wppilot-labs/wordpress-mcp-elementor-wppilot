@@ -40,11 +40,9 @@ if (is_admin()) {
 
 add_filter('wppilot_settings_sections', __NAMESPACE__ . '\\Gate\\register_setting');
 
-// The require-preview rule has to be attached per transport, because there is no
-// single choke point every path passes through. REST and the legacy MCP adapter
-// both expose a refusable filter; the modern MCP transport takes none and calls
-// its cross-cutting checks as plain functions, so its branch lives inline in
-// WPPilot\Mcp\call_tool(). Chat calls WP_Ability::execute() directly and is out
-// of scope, which the setting's own label says.
+// Two attachment points: the gate pipeline's filter, which the REST paths, the
+// modern MCP transport, Chat and Pro's approval replay all fire, and the legacy
+// MCP adapter's own envelope filter. The rule stands aside for Chat, which the
+// setting's own label says.
 add_filter('wppilot_pre_ability_execute', __NAMESPACE__ . '\\Gate\\filter_pre_ability_execute', priority: 8, accepted_args: 3);
 add_filter('mcp_adapter_pre_tool_call', __NAMESPACE__ . '\\Gate\\filter_pre_mcp_tool_call', priority: 8, accepted_args: 2);

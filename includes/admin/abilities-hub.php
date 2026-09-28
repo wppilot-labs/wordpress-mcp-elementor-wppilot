@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
  * Disabled abilities are usually absent from the registry after the policy hook,
  * so persisted disabled rules are merged back in as placeholder rows.
  *
- * @return array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}>>
+ * @return array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}>>
  */
 function wppilot_collect_ability_hub_rows(): array
 {
@@ -55,8 +55,8 @@ function wppilot_collect_ability_hub_rows(): array
 /**
  * Build a hub row for a registered ability, or null when it is hidden or not exposed.
  *
- * @param array<string, array{disabled: bool}> $rules
- * @return array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}|null
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
+ * @return array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}|null
  */
 function wppilot_build_registered_ability_row(WP_Ability $ability, array $rules): ?array
 {
@@ -99,6 +99,8 @@ function wppilot_build_registered_ability_row(WP_Ability $ability, array $rules)
         'disabled' => $disabled,
         'profile_blocked' => $profile_blocked,
         'protected' => $protected,
+        'require_confirmation' => !$protected && ($rules[$name]['require_confirmation'] ?? false) === true,
+        'min_profile' => $protected ? '' : (string) ($rules[$name]['min_profile'] ?? ''),
     ];
 }
 
@@ -106,10 +108,10 @@ function wppilot_build_registered_ability_row(WP_Ability $ability, array $rules)
  * Merge persisted disabled rules back in as placeholder rows for abilities that
  * are no longer registered (disabled abilities are absent after the policy hook).
  *
- * @param array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}>> $groups
- * @param array<string, array{disabled: bool}> $rules
+ * @param array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}>> $groups
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
  * @param array<string, bool> $seen
- * @return array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}>>
+ * @return array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}>>
  */
 function wppilot_append_disabled_ability_rows(array $groups, array $rules, array $seen): array
 {
@@ -129,6 +131,8 @@ function wppilot_append_disabled_ability_rows(array $groups, array $rules, array
             'disabled' => true,
             'profile_blocked' => false,
             'protected' => wppilot_ability_is_hub_protected($name),
+            'require_confirmation' => ($rule['require_confirmation'] ?? false) === true,
+            'min_profile' => (string) ($rule['min_profile'] ?? ''),
         ];
     }
 
@@ -244,7 +248,17 @@ function wppilot_handle_ability_hub_actions(): void
     $rules = wppilot_get_ability_rules();
     $rules[$ability_name] ??= ['disabled' => false];
 
-    $rules = wppilot_apply_ability_hub_action_to_rules($rules, $ability_name, $action);
+    if ($action === 'set_rules') {
+        $min_profile = is_string($_POST['min_profile'] ?? null) ? sanitize_key(wp_unslash($_POST['min_profile'])) : '';
+        $rules = wppilot_set_ability_governance_rule(
+            $rules,
+            $ability_name,
+            require_confirmation: ($_POST['require_confirmation'] ?? '') === '1',
+            min_profile: $min_profile,
+        );
+    } else {
+        $rules = wppilot_apply_ability_hub_action_to_rules($rules, $ability_name, $action);
+    }
 
     wppilot_update_ability_rules($rules);
     wp_safe_redirect(admin_url('admin.php?page=wppilot-abilities&wppilot_result=updated'));
@@ -350,8 +364,8 @@ function wppilot_get_ability_hub_bulk_ability_names(): array
 }
 
 /**
- * @param array<string, array{disabled: bool}> $rules
- * @return array<string, array{disabled: bool}>
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
+ * @return array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}>
  */
 function wppilot_apply_ability_hub_bulk_action_to_rules(array $rules, string $ability_name, string $action): array
 {
@@ -372,8 +386,8 @@ function wppilot_apply_ability_hub_bulk_action_to_rules(array $rules, string $ab
 }
 
 /**
- * @param array<string, array{disabled: bool}> $rules
- * @return array<string, array{disabled: bool}>
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
+ * @return array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}>
  */
 function wppilot_apply_ability_hub_action_to_rules(array $rules, string $ability_name, string $action): array
 {
@@ -385,8 +399,8 @@ function wppilot_apply_ability_hub_action_to_rules(array $rules, string $ability
 }
 
 /**
- * @param array<string, array{disabled: bool}> $rules
- * @return array<string, array{disabled: bool}>
+ * @param array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}> $rules
+ * @return array<string, array{disabled: bool, require_confirmation?: bool, min_profile?: string}>
  */
 function wppilot_toggle_ability_disabled_rule(array $rules, string $ability_name): array
 {
@@ -682,17 +696,9 @@ function wppilot_render_settings_page()
         <div class="wrap-title">
             <div>
                 <h1><?php echo esc_html(wppilot_nav_label('wppilot-abilities')); ?></h1>
-                <p class="description"><?php printf(
-                    /* translators: %s: link to the Configuration page */
-                    esc_html__(
-                        'Manage every ability exposed to AI agents. This lists abilities registered by WPPilot and any other plugin that uses the WordPress Abilities API, grouped by provider. Disabled abilities are removed from registry discovery and MCP execution while AI Abilities are enabled on the %s page.',
-                        domain: 'wppilot',
-                    ),
-                    '<a href="'
-                    . esc_url(admin_url('admin.php?page=wppilot-connect'))
-                    . '">'
-                    . esc_html__('Configuration', domain: 'wppilot')
-                    . '</a>',
+                <p class="wppilot-lede"><?php esc_html_e(
+                    'Choose which abilities agents can call. Switched-off abilities disappear from discovery and cannot run. Covers WPPilot and any other plugin that uses the WordPress Abilities API.',
+                    domain: 'wppilot',
                 ); ?></p>
             </div>
         </div>
@@ -774,7 +780,7 @@ function wppilot_render_ability_other_plugins_divider(): void
     <?php }
 
 /**
- * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}> $abilities
+ * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}> $abilities
  * @param string|null $expanded_source Group key that should render expanded.
  */
 function wppilot_render_ability_group_section(string $source, array $abilities, ?string $expanded_source): void
@@ -800,7 +806,7 @@ function wppilot_render_ability_group_section(string $source, array $abilities, 
  * the bare total when all are enabled. hub.js keeps both in sync after an
  * AJAX toggle.
  *
- * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}> $abilities
+ * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}> $abilities
  */
 function wppilot_render_ability_header_meta(array $abilities): void
 {
@@ -841,7 +847,7 @@ function wppilot_render_ability_select_all(string $label): void
  * Render a provider group's body: category sub-sections when there is more than
  * one category, otherwise a flat row list.
  *
- * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}> $abilities
+ * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}> $abilities
  */
 function wppilot_render_ability_group_body(array $abilities): void
 {
@@ -864,8 +870,8 @@ function wppilot_render_ability_group_body(array $abilities): void
 /**
  * Group hub rows by their category label. Uncategorized rows sort last.
  *
- * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}> $abilities
- * @return array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}>>
+ * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}> $abilities
+ * @return array<string, list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}>>
  */
 function wppilot_group_abilities_by_category(array $abilities): array
 {
@@ -885,7 +891,7 @@ function wppilot_group_abilities_by_category(array $abilities): array
 }
 
 /**
- * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool}> $rows
+ * @param list<array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string}> $rows
  */
 function wppilot_render_ability_category_subsection(string $category, array $rows): void
 {
@@ -912,7 +918,7 @@ function wppilot_render_ability_category_subsection(string $category, array $row
 }
 
 /**
- * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool} $ability
+ * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string} $ability
  */
 function wppilot_render_ability_hub_row(array $ability): void
 {
@@ -950,7 +956,7 @@ function wppilot_render_ability_hub_row(array $ability): void
  * row becomes expandable (CSS-only <details>) to reveal the full text and its
  * safety annotations; placeholder rows without a description stay flat.
  *
- * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool} $ability
+ * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string} $ability
  */
 function wppilot_render_ability_hub_main(array $ability): void
 {
@@ -961,6 +967,7 @@ function wppilot_render_ability_hub_main(array $ability): void
                 esc_html(wppilot_ability_display_slug($ability['name']))
             ; ?></span>
             <span class="desc"><?php echo esc_html($ability['label']); ?></span>
+            <?php wppilot_render_ability_governance_form($ability); ?>
         </div>
         <?php
 
@@ -976,13 +983,61 @@ function wppilot_render_ability_hub_main(array $ability): void
         </summary>
         <div class="wppilot-hub-detail">
             <p class="desc-full"><?php echo esc_html($ability['description']); ?></p>
+            <?php wppilot_render_ability_governance_form($ability); ?>
         </div>
     </details>
     <?php
 }
 
 /**
- * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool} $ability
+ * The per-ability governance overrides: demand confirmation, raise the minimum profile.
+ *
+ * Offered for every ability, third-party ones included; neither control can loosen
+ * what the ability declares for itself, which the help text says so nobody reads
+ * an unticked box as "confirmation switched off".
+ *
+ * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string} $ability
+ */
+function wppilot_render_ability_governance_form(array $ability): void
+{
+    if ($ability['protected'] || $ability['mcp_type'] === 'prompt' || $ability['mcp_type'] === 'resource') {
+        return;
+    }
+    $profiles = wppilot_safety_profiles();
+    $choices = [
+        '' => __('No override', domain: 'wppilot'),
+        'production' => $profiles['production']['label'],
+        'developer' => $profiles['developer']['label'],
+    ];
+    $field_id = 'wppilot-rule-' . md5($ability['name']);
+    ?>
+    <form method="post" class="wppilot-hub-rules" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:8px 0 0;">
+        <?php wp_nonce_field('wppilot_ability_hub_action'); ?>
+        <input type="hidden" name="wppilot_ability_hub_action" value="set_rules" />
+        <input type="hidden" name="ability_name" value="<?php echo esc_attr($ability['name']); ?>" />
+        <label>
+            <input type="checkbox" name="require_confirmation" value="1"<?php checked($ability['require_confirmation']); ?> />
+            <?php esc_html_e('Always require confirmation', domain: 'wppilot'); ?>
+        </label>
+        <label for="<?php echo esc_attr($field_id); ?>"><?php esc_html_e('Minimum profile', domain: 'wppilot'); ?></label>
+        <select id="<?php echo esc_attr($field_id); ?>" name="min_profile">
+            <?php foreach ($choices as $value => $label): ?>
+                <option value="<?php echo esc_attr($value); ?>"<?php selected($ability['min_profile'], $value); ?>><?php
+                    echo esc_html($label);
+                ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="button button-small"><?php esc_html_e('Save rule', domain: 'wppilot'); ?></button>
+        <span class="description" style="flex-basis:100%;"><?php esc_html_e(
+            'Both only tighten: a destructive ability is always confirmed, and an ability that declares its own minimum profile keeps it.',
+            domain: 'wppilot',
+        ); ?></span>
+    </form>
+    <?php
+}
+
+/**
+ * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string} $ability
  */
 function wppilot_render_ability_hub_pills(array $ability): void
 { ?>
@@ -1003,11 +1058,21 @@ function wppilot_render_ability_hub_pills(array $ability): void
         <?php if ($ability['protected']): ?>
             <span class="pill protected"><?php esc_html_e('Protected', domain: 'wppilot'); ?></span>
         <?php endif; ?>
+        <?php if ($ability['require_confirmation']): ?>
+            <span class="pill"><?php esc_html_e('Confirm', domain: 'wppilot'); ?></span>
+        <?php endif; ?>
+        <?php if ($ability['min_profile'] !== ''): ?>
+            <span class="pill"><?php echo esc_html(sprintf(
+                /* translators: %s: safety profile label */
+                __('Min: %s', domain: 'wppilot'),
+                wppilot_safety_profiles()[$ability['min_profile']]['label'] ?? $ability['min_profile'],
+            )); ?></span>
+        <?php endif; ?>
     </div>
     <?php }
 
 /**
- * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool} $ability
+ * @param array{name: string, label: string, description: string, category: string, mcp: string, mcp_type: string, source: string, status: string, disabled: bool, profile_blocked: bool, protected: bool, require_confirmation: bool, min_profile: string} $ability
  */
 function wppilot_render_ability_toggle_action(array $ability): void
 { ?>

@@ -1,0 +1,52 @@
+{
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "name": "co.wppilot/wppilot",
+    "title": "WPPilot",
+    "description": "WordPress MCP server: typed abilities with safety profiles, change evidence and undo.",
+    "version": "1.15.0",
+    "websiteUrl": "https://wppilot.co",
+    "repository": {
+        "url": "https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot",
+        "source": "github"
+    },
+    "remotes": [
+        {
+            "type": "streamable-http",
+            "url": "https://{site}/wp-json/mcp/wppilot",
+            "variables": {
+                "site": {
+                    "description": "Your WordPress site address without https://, including any subdirectory WordPress lives in (e.g. example.com or example.com/blog).",
+                    "isRequired": true
+                }
+            },
+            "headers": [
+                {
+                    "name": "Authorization",
+                    "description": "Basic credentials with a WordPress Application Password, or a WPPilot access token as a Bearer token. Create either under WPPilot > Connect.",
+                    "isRequired": true,
+                    "isSecret": true
+                }
+            ]
+        },
+        {
+            "type": "streamable-http",
+            "url": "https://{site}/wp-json/mcp/wppilot-oauth",
+            "variables": {
+                "site": {
+                    "description": "Your WordPress site address without https://, including any subdirectory WordPress lives in (e.g. example.com or example.com/blog).",
+                    "isRequired": true
+                }
+            }
+        }
+    ],
+    "_meta": {
+        "io.modelcontextprotocol.registry/publisher-provided": {
+            "serverCard": "https://{site}/.well-known/mcp/server-card.json",
+            "protocolVersions": [
+                "2026-07-28",
+                "2025-11-25"
+            ],
+            "documentation": "https://wppilot.co/docs"
+        }
+    }
+}

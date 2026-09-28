@@ -22,16 +22,96 @@ if (!defined('ABSPATH')) {
 /**
  * Expiry choices offered when minting, in days. 0 is "no expiry".
  *
+ * Short by default on purpose: a token is the credential most likely to be
+ * pasted into a script or a hosted automation and forgotten there. None is
+ * preselected, so every token's lifetime is a decision somebody made.
+ *
  * @return array<int, string>
  */
 function wppilot_token_expiry_choices(): array
 {
     return [
+        1 => __('1 day', domain: 'wppilot'),
+        7 => __('7 days', domain: 'wppilot'),
         30 => __('30 days', domain: 'wppilot'),
         90 => __('90 days', domain: 'wppilot'),
-        365 => __('1 year', domain: 'wppilot'),
-        0 => __('No expiry', domain: 'wppilot'),
+        0 => __('Never (not recommended)', domain: 'wppilot'),
     ];
+}
+
+/**
+ * Ceiling choices, keyed by stored value. Empty is "the site's own profile".
+ *
+ * @return array<string, string>
+ */
+function wppilot_token_ceiling_choices(): array
+{
+    $profiles = wppilot_safety_profiles();
+
+    return [
+        '' => __('Same as the site', domain: 'wppilot'),
+        'production' => $profiles['production']['label'],
+        'readonly' => $profiles['readonly']['label'],
+    ];
+}
+
+/**
+ * Ability categories to offer in the scope picker, slug => label.
+ *
+ * @return array<string, string>
+ */
+function wppilot_token_scope_category_choices(): array
+{
+    if (!function_exists('wp_get_ability_categories')) {
+        return [];
+    }
+
+    $choices = [];
+    /** @var mixed $category */
+    foreach (wp_get_ability_categories() as $slug => $category) {
+        if ($category instanceof WP_Ability_Category) {
+            $choices[$category->get_slug()] = $category->get_label();
+        } elseif (is_string($slug)) {
+            $choices[$slug] = $slug;
+        }
+    }
+    asort($choices);
+
+    return $choices;
+}
+
+/**
+ * Read the scope and ceiling fields a create or edit form posted.
+ *
+ * `all` means every ability (a null scope). `restricted` builds an allowlist
+ * from the ticked categories and the ability names typed one per line.
+ *
+ * @return array{scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}
+ */
+function wppilot_token_posted_policy(string $prefix): array
+{
+    $mode = is_string($_POST[$prefix . '_scope_mode'] ?? null) ? sanitize_key(wp_unslash($_POST[$prefix . '_scope_mode'])) : 'all';
+    $ceiling = is_string($_POST[$prefix . '_ceiling'] ?? null) ? sanitize_key(wp_unslash($_POST[$prefix . '_ceiling'])) : '';
+
+    if ($mode !== 'restricted') {
+        return ['scope' => null, 'ceiling' => $ceiling];
+    }
+
+    $raw_abilities = is_string($_POST[$prefix . '_abilities'] ?? null) ? wp_unslash($_POST[$prefix . '_abilities']) : '';
+    $lines = preg_split('/[\s,]+/', $raw_abilities);
+    $categories = [];
+    foreach (is_array($_POST[$prefix . '_categories'] ?? null) ? $_POST[$prefix . '_categories'] : [] as $category) {
+        if (is_string($category)) {
+            $categories[] = sanitize_key(wp_unslash($category));
+        }
+    }
+
+    $scope = wppilot_token_normalize_scope([
+        'abilities' => $lines === false ? [] : array_map('sanitize_text_field', $lines),
+        'categories' => $categories,
+    ]);
+
+    return ['scope' => $scope ?? ['abilities' => [], 'categories' => []], 'ceiling' => $ceiling];
 }
 
 /**
@@ -58,14 +138,19 @@ function wppilot_handle_create_token()
     $name = is_string($raw_name) ? trim($raw_name) : '';
 
     $raw_ttl = $_POST['wppilot_token_ttl'] ?? '';
-    $ttl = is_string($raw_ttl) || is_int($raw_ttl) ? (int) $raw_ttl : 0;
     // Whitelisted rather than clamped: an arbitrary posted number would let the
-    // form mint a token with a lifetime the screen never offered.
-    if (!array_key_exists($ttl, wppilot_token_expiry_choices())) {
-        $ttl = 90;
+    // form mint a token with a lifetime the screen never offered. A missing
+    // choice is refused rather than defaulted, because the lifetime is the one
+    // thing about a token nobody should get without having picked it.
+    if (!is_string($raw_ttl) || $raw_ttl === '' || !ctype_digit($raw_ttl)
+        || !array_key_exists((int) $raw_ttl, wppilot_token_expiry_choices())) {
+        return new WP_Error('wppilot_token_ttl', __('Choose when the token expires.', domain: 'wppilot'));
     }
+    $ttl = (int) $raw_ttl;
 
-    $created = wppilot_token_create(get_current_user_id(), $name, $ttl);
+    $policy = wppilot_token_posted_policy('wppilot_token');
+
+    $created = wppilot_token_create(get_current_user_id(), $name, $ttl, $policy['scope'], $policy['ceiling']);
     if ($created instanceof WP_Error) {
         return $created;
     }
@@ -98,8 +183,104 @@ function wppilot_handle_revoke_token(): void
 
     wppilot_token_revoke($token_id, get_current_user_id());
 
-    wp_safe_redirect(admin_url('admin.php?page=wppilot-connect&wppilot_result=token_revoked'));
+    wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=token_revoked'));
     exit();
+}
+
+/**
+ * Handle the edit-token form: name, scope and ceiling. Redirects on success.
+ *
+ * Called from admin_init, so headers have not been sent yet.
+ */
+function wppilot_handle_update_token(): void
+{
+    if (($_POST['wppilot_update_token'] ?? null) === null || !wppilot_current_user_can_manage()) {
+        return;
+    }
+
+    $raw_id = $_POST['wppilot_update_token_id'] ?? '';
+    $token_id = is_string($raw_id) || is_int($raw_id) ? (int) $raw_id : 0;
+    if ($token_id <= 0) {
+        return;
+    }
+
+    check_admin_referer('wppilot_update_token_' . $token_id);
+
+    $raw_name = $_POST['wppilot_edit_token_name'] ?? '';
+    $name = is_string($raw_name) ? trim(wp_unslash($raw_name)) : '';
+    $policy = wppilot_token_posted_policy('wppilot_edit_token');
+
+    $updated = wppilot_token_update_policy($token_id, get_current_user_id(), $name, $policy['scope'], $policy['ceiling']);
+    $result = $updated === true ? 'token_updated' : 'token_update_failed';
+
+    wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=' . $result));
+    exit();
+}
+
+/**
+ * The scope and ceiling fields, shared by the create and edit forms.
+ *
+ * @param array{abilities: list<string>, categories: list<string>}|null $scope
+ */
+function wppilot_render_token_policy_fields(string $prefix, ?array $scope, string $ceiling): void
+{
+    $restricted = $scope !== null;
+    $categories = wppilot_token_scope_category_choices();
+    $field = static fn(string $name): string => $prefix . '_' . $name;
+    ?>
+    <fieldset style="margin:0 0 12px;">
+        <legend style="margin-bottom:4px;"><strong><?php esc_html_e('What this token may use', domain: 'wppilot'); ?></strong></legend>
+        <label style="display:block;">
+            <input type="radio" name="<?php echo esc_attr($field('scope_mode')); ?>" value="all"<?php checked(!$restricted); ?> />
+            <?php esc_html_e('Every ability the safety profile allows', domain: 'wppilot'); ?>
+        </label>
+        <label style="display:block;">
+            <input type="radio" name="<?php echo esc_attr($field('scope_mode')); ?>" value="restricted"<?php checked($restricted); ?> />
+            <?php esc_html_e('Only the categories and abilities chosen below', domain: 'wppilot'); ?>
+        </label>
+        <div style="margin:8px 0 0 24px;">
+            <?php if ($categories !== []): ?>
+                <p style="margin:0 0 4px;"><?php esc_html_e('Categories', domain: 'wppilot'); ?></p>
+                <div style="display:flex; flex-wrap:wrap; gap:4px 16px; max-width:760px;">
+                    <?php foreach ($categories as $slug => $label): ?>
+                        <label>
+                            <input type="checkbox" name="<?php echo esc_attr($field('categories')); ?>[]" value="<?php echo esc_attr($slug); ?>"<?php
+                                checked($restricted && in_array($slug, $scope['categories'], strict: true));
+                            ?> />
+                            <?php echo esc_html($label); ?>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <p style="margin:8px 0 4px;">
+                <label for="<?php echo esc_attr($field('abilities')); ?>"><?php esc_html_e(
+                    'Abilities, one per line. provider/* allows everything from one plugin.',
+                    domain: 'wppilot',
+                ); ?></label>
+            </p>
+            <textarea
+                id="<?php echo esc_attr($field('abilities')); ?>"
+                name="<?php echo esc_attr($field('abilities')); ?>"
+                rows="3"
+                class="large-text code"
+                style="max-width:520px;"
+                placeholder="wppilot/get-post&#10;rank-math/*"
+            ><?php echo esc_textarea($restricted ? implode("\n", $scope['abilities']) : ''); ?></textarea>
+        </div>
+    </fieldset>
+    <p style="margin:0 0 12px;">
+        <label for="<?php echo esc_attr($field('ceiling')); ?>"><strong><?php esc_html_e('Safety profile ceiling', domain: 'wppilot'); ?></strong></label><br />
+        <select id="<?php echo esc_attr($field('ceiling')); ?>" name="<?php echo esc_attr($field('ceiling')); ?>">
+            <?php foreach (wppilot_token_ceiling_choices() as $value => $label): ?>
+                <option value="<?php echo esc_attr($value); ?>"<?php selected($ceiling, $value); ?>><?php echo esc_html($label); ?></option>
+            <?php endforeach; ?>
+        </select>
+        <span class="description"><?php esc_html_e(
+            'The token never gets more than this, and never more than the site profile either.',
+            domain: 'wppilot',
+        ); ?></span>
+    </p>
+    <?php
 }
 
 /**
@@ -224,15 +405,26 @@ function wppilot_render_token_step(?string $new_token, ?WP_Error $token_error = 
                 <label for="wppilot-token-ttl" style="display:block; margin-bottom:4px;">
                     <strong><?php esc_html_e('Expires', domain: 'wppilot'); ?></strong>
                 </label>
-                <select id="wppilot-token-ttl" name="wppilot_token_ttl">
+                <select
+                    id="wppilot-token-ttl"
+                    name="wppilot_token_ttl"
+                    required
+                    onchange="document.getElementById('wppilot-token-never-warning').style.display = this.value === '0' ? '' : 'none';"
+                >
+                    <option value="" selected disabled><?php esc_html_e('Choose…', domain: 'wppilot'); ?></option>
                     <?php foreach (wppilot_token_expiry_choices() as $days => $label): ?>
-                        <option value="<?php echo esc_attr((string) $days); ?>"<?php echo
-                            $days === 90 ? ' selected' : ''
-                        ; ?>><?php echo esc_html($label); ?></option>
+                        <option value="<?php echo esc_attr((string) $days); ?>"><?php echo esc_html($label); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
         </div>
+        <p id="wppilot-token-never-warning" class="notice notice-warning inline" style="display:none; margin:0 0 12px; padding:6px 10px;">
+            <?php esc_html_e(
+                'A token that never expires keeps working wherever it was pasted until someone remembers to revoke it. Prefer 90 days and a calendar reminder.',
+                domain: 'wppilot',
+            ); ?>
+        </p>
+        <?php wppilot_render_token_policy_fields('wppilot_token', null, ''); ?>
         <button type="submit" name="wppilot_create_token" class="button button-primary">
             <?php echo
                 $has_tokens
@@ -277,7 +469,8 @@ function wppilot_render_manage_tokens_section(): void
                         <th style="width:150px;"><?php esc_html_e('Created', domain: 'wppilot'); ?></th>
                         <th style="width:150px;"><?php esc_html_e('Last Used', domain: 'wppilot'); ?></th>
                         <th style="width:150px;"><?php esc_html_e('Expires', domain: 'wppilot'); ?></th>
-                        <th style="width:80px;"><?php esc_html_e('Actions', domain: 'wppilot'); ?></th>
+                        <th><?php esc_html_e('May use', domain: 'wppilot'); ?></th>
+                        <th style="width:140px;"><?php esc_html_e('Actions', domain: 'wppilot'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -535,9 +728,33 @@ function wppilot_render_token_config_section(string $url, ?string $token): void
 }
 
 /**
+ * One line describing a token's scope and ceiling, for the token table.
+ *
+ * @param array{scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string} $token
+ */
+function wppilot_token_policy_summary(array $token): string
+{
+    $scope = $token['scope'];
+    $what = $scope === null
+        ? __('Every ability', domain: 'wppilot')
+        : implode(', ', array_merge($scope['categories'], $scope['abilities']));
+    $ceilings = wppilot_token_ceiling_choices();
+    if ($token['ceiling'] === '' || !isset($ceilings[$token['ceiling']])) {
+        return $what;
+    }
+
+    return sprintf(
+        /* translators: 1: what the token may use, 2: safety profile label */
+        __('%1$s; at most %2$s', domain: 'wppilot'),
+        $what,
+        $ceilings[$token['ceiling']],
+    );
+}
+
+/**
  * Render one row of the access-token table.
  *
- * @param array{id: int, name: string, last_four: string, created: string, last_used: string, expires: string} $token
+ * @param array{id: int, name: string, last_four: string, created: string, last_used: string, expires: string, scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string} $token
  */
 function wppilot_render_token_row(array $token, string $dt_format): void
 {
@@ -568,8 +785,12 @@ function wppilot_render_token_row(array $token, string $dt_format): void
                 <strong><?php esc_html_e('(expired)', domain: 'wppilot'); ?></strong>
             <?php endif; ?>
         </td>
+        <td><?php echo esc_html(wppilot_token_policy_summary($token)); ?></td>
         <td>
-            <form method="post" style="margin:0;" onsubmit="return confirm('<?php echo
+            <button type="button" class="button button-small" aria-expanded="false" onclick="var r = document.getElementById('<?php echo
+                esc_js('wppilot-token-edit-' . $token['id'])
+            ; ?>'); r.hidden = !r.hidden; this.setAttribute('aria-expanded', String(!r.hidden));"><?php esc_html_e('Edit', domain: 'wppilot'); ?></button>
+            <form method="post" style="margin:0; display:inline;" onsubmit="return confirm('<?php echo
                 esc_js(__('Revoke this token? Any caller using it will lose access.', domain: 'wppilot'))
             ; ?>');">
                 <input type="hidden" name="wppilot_revoke_token_id" value="<?php echo
@@ -578,6 +799,34 @@ function wppilot_render_token_row(array $token, string $dt_format): void
                 <input type="hidden" name="_wpnonce" value="<?php echo esc_attr($revoke_nonce); ?>" />
                 <button type="submit" name="wppilot_revoke_token" class="button button-small wppilot-revoke-btn"><?php esc_html_e(
                     'Revoke',
+                    domain: 'wppilot',
+                ); ?></button>
+            </form>
+        </td>
+    </tr>
+    <tr id="<?php echo esc_attr('wppilot-token-edit-' . $token['id']); ?>" hidden>
+        <td colspan="7">
+            <form method="post" style="margin:8px 0;">
+                <?php wp_nonce_field('wppilot_update_token_' . $token['id']); ?>
+                <input type="hidden" name="wppilot_update_token_id" value="<?php echo esc_attr((string) $token['id']); ?>" />
+                <p style="margin:0 0 12px;">
+                    <label for="<?php echo esc_attr('wppilot-edit-token-name-' . $token['id']); ?>"><strong><?php esc_html_e('Name', domain: 'wppilot'); ?></strong></label><br />
+                    <input
+                        type="text"
+                        id="<?php echo esc_attr('wppilot-edit-token-name-' . $token['id']); ?>"
+                        name="wppilot_edit_token_name"
+                        value="<?php echo esc_attr($token['name']); ?>"
+                        class="regular-text"
+                        maxlength="70"
+                    />
+                </p>
+                <?php wppilot_render_token_policy_fields('wppilot_edit_token', $token['scope'], $token['ceiling']); ?>
+                <p class="description" style="margin:0 0 8px;"><?php esc_html_e(
+                    'The expiry cannot be changed. To extend a token, create a new one and revoke this one.',
+                    domain: 'wppilot',
+                ); ?></p>
+                <button type="submit" name="wppilot_update_token" class="button button-primary button-small"><?php esc_html_e(
+                    'Save token limits',
                     domain: 'wppilot',
                 ); ?></button>
             </form>

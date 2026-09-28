@@ -38,7 +38,7 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-const WPPILOT_TOKENS_SCHEMA_VERSION = 1;
+const WPPILOT_TOKENS_SCHEMA_VERSION = 2;
 
 const WPPILOT_TOKENS_SCHEMA_OPTION = 'wppilot_tokens_schema_version';
 
@@ -83,6 +83,11 @@ function wppilot_tokens_schema_install(): void
 
     // token_hash is the lookup key and is unique: two rows with the same digest
     // would mean the same secret authenticating as two identities.
+    //
+    // scope and ceiling arrived in schema 2. Both default to "no restriction" —
+    // NULL scope is every ability, an empty ceiling is the site's own profile —
+    // so a token minted before agent identities existed keeps exactly the access
+    // it was created with when dbDelta adds the columns.
     dbDelta("CREATE TABLE {$table} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id BIGINT UNSIGNED NOT NULL,
@@ -92,6 +97,8 @@ function wppilot_tokens_schema_install(): void
             created DATETIME NOT NULL,
             last_used DATETIME NULL DEFAULT NULL,
             expires DATETIME NULL DEFAULT NULL,
+            scope TEXT NULL,
+            ceiling VARCHAR(16) NOT NULL DEFAULT '',
             PRIMARY KEY  (id),
             UNIQUE KEY token_hash (token_hash),
             KEY user_id (user_id)
@@ -126,10 +133,17 @@ function wppilot_token_hash(string $secret): string
  * is written.
  *
  * @param int $ttl_days Days until the token expires; 0 means it does not expire.
+ * @param array{abilities?: list<string>, categories?: list<string>}|null $scope Null is every ability.
+ * @param string $ceiling A safety profile the token may never exceed; empty for the site's own.
  * @return array{secret: string, id: int, name: string}|WP_Error
  */
-function wppilot_token_create(int $user_id, string $name, int $ttl_days = 0): array|WP_Error
-{
+function wppilot_token_create(
+    int $user_id,
+    string $name,
+    int $ttl_days = 0,
+    ?array $scope = null,
+    string $ceiling = '',
+): array|WP_Error {
     // @mago-expect lint:no-global -- $wpdb is WordPress' database handle.
     global $wpdb;
     /** @var wpdb $wpdb */
@@ -143,11 +157,12 @@ function wppilot_token_create(int $user_id, string $name, int $ttl_days = 0): ar
         ));
     }
 
-    $name = trim(wp_strip_all_tags($name));
-    if ($name === '') {
-        $name = __('Access token', domain: 'wppilot');
+    $name = wppilot_token_clean_name($name);
+
+    $policy = wppilot_token_validate_policy($scope, $ceiling);
+    if ($policy instanceof WP_Error) {
+        return $policy;
     }
-    $name = mb_substr($name, start: 0, length: 191);
 
     // 32 bytes from the CSPRNG, base64url so the token survives being pasted into
     // JSON, TOML, YAML, a shell command and an HTTP header without escaping.
@@ -165,6 +180,8 @@ function wppilot_token_create(int $user_id, string $name, int $ttl_days = 0): ar
         'created' => $now,
         'last_used' => null,
         'expires' => $expires,
+        'scope' => $policy['scope'] === null ? null : wp_json_encode($policy['scope']),
+        'ceiling' => $policy['ceiling'],
     ]);
 
     if ($inserted === false) {
@@ -172,6 +189,231 @@ function wppilot_token_create(int $user_id, string $name, int $ttl_days = 0): ar
     }
 
     return ['secret' => $secret, 'id' => (int) $wpdb->insert_id, 'name' => $name];
+}
+
+function wppilot_token_clean_name(string $name): string
+{
+    $name = trim(wp_strip_all_tags($name));
+    if ($name === '') {
+        $name = __('Access token', domain: 'wppilot');
+    }
+
+    return mb_substr($name, start: 0, length: 191);
+}
+
+/**
+ * The profiles a token may be capped at.
+ *
+ * Developer is absent on purpose: it is the most permissive profile, so as a
+ * ceiling it could never lower anything, and offering it would read as though a
+ * token could be granted more than the site allows. A ceiling only ever takes
+ * access away.
+ *
+ * @return list<string>
+ */
+function wppilot_token_ceiling_ids(): array
+{
+    return ['readonly', 'production'];
+}
+
+/**
+ * Normalise a scope and ceiling before they are stored.
+ *
+ * A scope is an allowlist: ability names (`rank-math/set-link-settings`), a
+ * whole provider (`rank-math/*`), or ability categories. An empty allowlist is
+ * refused rather than stored, because it would mint a token that can call
+ * nothing and looks like it works.
+ *
+ * @param array<string, mixed>|null $scope
+ * @return array{scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}|WP_Error
+ */
+function wppilot_token_validate_policy(?array $scope, string $ceiling): array|WP_Error
+{
+    $ceiling = sanitize_key($ceiling);
+    if ($ceiling === 'developer') {
+        $ceiling = '';
+    }
+    if ($ceiling !== '' && !in_array($ceiling, wppilot_token_ceiling_ids(), strict: true)) {
+        return new WP_Error('wppilot_token_ceiling', __('Unknown safety profile ceiling.', domain: 'wppilot'));
+    }
+
+    if ($scope === null) {
+        return ['scope' => null, 'ceiling' => $ceiling];
+    }
+
+    $normalized = wppilot_token_normalize_scope($scope);
+    if ($normalized === null || ($normalized['abilities'] === [] && $normalized['categories'] === [])) {
+        return new WP_Error('wppilot_token_scope_empty', __(
+            'A restricted token needs at least one ability or category it may use.',
+            domain: 'wppilot',
+        ));
+    }
+
+    return ['scope' => $normalized, 'ceiling' => $ceiling];
+}
+
+/**
+ * Read a stored or submitted scope into its canonical shape, or null for "every ability".
+ *
+ * Entries that are not an ability name, a `provider/*` wildcard or a category
+ * slug are dropped rather than kept: a typo stored verbatim would silently match
+ * nothing, and the screen shows what was kept.
+ *
+ * @return array{abilities: list<string>, categories: list<string>}|null
+ */
+function wppilot_token_normalize_scope(mixed $scope): ?array
+{
+    if (is_string($scope)) {
+        if ($scope === '') {
+            return null;
+        }
+        /** @var mixed $scope */
+        $scope = json_decode($scope, associative: true);
+    }
+    if (!is_array($scope)) {
+        return null;
+    }
+
+    $abilities = [];
+    foreach (is_array($scope['abilities'] ?? null) ? $scope['abilities'] : [] as $entry) {
+        $entry = is_string($entry) ? strtolower(trim($entry)) : '';
+        if (preg_match('#^[a-z0-9-]+/(?:\*|[a-z0-9-/]+)$#', $entry) === 1) {
+            $abilities[] = $entry;
+        }
+    }
+
+    $categories = [];
+    foreach (is_array($scope['categories'] ?? null) ? $scope['categories'] : [] as $entry) {
+        $entry = is_string($entry) ? sanitize_key($entry) : '';
+        if ($entry !== '') {
+            $categories[] = $entry;
+        }
+    }
+
+    return [
+        'abilities' => array_values(array_unique($abilities)),
+        'categories' => array_values(array_unique($categories)),
+    ];
+}
+
+/**
+ * Change what an existing token may do. Scoped to the owner, like revocation.
+ *
+ * The expiry is deliberately not editable: extending a leaked token's life is
+ * the one edit that should need a new secret, so the way to "extend" is to mint
+ * a replacement and revoke this one.
+ *
+ * @param array<string, mixed>|null $scope
+ */
+function wppilot_token_update_policy(
+    int $token_id,
+    int $user_id,
+    string $name,
+    ?array $scope,
+    string $ceiling,
+): bool|WP_Error {
+    // @mago-expect lint:no-global -- $wpdb is WordPress' database handle.
+    global $wpdb;
+    /** @var wpdb $wpdb */
+
+    if ($token_id <= 0 || $user_id <= 0) {
+        return false;
+    }
+
+    $policy = wppilot_token_validate_policy($scope, $ceiling);
+    if ($policy instanceof WP_Error) {
+        return $policy;
+    }
+
+    $updated = $wpdb->update(
+        wppilot_tokens_table(),
+        [
+            'name' => wppilot_token_clean_name($name),
+            'scope' => $policy['scope'] === null ? null : wp_json_encode($policy['scope']),
+            'ceiling' => $policy['ceiling'],
+        ],
+        ['id' => $token_id, 'user_id' => $user_id],
+        null,
+        ['%d', '%d'],
+    );
+
+    wppilot_token_policy_cache($token_id, forget: true);
+
+    return $updated !== false;
+}
+
+/**
+ * What a token may do: its scope and ceiling, looked up by id.
+ *
+ * Null means the row is gone — revoked, or its owner deleted — which the caller
+ * must treat as "may do nothing", never as "unrestricted". Cached for the request
+ * because the answer is asked once per ability during discovery.
+ *
+ * @return array{id: int, name: string, scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}|null
+ */
+function wppilot_token_policy(int $token_id): ?array
+{
+    // @mago-expect lint:no-global -- $wpdb is WordPress' database handle.
+    global $wpdb;
+    /** @var wpdb $wpdb */
+
+    if ($token_id <= 0) {
+        return null;
+    }
+
+    $cached = wppilot_token_policy_cache($token_id);
+    if ($cached !== false) {
+        return $cached;
+    }
+
+    $table = wppilot_tokens_table();
+    // @mago-expect analysis:mixed-assignment
+    $row = $wpdb->get_row(
+        (string) $wpdb->prepare("SELECT id, name, scope, ceiling FROM {$table} WHERE id = %d LIMIT 1", $token_id),
+        ARRAY_A,
+    );
+
+    $policy = null;
+    if (is_array($row)) {
+        $ceiling = (string) ($row['ceiling'] ?? '');
+        $policy = [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'scope' => wppilot_token_normalize_scope($row['scope'] ?? null),
+            // A value the code no longer recognises caps at Read Only rather than
+            // being ignored: an unknown ceiling was meant to restrict something.
+            'ceiling' => $ceiling === '' || in_array($ceiling, wppilot_token_ceiling_ids(), strict: true)
+                ? $ceiling
+                : 'readonly',
+        ];
+    }
+
+    wppilot_token_policy_cache($token_id, $policy);
+
+    return $policy;
+}
+
+/**
+ * Request-local cache for wppilot_token_policy(). Returns false on a miss.
+ *
+ * @param array<string, mixed>|null|false $set
+ * @return array{id: int, name: string, scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}|null|false
+ */
+function wppilot_token_policy_cache(int $token_id, array|null|false $set = false, bool $forget = false): array|null|false
+{
+    /** @var array<int, array{id: int, name: string, scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}|null> $cache */
+    static $cache = [];
+
+    if ($forget) {
+        unset($cache[$token_id]);
+        return false;
+    }
+    if ($set !== false) {
+        /** @var array{id: int, name: string, scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}|null $set */
+        $cache[$token_id] = $set;
+    }
+
+    return array_key_exists($token_id, $cache) ? $cache[$token_id] : false;
 }
 
 /**
@@ -189,6 +431,8 @@ function wppilot_token_authenticate(string $secret): ?array
     // @mago-expect lint:no-global -- $wpdb is WordPress' database handle.
     global $wpdb;
     /** @var wpdb $wpdb */
+
+    wppilot_token_refusal('');
 
     if (!wppilot_token_looks_like($secret)) {
         return null;
@@ -218,6 +462,14 @@ function wppilot_token_authenticate(string $secret): ?array
 
     $expires = (string) ($row['expires'] ?? '');
     if ($expires !== '' && strtotime($expires . ' UTC') < time()) {
+        // The one refusal that is named. Only the holder of the real secret can
+        // reach this line, so saying "expired" tells them nothing an attacker
+        // could use — and a generic 401 on a token that worked yesterday sends
+        // people debugging proxies and firewalls instead of minting a new one.
+        wppilot_token_refusal(sprintf(
+            'This WPPilot access token expired on %s UTC. Create a new token on the WPPilot Configuration screen and update the client.',
+            $expires,
+        ));
         return null;
     }
 
@@ -234,6 +486,21 @@ function wppilot_token_authenticate(string $secret): ?array
     }
 
     return ['id' => (int) $row['id'], 'user_id' => $user_id, 'name' => (string) $row['name']];
+}
+
+/**
+ * Why the last wppilot_token_authenticate() call refused, when that reason is safe to say.
+ *
+ * Empty for every refusal that must stay generic.
+ */
+function wppilot_token_refusal(?string $set = null): string
+{
+    static $reason = '';
+    if ($set !== null) {
+        $reason = $set;
+    }
+
+    return $reason;
 }
 
 /**
@@ -264,7 +531,7 @@ function wppilot_token_touch(int $token_id): void
  *
  * Never returns a secret — there is none stored to return.
  *
- * @return list<array{id: int, name: string, last_four: string, created: string, last_used: string, expires: string}>
+ * @return list<array{id: int, name: string, last_four: string, created: string, last_used: string, expires: string, scope: array{abilities: list<string>, categories: list<string>}|null, ceiling: string}>
  */
 function wppilot_tokens_for_user(int $user_id): array
 {
@@ -282,7 +549,7 @@ function wppilot_tokens_for_user(int $user_id): array
 
     // @mago-expect analysis:mixed-assignment
     $rows = $wpdb->get_results(
-        (string) $wpdb->prepare("SELECT id, name, last_four, created, last_used, expires FROM {$table}
+        (string) $wpdb->prepare("SELECT id, name, last_four, created, last_used, expires, scope, ceiling FROM {$table}
              WHERE user_id = %d ORDER BY id DESC", $user_id),
         ARRAY_A,
     );
@@ -304,6 +571,8 @@ function wppilot_tokens_for_user(int $user_id): array
             'created' => (string) $row['created'],
             'last_used' => (string) ($row['last_used'] ?? ''),
             'expires' => (string) ($row['expires'] ?? ''),
+            'scope' => wppilot_token_normalize_scope($row['scope'] ?? null),
+            'ceiling' => (string) ($row['ceiling'] ?? ''),
         ];
     }
 
@@ -364,11 +633,13 @@ function wppilot_tokens_delete_for_user(int $user_id): void
 }
 
 /**
- * Drop expired rows.
+ * Drop rows that expired more than 30 days ago.
  *
  * Expiry is already enforced at authentication, so this is housekeeping rather
  * than a security boundary — it keeps the Connect screen from listing tokens
- * that can never work again.
+ * that can never work again. The grace period is what lets a client still
+ * sending an expired token be told "expired" rather than "invalid" for a month:
+ * once the row is gone the secret matches nothing and the reason is lost.
  */
 function wppilot_tokens_purge_expired(): void
 {
@@ -379,9 +650,15 @@ function wppilot_tokens_purge_expired(): void
     $table = wppilot_tokens_table();
     $wpdb->query((string) $wpdb->prepare(
         "DELETE FROM {$table} WHERE expires IS NOT NULL AND expires < %s",
-        current_time('mysql', gmt: true),
+        gmdate('Y-m-d H:i:s', time() - (30 * DAY_IN_SECONDS)),
     ));
 }
+
+// Every request, not only the Connect screen: every token-bearing request reads
+// the schema-2 columns to learn the token's scope, and a missing column reads as
+// "row not found", which denies everything. A site upgraded without anyone
+// opening wp-admin must still get them first. One option read when current.
+add_action('plugins_loaded', callback: 'wppilot_tokens_schema_maybe_install');
 
 add_action('deleted_user', static function (mixed $user_id): void {
     wppilot_tokens_delete_for_user((int) $user_id);

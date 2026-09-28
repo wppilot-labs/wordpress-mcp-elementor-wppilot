@@ -40,6 +40,9 @@ fi
 
 echo "Packaging WPPilot $VERSION"
 
+# The MCP Registry entry carries the version too; a release must not leave it describing the last one.
+php "$ROOT/scripts/generate-registry-server-json.php" --check
+
 # zip(1) is absent on a stock Windows Git Bash. bsdtar (shipped as tar.exe in
 # System32 on Windows 10+, and as `tar` on macOS) writes a spec-compliant zip;
 # GNU tar cannot write zip at all, and PowerShell's Compress-Archive emits
@@ -107,6 +110,8 @@ for entry in * .[!.]*; do
     build|dist|node_modules|scripts|src|tests|.git|.github|.gitignore) continue ;;
     package.json|package-lock.json|bun.lockb|tsconfig.json) continue ;;
     composer.json|composer.lock|.phpunit.result.cache|.DS_Store) continue ;;
+    # The MCP Registry entry is published from the repository, not read by the plugin.
+    server.json) continue ;;
     phpunit.xml|phpunit.xml.dist|.phpunit.cache|phpcs.xml|phpcs.xml.dist|mago.toml) continue ;;
     .gitattributes|.editorconfig) continue ;;
     *.zip) continue ;;
@@ -114,6 +119,14 @@ for entry in * .[!.]*; do
   esac
   cp -R "$entry" "$BUILD/wppilot/"
 done
+
+# A kit folder (includes/kits/<slug>/) is built to be copied whole into other plugins, so a
+# kit may keep its own tests/ beside its code. Those are development files like tests/ at the
+# root, and a test double shipped in a release is code running on a customer's site that
+# nobody meant to put there.
+if [ -d "$BUILD/wppilot/includes/kits" ]; then
+  find "$BUILD/wppilot/includes/kits" -mindepth 2 -maxdepth 2 -type d -name tests -prune -exec rm -rf {} +
+fi
 
 verify_tree "$BUILD/wppilot" "release build"
 make_zip "$ROOT/build/wppilot.zip" "$BUILD" wppilot
