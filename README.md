@@ -108,6 +108,33 @@ An access token borrows the capabilities of the user who created it, and that ch
 
 None of the three is a product licence. WPPilot needs no activation key, entitlement check or subscription service to run.
 
+### Local connection over WP-CLI (stdio)
+
+A client that runs on the same machine as the site - Claude Code, Cursor, a CI job - can start WPPilot itself instead of connecting over HTTP, with no credential to create. `wp wppilot mcp serve` serves the same MCP server as `/wp-json/mcp/wppilot` over stdin/stdout, as the WordPress user named in WP-CLI's `--user`, with the same abilities, safety profile, confirmations and permission checks:
+
+```bash
+# Claude Code
+claude mcp add wppilot-local -- wp --path=/var/www/html wppilot mcp serve --user=admin
+
+# WordPress in Docker
+claude mcp add wppilot-local -- docker exec -i <container> wp --path=/var/www/html wppilot mcp serve --user=admin
+```
+
+Cursor and other clients that take a command (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "wppilot-local": {
+      "command": "wp",
+      "args": ["--path=/var/www/html", "wppilot", "mcp", "serve", "--user=admin"]
+    }
+  }
+}
+```
+
+The **Connect** screen shows these with this site's path and your login filled in. Nothing is written to stdout except protocol messages, and each process is one agent session on the Changes screen.
+
 ## Safety model
 
 | Profile | What it allows |
@@ -117,6 +144,8 @@ None of the three is a product licence. WPPilot needs no activation key, entitle
 | **Developer Full Access** | Every enabled ability, including privileged surfaces. Critical calls still require explicit confirmation. |
 
 On top of the profile: WordPress user capabilities still apply, individual abilities can be switched off, destructive operations require an explicit confirmation flag, writes are rate-limited per credential, and supported changes are recorded in a redacted change ledger with rollback.
+
+**Undo a whole agent session.** Every write an agent makes is filed under its session - one MCP connection, one `wp wppilot mcp serve` process, or one credential and client until it has been idle for 30 minutes. `wppilot/undo-session` (or **Undo session** on the Changes screen) takes back everything that session did, newest first, verifying each change against its before-image. It refuses without touching anything when something else changed a target after the session did, stops at the first change that fails verification and says exactly what was and was not undone, and never skips a change that cannot be undone without saying so. `wppilot/redo-session` puts an undone session back, under the same checks. `wppilot/list-sessions` shows each session and what undo and redo would do right now.
 
 Every ledger entry names the agent behind the write, not only the WordPress user. Claude Code, Cursor and Codex usually connect as the same administrator, so the user alone cannot answer which of them made a change: the OAuth client id or application-password UUID can, and it is what the ledger records, alongside the client name the agent introduced itself with. A write with no agent behind it - wp-admin, WP-CLI, cron - is recorded as `direct` rather than credited to the last agent seen. OAuth client ids are stored hashed.
 
