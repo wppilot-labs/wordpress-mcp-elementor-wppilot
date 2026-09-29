@@ -48,13 +48,13 @@ function wppilot_pro_integration_catalog(): array
 {
     return [
         // Page builders, themes, and block libraries.
-        ['label' => 'Elementor', 'category' => 'builder', 'constant' => 'ELEMENTOR_VERSION', 'abilities' => 33],
+        ['label' => 'Elementor', 'category' => 'builder', 'constant' => 'ELEMENTOR_VERSION', 'abilities' => 51],
         ['label' => 'Bricks Builder', 'category' => 'builder', 'constant' => 'BRICKS_VERSION', 'abilities' => 49],
         ['label' => 'Bricksforge', 'category' => 'builder', 'constant' => 'BRICKSFORGE_VERSION', 'abilities' => 21],
         ['label' => 'Divi 5', 'category' => 'builder', 'constant' => 'ET_BUILDER_VERSION', 'abilities' => 47],
         ['label' => 'WPBakery Page Builder', 'category' => 'builder', 'constant' => 'WPB_VC_VERSION', 'abilities' => 18],
         ['label' => 'Breakdance', 'category' => 'builder', 'function' => 'Breakdance\\Data\\get_global_option', 'abilities' => 33],
-        ['label' => 'Mosaic', 'category' => 'builder', 'class' => 'Mosaic\\Database\\MosaicDB', 'abilities' => 36],
+        ['label' => 'Mosaic', 'category' => 'builder', 'class' => 'Mosaic\\Database\\MosaicDB', 'abilities' => 41],
         ['label' => 'Etch', 'category' => 'builder', 'class' => 'Etch\\Plugin', 'abilities' => 60],
         ['label' => 'Beaver Builder', 'category' => 'builder', 'class' => 'FLBuilderModel', 'abilities' => 21],
         ['label' => 'GeneratePress', 'category' => 'builder', 'function' => 'generate_get_option', 'abilities' => 23],
@@ -91,10 +91,10 @@ function wppilot_pro_integration_catalog(): array
         ['label' => 'UpdraftPlus', 'category' => 'backups', 'class' => 'UpdraftPlus', 'abilities' => 3],
         ['label' => 'Duplicator', 'category' => 'backups', 'class' => 'Duplicator\\Package\\DupPackage', 'abilities' => 3],
         ['label' => 'BackWPup', 'category' => 'backups', 'class' => 'BackWPup', 'abilities' => 3],
-        ['label' => 'Wordfence', 'category' => 'security', 'constant' => 'WORDFENCE_VERSION', 'abilities' => 3],
-        ['label' => 'Solid Security', 'category' => 'security', 'class' => 'ITSEC_Core', 'abilities' => 3],
+        ['label' => 'Wordfence', 'category' => 'security', 'constant' => 'WORDFENCE_VERSION', 'abilities' => 8],
+        ['label' => 'Solid Security', 'category' => 'security', 'class' => 'ITSEC_Core', 'abilities' => 8],
         // Commerce, dev tools, dynamic content.
-        ['label' => 'WooCommerce', 'category' => 'commerce', 'class' => 'WooCommerce', 'abilities' => 35],
+        ['label' => 'WooCommerce', 'category' => 'commerce', 'class' => 'WooCommerce', 'abilities' => 65],
         ['label' => 'FunnelKit', 'category' => 'commerce', 'constant' => 'WFFN_VERSION', 'abilities' => 4],
         ['label' => 'Code Snippets', 'category' => 'dev', 'constant' => 'CODE_SNIPPETS_VERSION', 'abilities' => 11],
         ['label' => 'Dynamic Shortcodes', 'category' => 'dynamic', 'constant' => 'DYNAMIC_SHORTCODES_VERSION', 'abilities' => 9],
@@ -128,7 +128,7 @@ function wppilot_pro_integration_active(array $integration): bool
  * constant rather than counted from the catalog above: that catalog only lists
  * what this plugin can *detect*, which is a subset of what Pro ships.
  */
-const WPPILOT_PRO_INTEGRATION_COUNT = 51;
+const WPPILOT_PRO_INTEGRATION_COUNT = 88;
 
 /**
  * Labels of catalog integrations whose plugin or theme is active on this site,
