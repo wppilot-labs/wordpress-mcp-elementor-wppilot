@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.15.0
+Stable tag: 1.15.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,13 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.15.1 =
+* Fixed: with Wordfence active, every MCP call made with an Application Password returned 401 and nothing said why. Wordfence switches Application Passwords off by default (its "Disable WordPress application passwords" setting), and the Connection Doctor, Diagnostics and the Connect screen only said "a plugin or code". They now name Wordfence and the exact setting to uncheck, name any other plugin that switches Application Passwords off by the file its filter lives in, and point to OAuth or an access token, which do not need Application Passwords.
+* Fixed: change records showed email addresses in full. wppilot/get-change, wppilot/export-changes, the Changes screen and its download redacted secrets by key name only, so an address typed into an excerpt or a comment came back as written, and get-change returned before-images with no redaction at all. Email addresses in the input, the result, the before-image and the undo verification are now masked when a record is read (j***@e***.com), and before-images get the key-name redaction too. What is stored is unchanged, so undo still restores the exact original.
+* Fixed: the content audit and wppilot/read-content only knew Yoast, Rank Math, SEOPress and AIOSEO (read-content not even SEOPress), so on a site using The SEO Framework, Slim SEO or SmartCrawl the audit said no SEO plugin was found and read-content reported no SEO title or description. Their meta is now read, Slim SEO's single settings array included. With WPPilot Pro active the audit reads the active SEO plugins through Pro's own readers, and suggests each plugin's update ability only when it is registered.
+* Changed: the Pro upsell names the integrations Pro adds for UpdraftPlus, Duplicator, BackWPup, Wordfence, Solid Security, The SEO Framework, Slim SEO, SmartCrawl, Forminator, WS Form, Kadence Blocks patterns and FunnelKit when one of them is active.
+* Kits: kit.json can declare another plugin's storage (vendor_storage) and the kits a kit needs exported with it (requires.kits); the coexistence check honours the first and the exporter the second. No abilities were added or changed, and existing connections keep working.
 
 = 1.15.0 =
 * New: a redesigned admin. WPPilot opens on a Dashboard that answers "is everything fine, what did agents do, does anything need me": whether agents can act and under which safety profile, connected clients and when they were last active, changes in the last 24 hours and how many can be undone, writes waiting for approval, and the latest changes with an Undo button on each. The connection wizard, credentials and endpoints moved to their own Connect screen. Sixteen screens are grouped into six sections - Dashboard, Connect, Activity, Agent, Studio, Settings - with the screens of each section as tabs under the page title, and Activity shows a count when writes wait for approval. The look is calmer: hairline cards instead of heavy black borders, sentence-case labels, and green for "agents can act" instead of red. The header is one white bar with the site's name and the agents' state, and the toolbar shows "WPPilot" with a green, amber or grey dot instead of a red "WPPilot ON" block. Every screen now fits a phone without scrolling sideways.
@@ -427,6 +434,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.15.1 =
+Fixes Application Password 401s under Wordfence going unexplained (the Connection Doctor and Connect screen now name Wordfence and the setting to change), email addresses showing in full in change records, and the content audit missing The SEO Framework, Slim SEO and SmartCrawl. No new abilities or permission changes.
 
 = 1.15.0 =
 A redesigned admin with a Dashboard, six sections and a phone-friendly layout. Search and replace with undo, image editing, WCAG and content audits, Block Notes, site tools, multisite, Connection Doctor, MCP Tasks and Apps, human confirmation, scoped expiring tokens, and a change log in its own table (existing history is moved across on update). 26 new abilities; no permission changes.
