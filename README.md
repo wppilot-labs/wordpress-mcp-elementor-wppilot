@@ -1,6 +1,6 @@
 # WPPilot - WordPress MCP Server, Elementor MCP and WooCommerce MCP
 
-**Point Claude Code, Codex, Cursor or Antigravity at your WordPress site and let it build pages, Elementor layouts, block content, menus, taxonomies, media and SEO metadata through typed abilities your permissions still govern.**
+**Connect Claude, ChatGPT, Claude Code, Codex, Cursor or Antigravity to your WordPress site and let an AI agent build pages, Elementor layouts, block content, menus, taxonomies, media and SEO metadata through typed abilities your permissions still govern.**
 
 [![Version](https://img.shields.io/github/v/release/wppilot-labs/wordpress-mcp-elementor-wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases)
 [![Quality](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/actions/workflows/quality.yml)
@@ -16,6 +16,14 @@ Installs straight into **Plugins - Add New - Upload Plugin**. That link always r
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
 
 The free plugin is the **WordPress MCP server**, and since 1.10.0 it is also a working **Elementor MCP server**: 17 abilities that read an Elementor document, report the widgets and style properties your install actually offers, and add, edit, move, duplicate, reorder and delete elements in the tree. No licence, no key, no Pro install. [WPPilot Pro](https://wppilot.co/pro) then extends that same endpoint into a **WooCommerce MCP server** and a Bricks, Divi, Oxygen, Etch or WPBakery MCP server, and adds Elementor's authoring layer on top: whole-page composition, templates and theme parts, popups, forms, dynamic tags, global classes and variables.
+
+### How WPPilot compares to other WordPress MCP servers
+
+WordPress MCP servers differ most in what happens *after* an agent writes: who confirms a destructive call, whether a change can be undone, and whether the server runs on your own site or through someone else's relay. WPPilot is self-hosted with no call caps. It can require a person, not the model, to confirm destructive calls. It records every write in a change ledger, and its undo checks the restored state against the before-image instead of assuming it worked. The free plugin covers Elementor editing, accessibility and content audits, and search and replace with undo.
+
+Other servers lead elsewhere, and the comparisons say so. Every competitor fact is sourced and dated:
+
+[Best WordPress MCP servers in 2026](https://wppilot.co/compare/wordpress-mcp-servers) · [vs Respira](https://wppilot.co/compare/respira-vs-wppilot) · [vs Easy MCP AI](https://wppilot.co/compare/easy-mcp-ai-vs-wppilot) · [vs EMCP](https://wppilot.co/compare/emcp-vs-wppilot) · [vs Elementor's MCP](https://wppilot.co/compare/elementor-mcp-vs-wppilot) · [vs WPVibe](https://wppilot.co/compare/wpvibe-vs-wppilot) · [vs Royal MCP](https://wppilot.co/compare/royal-mcp-vs-wppilot) · [vs AI Engine](https://wppilot.co/compare/ai-engine-mcp-vs-wppilot) · [vs the WordPress MCP Adapter](https://wppilot.co/compare/wordpress-mcp-adapter-vs-wppilot) · [Undo and rollback, compared](https://wppilot.co/wordpress-mcp/undo-rollback)
 
 ### Looking for an Elementor, Divi or Beaver Builder MCP server?
 
@@ -80,7 +88,7 @@ https://example.com/wp-json/mcp/wppilot
 
 OAuth-authenticated clients use `/wp-json/mcp/wppilot-oauth`. Application passwords and access tokens both authenticate on the canonical route. The older `/wp-json/mcp/mcp-adapter-default-server` route still resolves as a legacy alias, but new configurations should use the canonical path above.
 
-## Supported AI clients
+## Supported AI clients: connect Claude, ChatGPT, Cursor and more to WordPress
 
 Claude Code · Claude Desktop · Claude on the web · ChatGPT · Codex CLI · Codex desktop app · Cursor · VS Code · GitHub Copilot · Gemini CLI · Devin Desktop (formerly Windsurf) · Factory Droid · Antigravity CLI · Antigravity IDE · Zed · Cline · Roo Code · Kilo Code · Amazon Q · OpenCode · OpenClaw · Qwen Code · Kimi Code CLI · ZCode (GLM) · Mistral Le Chat · Perplexity · Manus
 
