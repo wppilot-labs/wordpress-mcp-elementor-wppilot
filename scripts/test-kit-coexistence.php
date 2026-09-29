@@ -85,7 +85,52 @@ const NAMING_CALLS = [
  * WordPress's own options. Every plugin reads them (which page is the front page, the site name),
  * so two copies of a kit both naming one is the site being read, not a clash between the copies.
  */
-const CORE_OPTIONS = ['show_on_front', 'page_on_front', 'page_for_posts', 'blogname', 'blogdescription', 'home', 'siteurl', 'permalink_structure'];
+const CORE_OPTIONS = ['show_on_front', 'page_on_front', 'page_for_posts', 'blogname', 'blogdescription', 'home', 'siteurl', 'permalink_structure', 'blog_public', 'gmt_offset'];
+
+/**
+ * Storage kinds a kit.json `vendor_storage` may declare, and the kind this gate files each under.
+ * Meta keys are compared as options: the static read files a constant named *META* or *KEY*
+ * under `option`, whichever table the key lives in.
+ */
+const VENDOR_STORAGE_KINDS = ['option' => 'option', 'meta' => 'option', 'transient' => 'transient', 'cron' => 'cron'];
+
+/**
+ * Vendor-owned names Pro's kits use but do not declare in kit.json yet. Transitional: every run
+ * lists the entries no kit.json declares, and the list goes once Pro's kits declare them all.
+ */
+const UNDECLARED_VENDOR_NAMES = [
+    'option' => ['backwpup_cfg_logfolder', '_wds_focus-keywords'],
+    'cron' => ['backwpup_cron', 'updraft_backup', 'updraft_backup_database'],
+];
+
+/**
+ * Names that belong to another plugin (Elementor's page data, Slim SEO's per-post array, a backup
+ * plugin's cron event), declared by the kits that read or write them in kit.json:
+ *
+ *   "vendor_storage": {"option": [...], "meta": [...], "transient": [...], "cron": [...]}
+ *
+ * Both copies naming one of these are both talking to that plugin, not clashing with each other,
+ * and renaming them in an export would break the kit. Keyed by this gate's kind.
+ *
+ * @param list<string> $kit_jsons
+ * @return array<string, array<string, true>>
+ */
+function vendor_names(array $kit_jsons): array
+{
+    $names = [];
+    foreach ($kit_jsons as $file) {
+        $manifest = json_decode((string) file_get_contents($file), true);
+        $declared = is_array($manifest['vendor_storage'] ?? null) ? $manifest['vendor_storage'] : [];
+        foreach (VENDOR_STORAGE_KINDS as $key => $kind) {
+            foreach (is_array($declared[$key] ?? null) ? $declared[$key] : [] as $name) {
+                if (is_string($name) && $name !== '') {
+                    $names[$kind][$name] = true;
+                }
+            }
+        }
+    }
+    return $names;
+}
 
 /**
  * Names each kind of shared resource a tree's PHP source spells out, statically.
@@ -380,13 +425,27 @@ function load_both(string $free, string $pro, string $export): array
         }
     }
 
+    $vendor = vendor_names(array_merge(
+        glob($free . '/includes/kits/*/kit.json') ?: [],
+        $pro !== '' ? (glob($pro . '/includes/kits/*/kit.json') ?: []) : [],
+    ));
+    $undeclared = [];
+    foreach ($pro !== '' ? UNDECLARED_VENDOR_NAMES : [] as $kind => $list) {
+        foreach ($list as $name) {
+            if (!isset($vendor[$kind][$name])) {
+                $vendor[$kind][$name] = true;
+                $undeclared[] = "{$kind} {$name}";
+            }
+        }
+    }
+
     $fired = ($sides['wppilot']['fired'] ?? []) + ($sides['export']['fired'] ?? []);
     foreach (['ability', 'category', 'option', 'transient', 'cron', 'rest_namespace', 'rest_route', 'post_type', 'handle', 'nonce', 'admin_page', 'hook'] as $kind) {
         $ours = $sides['wppilot'][$kind] ?? [];
         $theirs = $sides['export'][$kind] ?? [];
         foreach (array_keys($ours) as $name) {
             $name = (string) $name;
-            $clash = isset($theirs[$name]) && !isset(CORE_NAMES[$kind][$name]);
+            $clash = isset($theirs[$name]) && !isset(CORE_NAMES[$kind][$name]) && !isset($vendor[$kind][$name]);
             if (!$clash && $kind === 'option' && str_ends_with($name, '_')) {
                 foreach (array_keys($theirs) as $other) {
                     $clash = $clash || str_starts_with((string) $other, $name);
@@ -407,6 +466,9 @@ function load_both(string $free, string $pro, string $export): array
         $counts[] = sprintf('%s %d/%d', $kind, count($sides['wppilot'][$kind] ?? []), count($sides['export'][$kind] ?? []));
     }
     echo 'Compared (WPPilot/export): ', implode(', ', $counts), "\n";
+    if ($undeclared !== []) {
+        echo 'Vendor names no kit.json declares yet, allowed by the transitional list (declare them in vendor_storage): ', implode(', ', $undeclared), "\n";
+    }
     echo 'Abilities registered: ', implode(', ', array_keys(\Kit_Coexistence::$abilities)), "\n";
     return $problems;
 }
