@@ -9,14 +9,17 @@ declare(strict_types=1);
  * Configuration page: generated client configuration for the Access token method.
  *
  * One credential, one URL, one header — so unlike the application-password
- * method there is no npx bridge here and nothing to install. What differs
- * between clients is only where the header goes, and the field names disagree
- * more than they should: VS Code nests servers under `servers`, everyone else
- * under `mcpServers`; Antigravity and Devin Desktop call the URL `serverUrl`;
- * Cline spells the transport `streamableHttp` where Kilo spells it
- * `streamable-http`; Codex uses TOML with `http_headers`. Each builder below
- * writes the shape that client actually parses, verified against its own
- * documentation rather than assumed from the others.
+ * method there is nothing to install for almost every client. The exception is
+ * Claude Desktop, whose config file is documented for local stdio servers only,
+ * so the header rides on the mcp-remote bridge there. What differs between
+ * clients is mostly where the header goes, and the field names disagree more
+ * than they should: VS Code nests servers under `servers`, most others under
+ * `mcpServers`, OpenCode and Kilo under `mcp`, OpenClaw under `mcp.servers`;
+ * Antigravity and Devin Desktop call the URL `serverUrl`; Cline spells the
+ * transport `streamableHttp` where Roo spells it `streamable-http` and OpenClaw
+ * wants `transport: "streamable-http"`; Codex uses TOML with `http_headers`.
+ * Each builder below writes the shape that client actually parses, verified
+ * against its own documentation rather than assumed from the others.
  *
  * Every builder returns a string; nothing in this file echoes, so the same value
  * can be rendered, copied, or handed to JavaScript.
@@ -159,34 +162,32 @@ function wppilot_token_droid_cmd(string $name, string $url, string $token): stri
 }
 
 /**
- * Zed speaks stdio only, so the token rides on an mcp-remote bridge.
+ * Zed connects to a remote server natively: `url` plus `headers` under
+ * `context_servers`. The old `source: "custom"` marker is gone from its docs,
+ * and with a header set Zed skips its own OAuth prompt.
  *
- * This is the one client here that still needs Node — not a WPPilot limitation:
- * Zed has no native Streamable HTTP transport, and its own documentation points
- * at the same bridge.
+ * Source, checked 2026-09-30: https://zed.dev/docs/ai/mcp
  */
 function wppilot_token_zed_json(string $name, string $url, string $token): string
 {
     return wppilot_token_json([
         'context_servers' => [
             $name => [
-                'source' => 'custom',
-                'enabled' => true,
-                'command' => 'npx',
-                'args' => [
-                    '-y',
-                    'mcp-remote',
-                    $url,
-                    '--header',
-                    'Authorization: ' . wppilot_token_auth_header($token),
-                ],
+                'url' => $url,
+                'headers' => ['Authorization' => wppilot_token_auth_header($token)],
             ],
         ],
     ]);
 }
 
 /**
- * OpenCode names the remote transport `remote` and the URL `url`.
+ * OpenCode and Kilo Code share a format: servers under `mcp`, the remote
+ * transport named `remote`. `oauth: false` is what both document for a server
+ * authenticated by a header — it stops either client starting a browser sign-in
+ * because this site also advertises OAuth metadata.
+ *
+ * Sources, checked 2026-09-30: https://opencode.ai/docs/mcp-servers/ and
+ * https://kilo.ai/docs/automate/mcp/using-in-kilo-code
  */
 function wppilot_token_opencode_json(string $name, string $url, string $token): string
 {
@@ -196,7 +197,103 @@ function wppilot_token_opencode_json(string $name, string $url, string $token): 
                 'type' => 'remote',
                 'url' => $url,
                 'enabled' => true,
+                'oauth' => false,
                 'headers' => ['Authorization' => wppilot_token_auth_header($token)],
+            ],
+        ],
+    ]);
+}
+
+/**
+ * Claude Desktop's config file is documented for local stdio servers; remote
+ * servers are added as custom connectors, which connect from Anthropic's cloud.
+ * So a token for the desktop app goes through the mcp-remote bridge, which runs
+ * locally and therefore also reaches a site that is not on the public internet.
+ *
+ * The header travels as `Authorization:${AUTH_HEADER}` with the value in env:
+ * mcp-remote's README warns that Claude Desktop on Windows does not escape spaces
+ * inside `args`, which would split "Bearer <token>" in two.
+ *
+ * Sources, checked 2026-09-30:
+ * https://modelcontextprotocol.io/docs/develop/connect-local-servers
+ * https://modelcontextprotocol.io/docs/develop/connect-remote-servers
+ * https://github.com/geelen/mcp-remote (README, "--header")
+ */
+function wppilot_token_claude_desktop_json(string $name, string $url, string $token): string
+{
+    $env = ['AUTH_HEADER' => wppilot_token_auth_header($token)];
+    if (wppilot_likely_self_signed_https()) {
+        $env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+    }
+
+    return wppilot_token_json([
+        'mcpServers' => [
+            $name => [
+                'command' => 'npx',
+                'args' => ['-y', 'mcp-remote', $url, '--header', 'Authorization:${AUTH_HEADER}'],
+                'env' => $env,
+            ],
+        ],
+    ]);
+}
+
+/**
+ * Copilot CLI: `mcpServers`, `type: "http"`, and a required `tools` list. It
+ * rejects the `servers` key VS Code uses.
+ *
+ * Sources, checked 2026-09-30:
+ * https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+ * https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference
+ */
+function wppilot_token_copilot_cli_json(string $name, string $url, string $token): string
+{
+    return wppilot_token_json([
+        'mcpServers' => [
+            $name => [
+                'type' => 'http',
+                'url' => $url,
+                'headers' => ['Authorization' => wppilot_token_auth_header($token)],
+                'tools' => ['*'],
+            ],
+        ],
+    ]);
+}
+
+/**
+ * Kimi Code CLI: an entry with `url` and no `transport` is Streamable HTTP;
+ * static headers go in `headers`.
+ *
+ * Source, checked 2026-09-30:
+ * https://moonshotai.github.io/kimi-code/en/customization/mcp.html
+ */
+function wppilot_token_kimi_json(string $name, string $url, string $token): string
+{
+    return wppilot_token_json([
+        'mcpServers' => [
+            $name => [
+                'url' => $url,
+                'headers' => ['Authorization' => wppilot_token_auth_header($token)],
+            ],
+        ],
+    ]);
+}
+
+/**
+ * OpenClaw reads `mcp.servers` from ~/.openclaw/openclaw.json. Without
+ * `transport: "streamable-http"` a remote entry is treated as SSE.
+ *
+ * Source, checked 2026-09-30: https://docs.openclaw.ai/cli/mcp/transports
+ */
+function wppilot_token_openclaw_json(string $name, string $url, string $token): string
+{
+    return wppilot_token_json([
+        'mcp' => [
+            'servers' => [
+                $name => [
+                    'url' => $url,
+                    'transport' => 'streamable-http',
+                    'headers' => ['Authorization' => wppilot_token_auth_header($token)],
+                ],
             ],
         ],
     ]);
@@ -346,7 +443,11 @@ function wppilot_token_ui_entry(array $steps, string $hint): array
  * service-account credential is wanted rather than a sign-in per person.
  *
  * ChatGPT is absent: developer mode offers OAuth or no authentication and has no
- * header field, so a token has nowhere to go there.
+ * header field, so a token has nowhere to go there. Manus is present because its
+ * custom-MCP documentation lists a Bearer token among the credentials a custom
+ * server can take (https://manus.im/docs/integrations/custom-mcp, checked
+ * 2026-09-30); that page does not name the dialog's fields, so the steps stay
+ * general about them.
  *
  * @return array<string, array{code: string, hint: string, paths: array<string, string>, isShell: bool, steps: list<string>}>
  */
@@ -421,6 +522,28 @@ function wppilot_build_token_web_ui_configs(string $url, string $token): array
                 domain: 'wppilot',
             ),
         ),
+        'manus' => wppilot_token_ui_entry(
+            [
+                __(
+                    'In Manus, open Settings and add a custom MCP server (Connectors, then Custom MCP, in current versions).',
+                    domain: 'wppilot',
+                ),
+                __('Paste the server URL:', domain: 'wppilot'),
+                $url,
+                __('For authentication choose the Bearer token option and paste the token:', domain: 'wppilot'),
+                $token,
+                __(
+                    'If the form asks for a request header instead, name it Authorization and give it this value:',
+                    domain: 'wppilot',
+                ),
+                $header,
+                __('Save. Manus checks it can reach the server and lists the tools it found.', domain: 'wppilot'),
+            ],
+            __(
+                'Manus connects from its own servers, so this site must be reachable over public HTTPS.',
+                domain: 'wppilot',
+            ),
+        ),
     ];
 }
 
@@ -428,11 +551,11 @@ function wppilot_build_token_web_ui_configs(string $url, string $token): array
  * Every access-token config snippet, keyed the same way as the client registry so
  * the tab strip can be built from wppilot_selectable_clients().
  *
- * The hosted web UIs that can store a fixed Authorization header — claude.ai,
- * Mistral Le Chat, Perplexity — appear here as click-through steps rather than a
- * snippet, because that is how a token is entered there. ChatGPT, Manus and the
- * Codex desktop app are absent on purpose: their connector dialogs offer OAuth or
- * no authentication and have no header field, so a token has nowhere to go, and
+ * The hosted web UIs that can store a fixed credential — claude.ai, Mistral Le
+ * Chat, Perplexity, Manus — appear here as click-through steps rather than a
+ * snippet, because that is how a token is entered there. ChatGPT and the Codex
+ * desktop app are absent on purpose: their connector dialogs offer OAuth or no
+ * authentication and have no header field, so a token has nowhere to go, and
  * showing one would be the page inventing a route that does not exist.
  *
  * @return array<string, array{code: string, hint: string, paths: array<string, string>, isShell: bool}>
@@ -446,15 +569,26 @@ function wppilot_build_token_configs(string $url, string $name, string $token): 
         [
             'claude-code' => wppilot_token_entry(
                 wppilot_token_claude_code_cmd($name, $url, $token),
+                // A server whose Authorization header you configured is never
+                // flagged "needs authentication": a good token shows connected, a
+                // bad one "failed" with the HTTP status. Source, checked
+                // 2026-09-30: https://code.claude.com/docs/en/mcp
                 __(
-                    'Run in your terminal, then restart Claude Code. The /mcp screen may still list this server as needing authentication — that is a known display bug when a server also advertises OAuth; the header authenticates every call regardless, and the tools will work.',
+                    'Run in your terminal, then restart Claude Code. Run /mcp to check: the server should read connected. If it reads failed, the detail shows the HTTP status — a 401 means the token is wrong or revoked.',
                     domain: 'wppilot',
                 ),
                 is_shell: true,
             ),
             'claude-desktop' => wppilot_token_entry(
-                $standard,
-                sprintf($add_to, '<code>claude_desktop_config.json</code>'),
+                wppilot_token_claude_desktop_json($name, $url, $token),
+                sprintf(
+                    /* translators: %s: config file name wrapped in <code> tags */
+                    __(
+                        'Add to %s, then fully quit and reopen Claude Desktop. This file runs local servers only, so the token goes through the mcp-remote bridge (needs Node.js). On a public HTTPS site you can instead add a custom connector under Settings, Connectors — see the Claude (web) steps.',
+                        domain: 'wppilot',
+                    ),
+                    '<code>claude_desktop_config.json</code>',
+                ),
                 [
                     'macOS' => '~/Library/Application Support/Claude/claude_desktop_config.json',
                     'Windows' => '%APPDATA%\\Claude\\claude_desktop_config.json',
@@ -496,17 +630,16 @@ function wppilot_build_token_configs(string $url, string $name, string $token): 
                 ],
             ),
             'github-copilot' => wppilot_token_entry(
-                wppilot_token_json([
-                    'servers' => [
-                        $name => [
-                            'type' => 'http',
-                            'url' => $url,
-                            'headers' => ['Authorization' => wppilot_token_auth_header($token)],
-                        ],
-                    ],
-                ]),
-                __('Copilot reads the VS Code MCP configuration.', domain: 'wppilot'),
-                [__('Project', domain: 'wppilot') => '.github/copilot/mcp.json'],
+                wppilot_token_copilot_cli_json($name, $url, $token),
+                sprintf(
+                    /* translators: %s: config file name wrapped in <code> tags */
+                    __(
+                        'For Copilot CLI: add to %s, or run copilot mcp add. Copilot Chat in VS Code reads the VS Code configuration instead — use the VS Code tab.',
+                        domain: 'wppilot',
+                    ),
+                    '<code>mcp-config.json</code>',
+                ),
+                wppilot_copilot_cli_paths(),
             ),
             'factory-droid' => wppilot_token_entry(
                 wppilot_token_droid_cmd($name, $url, $token),
@@ -521,15 +654,12 @@ function wppilot_build_token_configs(string $url, string $name, string $token): 
                 sprintf(
                     /* translators: %s: config file name wrapped in <code> tags */
                     __(
-                        'Add to %s. Devin Desktop still reads the Windsurf path, and expects "serverUrl".',
+                        'Add to %s — the Cascade panel\'s … menu, then Open MCP config file, opens the one your install reads. Remote servers use "serverUrl".',
                         domain: 'wppilot',
                     ),
                     '<code>mcp_config.json</code>',
                 ),
-                [
-                    'macOS / Linux' => '~/.codeium/windsurf/mcp_config.json',
-                    'Windows' => '%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json',
-                ],
+                wppilot_devin_desktop_paths(),
             ),
             'antigravity-cli' => wppilot_token_entry(
                 wppilot_token_server_url_json($name, $url, $token),
@@ -548,7 +678,13 @@ function wppilot_build_token_configs(string $url, string $name, string $token): 
             ),
             'antigravity-ide' => wppilot_token_entry(
                 wppilot_token_server_url_json($name, $url, $token),
-                __('Settings, then Customizations, then Open MCP Config.', domain: 'wppilot'),
+                // "Settings, Customizations" is the Antigravity 2.0 desktop app;
+                // the IDE opens the file from the agent side panel. Source,
+                // checked 2026-09-30: https://antigravity.google/docs/mcp
+                __(
+                    'Click … at the top of the agent side panel, choose MCP Servers, then Manage MCP Servers and View raw config. Antigravity expects "serverUrl".',
+                    domain: 'wppilot',
+                ),
                 [
                     __('Global', domain: 'wppilot') => '~/.gemini/config/mcp_config.json',
                     __('Workspace', domain: 'wppilot') => '.agents/mcp_config.json',
@@ -584,20 +720,37 @@ function wppilot_build_token_vscode_family_configs(string $url, string $name, st
         'roo-code' => wppilot_token_entry(
             wppilot_token_mcp_servers_json($name, $url, $token, type: 'streamable-http'),
             __(
-                'Roo Code spells the transport "streamable-http", with a hyphen. The extension was discontinued in May 2026 — for a new setup, use Cline.',
+                'Roo Code spells the transport "streamable-http", with a hyphen. The extension was discontinued in May 2026 — for a new setup, use Cline or ZooCode.',
                 domain: 'wppilot',
             ),
             [__('Project', domain: 'wppilot') => '.roo/mcp.json'],
         ),
         'kilo-code' => wppilot_token_entry(
-            wppilot_token_mcp_servers_json($name, $url, $token, type: 'streamable-http'),
-            __('Kilo Code spells the transport "streamable-http", with a hyphen.', domain: 'wppilot'),
-            [__('Project', domain: 'wppilot') => '.kilocode/mcp.json'],
+            wppilot_token_opencode_json($name, $url, $token),
+            sprintf(
+                /* translators: %s: config file name wrapped in <code> tags */
+                __(
+                    'Add to %s, or use Settings, Agent Behaviour, MCP Servers. Kilo names the remote transport "remote"; "oauth": false stops it offering a sign-in the header makes unnecessary.',
+                    domain: 'wppilot',
+                ),
+                '<code>kilo.jsonc</code>',
+            ),
+            wppilot_kilo_code_paths(),
         ),
-        'amazon-q' => wppilot_token_entry($standard, sprintf($add_to, '<code>mcp.json</code>'), [
-            __('Global', domain: 'wppilot') => '~/.aws/amazonq/mcp.json',
-            __('Project', domain: 'wppilot') => '.amazonq/mcp.json',
-        ]),
+        // Kiro's documented remote shape is plain `url` + `headers`; Amazon Q
+        // Developer reads the same mcpServers file format.
+        'amazon-q' => wppilot_token_entry(
+            wppilot_token_json([
+                'mcpServers' => [
+                    $name => [
+                        'url' => $url,
+                        'headers' => ['Authorization' => wppilot_token_auth_header($token)],
+                    ],
+                ],
+            ]),
+            sprintf($add_to, '<code>mcp.json</code>'),
+            wppilot_amazon_q_kiro_paths(),
+        ),
         'opencode' => wppilot_token_entry(
             wppilot_token_opencode_json($name, $url, $token),
             sprintf($add_to, '<code>opencode.json</code>'),
@@ -611,24 +764,24 @@ function wppilot_build_token_vscode_family_configs(string $url, string $name, st
             sprintf(
                 /* translators: %s: config file name wrapped in <code> tags */
                 __(
-                    'Add to %s. Zed has no HTTP transport, so this one still needs Node for the bridge.',
+                    'Add to %s (zed: open settings file), or use Settings, AI, MCP Servers, Add Remote Server. Zed connects directly — no Node or bridge needed.',
                     domain: 'wppilot',
                 ),
                 '<code>settings.json</code>',
             ),
-            ['macOS / Linux' => '~/.config/zed/settings.json'],
+            wppilot_zed_paths(),
         ),
         'kimi-cli' => wppilot_token_entry(
-            $standard,
+            wppilot_token_kimi_json($name, $url, $token),
             sprintf(
                 /* translators: %s: config file name wrapped in <code> tags */
                 __(
-                    'Add to %s, or run the equivalent kimi mcp add command. Restart afterwards; no sign-in step follows.',
+                    'Add to %s, or add it with /mcp-config inside Kimi Code. New sessions pick it up; no sign-in step follows.',
                     domain: 'wppilot',
                 ),
                 '<code>mcp.json</code>',
             ),
-            [__('Global', domain: 'wppilot') => '~/.kimi/mcp.json'],
+            wppilot_kimi_code_paths(),
         ),
         'qwen-code' => wppilot_token_entry(
             wppilot_token_http_url_json($name, $url, $token),
@@ -659,8 +812,17 @@ function wppilot_build_token_vscode_family_configs(string $url, string $name, st
             domain: 'wppilot',
         )),
         'openclaw' => wppilot_token_entry(
-            wppilot_token_mcp_servers_json($name, $url, $token),
-            __('Add to your OpenClaw MCP configuration and restart the agent.', domain: 'wppilot'),
+            wppilot_token_openclaw_json($name, $url, $token),
+            sprintf(
+                /* translators: 1: config file name, 2: command, both wrapped in <code> tags */
+                __(
+                    'Merge into %1$s, or save the inner server object with %2$s. Keep "transport": "streamable-http" — without it OpenClaw falls back to SSE.',
+                    domain: 'wppilot',
+                ),
+                '<code>openclaw.json</code>',
+                '<code>openclaw mcp set</code>',
+            ),
+            wppilot_openclaw_paths(),
         ),
     ];
 }

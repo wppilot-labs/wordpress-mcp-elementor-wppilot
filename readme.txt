@@ -54,11 +54,11 @@ Either way, WPPilot generates the exact configuration for your client and shows 
 
 **Editors and CLIs:** Claude Code, Claude Desktop, Codex CLI, the Codex desktop app, Cursor, VS Code, GitHub Copilot, Factory Droid, Antigravity CLI, Antigravity IDE, Devin Desktop (formerly Windsurf), Zed, Cline, Roo Code, Kilo Code, Amazon Q, OpenCode, OpenClaw, Kimi Code CLI, Qwen Code, Gemini CLI and ZCode (GLM).
 
-**Web apps**, each with its own walkthrough: Claude on the web, ChatGPT, Perplexity, Mistral Le Chat and Manus. Every one adds this site from its own settings screen, and WPPilot tells you which credential that app accepts — three of the five can take an access token instead of signing in.
+**Web apps**, each with its own walkthrough: Claude on the web, ChatGPT, Perplexity, Mistral Le Chat and Manus. Every one adds this site from its own settings screen, and WPPilot tells you which credential that app accepts — four of the five can take an access token instead of signing in.
 
 **Anything else that speaks HTTP:** the Claude Messages API MCP connector, the OpenAI Responses API, and plain curl.
 
-Every client's snippet is written in the shape that client actually parses. The field names disagree more than they should — VS Code nests servers under "servers", Antigravity and Devin Desktop want "serverUrl", Qwen Code and Gemini CLI want "httpUrl", Cline spells the transport "streamableHttp" where Kilo spells it "streamable-http", Codex uses TOML — and a snippet copied from the wrong client's documentation often parses cleanly and then connects to nothing.
+Every client's snippet is written in the shape that client actually parses. The field names disagree more than they should — VS Code nests servers under "servers", Antigravity and Devin Desktop want "serverUrl", Qwen Code and Gemini CLI want "httpUrl", Cline spells the transport "streamableHttp" where Roo Code spells it "streamable-http" and OpenClaw wants a "transport" field, OpenCode and Kilo Code nest servers under "mcp", Codex uses TOML — and a snippet copied from the wrong client's documentation often parses cleanly and then connects to nothing.
 
 = Or let your AI set it up =
 
