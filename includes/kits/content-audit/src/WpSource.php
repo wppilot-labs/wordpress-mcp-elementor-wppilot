@@ -219,6 +219,13 @@ final class WpSource implements Source
      */
     private function registry(): array
     {
+        // Providers register when the host's integrations load, inside wp_abilities_api_init.
+        // WordPress fires that lazily, on the first touch of the ability registry, and a
+        // background step under WP-Cron may not have touched it yet: the registry then reads
+        // empty and the audit falls back to meta keys, including a deactivated plugin's.
+        if (function_exists('wp_get_abilities')) {
+            wp_get_abilities();
+        }
         /** @var mixed $all */
         $all = Runtime\host()->extension('seo-provider-registry');
         if (!is_callable($all)) {
