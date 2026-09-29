@@ -16,6 +16,9 @@
                 "THE_SEO_FRAMEWORK_VERSION",
                 "SLIM_SEO_VER",
                 "SMARTCRAWL_VERSION"
+            ],
+            "classes": [
+                "SmartCrawl\\SmartCrawl"
             ]
         }
     },

@@ -41,7 +41,9 @@ function vendors(): array
         'seopress' => defined('SEOPRESS_VERSION'),
         'tsf' => defined('THE_SEO_FRAMEWORK_VERSION'),
         'slim-seo' => defined('SLIM_SEO_VER'),
-        'smartcrawl' => defined('SMARTCRAWL_VERSION'),
+        // SmartCrawl defines SMARTCRAWL_VERSION only on init (priority 1); its main file declares
+        // the SmartCrawl\SmartCrawl class, which is what can be seen at plugins_loaded.
+        'smartcrawl' => defined('SMARTCRAWL_VERSION') || class_exists('SmartCrawl\\SmartCrawl'),
     ];
 }
 

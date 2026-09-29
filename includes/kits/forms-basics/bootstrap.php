@@ -33,7 +33,7 @@ return (static function (): array {
         'wpforms' => wpforms_available(),
         'cf7' => cf7_available(),
         'gravityforms' => gf_available(),
-        'forminator' => forminator_available(),
+        'forminator' => forminator_installed(),
     ];
     $files = [];
     foreach (array_keys(array_filter($vendors)) as $vendor) {

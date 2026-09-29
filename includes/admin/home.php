@@ -313,7 +313,9 @@ function wppilot_home_ability_label(string $name): string
     if ($name === '') {
         return __('Unknown change', domain: 'wppilot');
     }
-    if (function_exists('wp_get_ability')) {
+    // wp_has_ability() first: a change made by an ability whose plugin has since been switched off
+    // (an SEO plugin's edit) is ordinary history, and wp_get_ability() logs a notice for it.
+    if (function_exists('wp_get_ability') && function_exists('wp_has_ability') && wp_has_ability($name)) {
         $ability = wp_get_ability($name);
         if (is_object($ability) && method_exists($ability, 'get_label')) {
             $label = trim((string) $ability->get_label());

@@ -161,7 +161,9 @@ function list_orders(array $input): array|WP_Error
     }
     $limit = min(100, max(1, (int) ($input['limit'] ?? 20)));
     $page = max(1, (int) ($input['page'] ?? 1));
-    $args = ['limit' => $limit, 'paged' => $page, 'paginate' => true, 'orderby' => 'date', 'order' => 'DESC'];
+    // Orders only: without a type wc_get_orders() also returns refunds, which are not orders, are
+    // not WC_Order, and would inflate total and pages (Pro 1.10.0's copy fatals on them).
+    $args = ['type' => 'shop_order', 'limit' => $limit, 'paged' => $page, 'paginate' => true, 'orderby' => 'date', 'order' => 'DESC'];
     if (isset($input['status']) && is_string($input['status']) && $input['status'] !== '') {
         $status = str_replace('wc-', '', sanitize_key($input['status']));
         if (!array_key_exists('wc-' . $status, (array) wc_get_order_statuses())) {

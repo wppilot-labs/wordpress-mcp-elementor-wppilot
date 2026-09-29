@@ -40,6 +40,19 @@ const FORMINATOR_TYPE_MAP = [
     'paypal' => 'creditcard',
 ];
 
+/**
+ * Whether Forminator is installed and active, for the loader.
+ *
+ * Forminator loads its models (Forminator_Base_Form_Model, Forminator_Form_Entry_Model) on `init`,
+ * after the kit loader decides which files to register on plugins_loaded, so only its API class,
+ * which its main file requires, can be seen that early. forminator_available() checks the rest
+ * when an ability runs.
+ */
+function forminator_installed(): bool
+{
+    return class_exists('Forminator_API');
+}
+
 function forminator_available(): bool
 {
     return class_exists('Forminator_API') && class_exists('Forminator_Base_Form_Model') && class_exists('Forminator_Form_Entry_Model');
