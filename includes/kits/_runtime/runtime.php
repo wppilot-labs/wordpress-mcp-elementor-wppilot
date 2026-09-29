@@ -26,8 +26,9 @@ if (!defined('ABSPATH')) {
  * than loading code written against a different contract.
  *
  * 1.1 added require_profile() and the ProfileGate host interface.
+ * 1.2 added unclaimed(), for kits that carry an ability another plugin may already register.
  */
-const API_VERSION = '1.1';
+const API_VERSION = '1.2';
 
 require_once __DIR__ . '/host.php';
 require_once __DIR__ . '/ledger/post-partial.php';
@@ -59,6 +60,27 @@ function has_host(): bool
     } catch (\LogicException) {
         return false;
     }
+}
+
+/**
+ * Whether this copy may register an ability under this name: false when something registered it
+ * first.
+ *
+ * Some kits carry abilities an older release of a companion plugin still registers itself under
+ * the same name — WPPilot 1.16.0 took the WooCommerce reads, the backup and security status
+ * reads, the basic per-post SEO and form reads and the scheduled audits from Pro 1.10.0, which
+ * keeps registering its own copies until its next release, and a richer Pro version of a write
+ * keeps its name on purpose. Registering a name twice is refused by core with a doing_it_wrong
+ * notice on every request, so the kit checks first and stands aside: the first registration
+ * wins, and on a WPPilot site that is Pro's, which loads its integrations at
+ * wp_abilities_api_init priority 10, ahead of the kit loader's 20.
+ *
+ * A kit that stands aside must also leave the name's ledger capture alone, since the ability that
+ * runs is not its own: call Ledger::capture_for() only inside the same check.
+ */
+function unclaimed(string $ability_name): bool
+{
+    return !wp_has_ability($ability_name);
 }
 
 /**
