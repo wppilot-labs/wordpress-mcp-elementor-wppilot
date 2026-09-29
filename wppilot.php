@@ -329,6 +329,9 @@ require_once __DIR__ . '/includes/admin/sidebar.php';
 require_once __DIR__ . '/includes/prompt-library/packs.php';
 require_once __DIR__ . '/includes/prompt-library/admin.php';
 require_once __DIR__ . '/includes/oauth/bootstrap.php';
+// `wp wppilot mcp serve`. Registers nothing outside WP-CLI.
+require_once __DIR__ . '/includes/cli/mcp-serve.php';
+\WPPilot\Cli\McpServe\register();
 require_once __DIR__ . '/includes/troubleshoot/bootstrap.php';
 require_once __DIR__ . '/includes/admin/instructions.php';
 require_once __DIR__ . '/includes/admin/settings.php';
