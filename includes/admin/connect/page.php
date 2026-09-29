@@ -148,6 +148,10 @@ function wppilot_render_connect_page(): void
             <div class="wppilot-connect-section">
                 <?php wppilot_render_verify_step(); ?>
             </div>
+
+            <div class="wppilot-connect-section">
+                <?php wppilot_render_stdio_section(); ?>
+            </div>
         <?php endif; ?>
 
         <?php /*

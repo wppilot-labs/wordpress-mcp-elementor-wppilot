@@ -92,6 +92,16 @@ The ledger retains at most 500 records and is also capped by total serialized si
 
 Permanent deletion, payment refunds, and other irreversible external side effects are recorded as non-reversible.
 
+### Session undo and redo
+
+Each record written by an agent carries the agent session it belongs to: the `Mcp-Session-Id` of a legacy MCP connection (stored as a keyed hash), one `wp wppilot mcp serve` process, or, for the stateless 2026-07-28 transport and the REST run route, one credential and client until it has been quiet for 30 minutes. Writes from wp-admin, cron and plain WP-CLI carry none and are never part of a session. The record also keeps a digest of the target's state straight after the write.
+
+`wppilot/undo-session` undoes a session's changes newest first through the same verified rollback as `wppilot/rollback-change`. Before anything is written it checks every target: the newest session write to each must still match the state it left, and consecutive session writes to one target must chain (the newer one's before-image equals the older one's after-state). A mismatch means a person, another agent or another plugin changed the target since, and the whole run is refused with the conflict named - which change, which fields, and the later ledger rows that touched it. Caches that change without an edit (Elementor's CSS and asset meta, edit locks, `post_modified`) are not counted. Each change is checked again just before it is undone. The run stops at the first change that fails verification and reports what was undone, the failure, and what was not attempted. A session that holds a change which cannot be undone is refused unless `allow_partial` is true, and the change is listed either way. A change whose restore strategy is missing (its plugin was deactivated) fails and stops the run the same way.
+
+Every undo keeps the state it replaced. `wppilot/redo-session` puts those back oldest first under the same rules, and checks each result against the state recorded when the change was first made. A created term or comment is deleted permanently by its undo and cannot be redone; such changes are listed.
+
+Both are destructive and need the same confirmation as any other destructive call; Read Only refuses them. One run handles up to 2,000 changes and only one run per session goes at a time. The Changes screen lists recent sessions and has **Undo session** and **Redo session** on a session's view.
+
 Each record also says how the call was confirmed (`confirmation.method`): `argument`, `elicitation`, `approval-url` (with the approving user's id), `chat`, `approval-queue`, or `not-required` for a write that needed no confirmation.
 
 Each record names the agent behind the write as well as the WordPress user. The user is not an agent identity - several AI clients usually connect as the same administrator - so the credential is what distinguishes them: an OAuth client id, stored hashed, or an application-password UUID. The client name and version the agent introduced itself with are recorded alongside it. Writes that arrive outside an authenticated MCP request, from wp-admin, WP-CLI or another plugin, are recorded as `direct` rather than attributed to the last agent seen.

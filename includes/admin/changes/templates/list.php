@@ -38,6 +38,7 @@ $group_sizes = \wppilot_change_group_sizes(array_values(array_unique(array_map(
 ))));
 $datetime_format = \wppilot_get_datetime_format();
 $active_group = (string) ($filters['group'] ?? '');
+$active_session = (string) ($filters['session'] ?? '');
 
 ?>
 <?php \wppilot_render_admin_header(); ?>
@@ -50,6 +51,9 @@ $active_group = (string) ($filters['group'] ?? '');
             <input type="hidden" name="page" value="<?php echo esc_attr(PAGE_SLUG); ?>">
             <?php if ($active_group !== '') { ?>
                 <input type="hidden" name="group" value="<?php echo esc_attr($active_group); ?>">
+            <?php } ?>
+            <?php if ($active_session !== '') { ?>
+                <input type="hidden" name="session" value="<?php echo esc_attr($active_session); ?>">
             <?php } ?>
             <label>
                 <span><?php esc_html_e('Ability', domain: 'wppilot'); ?></span>
@@ -108,6 +112,127 @@ $active_group = (string) ($filters['group'] ?? '');
                 <a href="<?php echo esc_url(list_url(array_diff_key($filters, ['group' => true]))); ?>"><?php esc_html_e('Show everything', domain: 'wppilot'); ?></a>
             </p>
         <?php } ?>
+
+        <?php if ($active_session !== '') {
+            $session_detail = \wppilot_session_detail($active_session, limit: 1);
+            ?>
+            <div class="wppilot-changes__session" id="wppilot-session-panel">
+                <p class="wppilot-changes__scope">
+                    <?php echo esc_html(sprintf(
+                        /* translators: 1: session id, 2: number of changes */
+                        _n('Showing one agent session (%1$s): %2$d change.', 'Showing one agent session (%1$s): %2$d changes.', $total, 'wppilot'),
+                        $active_session,
+                        $total,
+                    )); ?>
+                    <a href="<?php echo esc_url(list_url(array_diff_key($filters, ['session' => true]))); ?>"><?php esc_html_e('Show everything', domain: 'wppilot'); ?></a>
+                </p>
+                <?php if ($session_detail instanceof \WP_Error) { ?>
+                    <p class="wppilot-muted"><?php echo esc_html($session_detail->get_error_message()); ?></p>
+                <?php } else {
+                    $session_undo = $session_detail['undo'];
+                    $session_redo = $session_detail['redo'];
+                    ?>
+                    <ul class="wppilot-changes__session-facts">
+                        <li><?php echo esc_html(sprintf(
+                            /* translators: 1: changes that can be undone, 2: already undone, 3: cannot be undone */
+                            __('%1$d can be undone, %2$d already undone, %3$d cannot be undone.', domain: 'wppilot'),
+                            $session_undo['can_undo'],
+                            $session_undo['already_undone'],
+                            count($session_undo['not_reversible']),
+                        )); ?></li>
+                        <?php foreach (array_slice($session_undo['conflicts'], 0, 5) as $conflict) { ?>
+                            <li class="wppilot-changes__session-conflict"><?php echo esc_html(sprintf(
+                                /* translators: 1: ability, 2: target, 3: changed fields */
+                                __('Conflict: %1$s on %2$s was changed afterwards (%3$s).', domain: 'wppilot'),
+                                (string) $conflict['ability'],
+                                (string) $conflict['target'],
+                                implode(', ', array_map('strval', (array) ($conflict['changed'] ?? []))),
+                            )); ?></li>
+                        <?php } ?>
+                        <?php foreach (array_slice($session_undo['not_reversible'], 0, 5) as $blocked) { ?>
+                            <li><?php echo esc_html(sprintf(
+                                /* translators: 1: ability, 2: reason */
+                                __('Cannot be undone: %1$s. %2$s', domain: 'wppilot'),
+                                (string) $blocked['ability'],
+                                (string) ($blocked['reason'] ?? ''),
+                            )); ?></li>
+                        <?php } ?>
+                    </ul>
+                    <div class="wppilot-changes__toolbar">
+                        <?php if ($session_undo['can_undo'] > 0) { ?>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return window.confirm(this.dataset.confirm);" data-confirm="<?php echo esc_attr(sprintf(
+                                /* translators: %d: number of changes */
+                                _n('Undo %d change of this session, newest first? Each is verified; the run stops at the first that fails and can be redone.', 'Undo all %d changes of this session, newest first? Each is verified; the run stops at the first that fails and can be redone.', $session_undo['can_undo'], 'wppilot'),
+                                $session_undo['can_undo'],
+                            )); ?>">
+                                <input type="hidden" name="action" value="wppilot_changes_undo_session">
+                                <input type="hidden" name="session" value="<?php echo esc_attr($active_session); ?>">
+                                <?php wp_nonce_field('wppilot_changes_undo_session'); ?>
+                                <?php if ($session_undo['not_reversible'] !== []) { ?>
+                                    <label><input type="checkbox" name="allow_partial" value="1"> <?php esc_html_e('Undo the rest and leave the ones that cannot be undone', domain: 'wppilot'); ?></label>
+                                <?php } ?>
+                                <button type="submit" class="button button-primary"><?php esc_html_e('Undo session', domain: 'wppilot'); ?></button>
+                            </form>
+                        <?php } ?>
+                        <?php if ($session_redo['can_redo'] > 0) { ?>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return window.confirm(this.dataset.confirm);" data-confirm="<?php echo esc_attr(sprintf(
+                                /* translators: %d: number of changes */
+                                _n('Redo %d undone change of this session?', 'Redo all %d undone changes of this session, oldest first?', $session_redo['can_redo'], 'wppilot'),
+                                $session_redo['can_redo'],
+                            )); ?>">
+                                <input type="hidden" name="action" value="wppilot_changes_redo_session">
+                                <input type="hidden" name="session" value="<?php echo esc_attr($active_session); ?>">
+                                <?php wp_nonce_field('wppilot_changes_redo_session'); ?>
+                                <?php if ($session_redo['not_redoable'] !== []) { ?>
+                                    <label><input type="checkbox" name="allow_partial" value="1"> <?php esc_html_e('Redo the rest and leave the ones that cannot be redone', domain: 'wppilot'); ?></label>
+                                <?php } ?>
+                                <button type="submit" class="button"><?php esc_html_e('Redo session', domain: 'wppilot'); ?></button>
+                            </form>
+                        <?php } ?>
+                    </div>
+                <?php } ?>
+            </div>
+        <?php } elseif ($filters === []) {
+            $recent_sessions = \wppilot_list_change_sessions(5);
+            if ($recent_sessions !== []) { ?>
+                <div class="wppilot-changes__sessions">
+                    <h2><?php esc_html_e('Recent agent sessions', domain: 'wppilot'); ?></h2>
+                    <table class="widefat striped">
+                        <thead>
+                            <tr>
+                                <th scope="col"><?php esc_html_e('Session', domain: 'wppilot'); ?></th>
+                                <th scope="col"><?php esc_html_e('Agent', domain: 'wppilot'); ?></th>
+                                <th scope="col"><?php esc_html_e('Last change', domain: 'wppilot'); ?></th>
+                                <th scope="col"><?php esc_html_e('Changes', domain: 'wppilot'); ?></th>
+                                <th scope="col"><span class="screen-reader-text"><?php esc_html_e('Actions', domain: 'wppilot'); ?></span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recent_sessions as $recent) {
+                                $last = strtotime((string) $recent['last_change_at']);
+                                $who = trim((string) $recent['agent']['label'] . ' ' . ((string) $recent['agent']['client'] !== '' ? '(' . (string) $recent['agent']['client'] . ')' : ''));
+                                ?>
+                                <tr>
+                                    <td><code title="<?php echo esc_attr((string) $recent['session_id']); ?>"><?php echo esc_html(session_label((string) $recent['session_id'])); ?></code></td>
+                                    <td><?php echo esc_html($who !== '' ? $who : (string) $recent['user']['login']); ?></td>
+                                    <td><?php echo esc_html($last !== false ? wp_date($datetime_format, $last) : ''); ?></td>
+                                    <td><?php echo esc_html(sprintf(
+                                        /* translators: 1: total changes, 2: can be undone, 3: undone */
+                                        __('%1$d (%2$d can be undone, %3$d undone)', domain: 'wppilot'),
+                                        (int) $recent['changes'],
+                                        (int) $recent['undoable'],
+                                        (int) $recent['undone'],
+                                    )); ?></td>
+                                    <td class="wppilot-changes__actions">
+                                        <a class="button button-small" href="<?php echo esc_url(list_url(['session' => (string) $recent['session_id']])); ?>"><?php esc_html_e('Review and undo', domain: 'wppilot'); ?></a>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php }
+        } ?>
 
         <div class="wppilot-changes__toolbar">
             <span class="wppilot-muted">
@@ -195,6 +320,10 @@ $active_group = (string) ($filters['group'] ?? '');
                                     <a href="<?php echo esc_url(list_url(['agent' => $credential])); ?>"><?php echo esc_html(actor_label($entry)); ?></a>
                                 <?php } else { ?>
                                     <?php echo esc_html(actor_label($entry)); ?>
+                                <?php } ?>
+                                <?php $row_session = (string) ($entry['session'] ?? ''); ?>
+                                <?php if ($row_session !== '' && $active_session === '') { ?>
+                                    <a class="wppilot-changes__batch" title="<?php echo esc_attr($row_session); ?>" href="<?php echo esc_url(list_url(['session' => $row_session])); ?>"><?php esc_html_e('session', domain: 'wppilot'); ?></a>
                                 <?php } ?>
                             </td>
                             <td>

@@ -89,6 +89,16 @@ $pretty = static fn(mixed $value): string => (string) wp_json_encode(
                     <?php } ?>
                 </td>
             </tr>
+            <?php $session = (string) ($entry['session'] ?? ''); ?>
+            <?php if ($session !== '') { ?>
+                <tr>
+                    <th scope="row"><?php esc_html_e('Agent session', domain: 'wppilot'); ?></th>
+                    <td>
+                        <a href="<?php echo esc_url(list_url(['session' => $session])); ?>"><code><?php echo esc_html($session); ?></code></a>
+                        <p class="description"><?php esc_html_e('Every change this agent run made, with Undo session and Redo session.', domain: 'wppilot'); ?></p>
+                    </td>
+                </tr>
+            <?php } ?>
             <?php if ($group !== '' && $group_size > 1) { ?>
                 <tr>
                     <th scope="row"><?php esc_html_e('Batch', domain: 'wppilot'); ?></th>

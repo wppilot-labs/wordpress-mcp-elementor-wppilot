@@ -101,7 +101,7 @@ rather than appearing as a white screen.
 
 ## What is registered on a fresh install
 
-213 abilities, plus one MCP prompt per saved skill. They are grouped into a
+216 abilities, plus one MCP prompt per saved skill. They are grouped into a
 single **WordPress** category on the Abilities screen and can be switched off
 individually: content, taxonomies, media, comments, menus, revisions, user
 reads, allowlisted site settings, the plugin and theme lifecycle, Gutenberg
@@ -134,6 +134,46 @@ Three routes, all configured on **WPPilot → Connect**:
 
 None of the three is a product licence. The free plugin has no activation key
 and contacts no entitlement service to run.
+
+## Local stdio connection
+
+`wp wppilot mcp serve` runs the same MCP server over stdin/stdout, for a client
+on the machine that runs WordPress. There is no credential: WP-CLI's global
+`--user` names the WordPress user, and every ability checks that user's
+permissions exactly as over HTTP. The command drives the adapter's own request
+router, so tool listing, the `mcp_adapter_pre_tool_call` controls (safety
+profile, confirmation, rate limit, design and preview gates) and the permission
+callbacks are the HTTP ones, not a copy.
+
+```bash
+claude mcp add wppilot-local -- wp --path=/var/www/html wppilot mcp serve --user=admin
+claude mcp add wppilot-local -- docker exec -i <container> wp --path=/var/www/html wppilot mcp serve --user=admin
+
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+  | wp --path=/var/www/html wppilot mcp serve --user=admin
+```
+
+A client that takes a command and arguments (Cursor's `.cursor/mcp.json`) gets
+`"command": "wp"` and `"args": ["--path=/var/www/html", "wppilot", "mcp",
+"serve", "--user=admin"]`.
+
+What differs from HTTP, and why:
+
+- It refuses to start without `--user`, and when WPPilot's AI abilities are
+  switched off. `--server=<id>` picks another registered MCP server; the default
+  is `wppilot` (the adapter's own `wp mcp-adapter serve` picks the first server
+  registered, which is Elementor's when both are installed).
+- stdout carries only JSON-RPC, one message per line. PHP errors go to stderr,
+  and anything a plugin prints while a message is handled is moved there.
+- WordPress's in-memory cache is dropped before each message, so an edit made
+  in wp-admin while the client is connected is seen. Abilities switched on or
+  off on the Abilities screen are registered once per process, so restart the
+  client after changing them.
+- Writes are credited to method `stdio` and the client name from `initialize`,
+  appear on the Connections list as "WP-CLI stdio", and each process is one
+  session for `wppilot/undo-session`.
+- `mcp_adapter_enable_stdio_transport` and `wppilot_stdio_enabled` returning
+  false switch it off.
 
 ## Related
 

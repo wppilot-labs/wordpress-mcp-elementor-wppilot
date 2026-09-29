@@ -108,6 +108,33 @@ An access token borrows the capabilities of the user who created it, and that ch
 
 None of the three is a product licence. WPPilot needs no activation key, entitlement check or subscription service to run.
 
+### Local connection over WP-CLI (stdio)
+
+A client that runs on the same machine as the site - Claude Code, Cursor, a CI job - can start WPPilot itself instead of connecting over HTTP, with no credential to create. `wp wppilot mcp serve` serves the same MCP server as `/wp-json/mcp/wppilot` over stdin/stdout, as the WordPress user named in WP-CLI's `--user`, with the same abilities, safety profile, confirmations and permission checks:
+
+```bash
+# Claude Code
+claude mcp add wppilot-local -- wp --path=/var/www/html wppilot mcp serve --user=admin
+
+# WordPress in Docker
+claude mcp add wppilot-local -- docker exec -i <container> wp --path=/var/www/html wppilot mcp serve --user=admin
+```
+
+Cursor and other clients that take a command (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "wppilot-local": {
+      "command": "wp",
+      "args": ["--path=/var/www/html", "wppilot", "mcp", "serve", "--user=admin"]
+    }
+  }
+}
+```
+
+The **Connect** screen shows these with this site's path and your login filled in. Nothing is written to stdout except protocol messages, and each process is one agent session on the Changes screen.
+
 ## Safety model
 
 | Profile | What it allows |
@@ -118,11 +145,13 @@ None of the three is a product licence. WPPilot needs no activation key, entitle
 
 On top of the profile: WordPress user capabilities still apply, individual abilities can be switched off, destructive operations require an explicit confirmation flag, writes are rate-limited per credential, and supported changes are recorded in a redacted change ledger with rollback.
 
+**Undo a whole agent session.** Every write an agent makes is filed under its session - one MCP connection, one `wp wppilot mcp serve` process, or one credential and client until it has been idle for 30 minutes. `wppilot/undo-session` (or **Undo session** on the Changes screen) takes back everything that session did, newest first, verifying each change against its before-image. It refuses without touching anything when something else changed a target after the session did, stops at the first change that fails verification and says exactly what was and was not undone, and never skips a change that cannot be undone without saying so. `wppilot/redo-session` puts an undone session back, under the same checks. `wppilot/list-sessions` shows each session and what undo and redo would do right now.
+
 Every ledger entry names the agent behind the write, not only the WordPress user. Claude Code, Cursor and Codex usually connect as the same administrator, so the user alone cannot answer which of them made a change: the OAuth client id or application-password UUID can, and it is what the ledger records, alongside the client name the agent introduced itself with. A write with no agent behind it - wp-admin, WP-CLI, cron - is recorded as `direct` rather than credited to the last agent seen. OAuth client ids are stored hashed.
 
 ## What the free plugin can do
 
-213 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, so a fresh install with none of those plugins shows 173. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+216 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, so a fresh install with none of those plugins shows 173. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -140,7 +169,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Design system** | `19` | Typed design tokens, saved designs and activation, plus the checks that grade a built page against them: contrast, composition, layout grammars and a rendered-page verification pass. |
 | **Preview** | `8` | Compute what a write would change without performing it, then apply the reviewed result. Plus a view link, so an agent with a browser can look at the page it built - including one still in draft - and a capture store that compares two screenshots of a page and reports which regions moved. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
-| **Changes** | `5` | Read the redacted change ledger, attributed to the agent credential that made each write, export it as rows for a client report or an audit, and roll a change back. |
+| **Changes** | `8` | Read the redacted change ledger, attributed to the agent credential that made each write, export it as rows for a client report or an audit, roll a change back, and undo or redo everything one agent session did. |
 | **Diagnostics** | `4` | Scoped health, performance and configuration-security checks, and a Connection Doctor that finds what blocks an MCP client (firewalls, a stripped Authorization header, disabled Application Passwords) and names the fix. |
 | **Search and replace** | `4` | Preview a search-and-replace across posts and their meta (serialized and builder JSON included) as a reviewed plan, apply only posts unchanged since, 100 per call or as a background job, cancel it, and undo one post or the whole run. |
 | **Media and accessibility** | `5` | Resize, crop, rotate or flip an image as a copy or in place, with undo. Audit a served page against WCAG 2.2, find images with missing or filename alt text, show an image to the model so it can write real alt text, and set alt text in bulk with undo. |
@@ -195,7 +224,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 88 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **213 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **216 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 88 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -337,7 +366,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 213 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 216 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.
