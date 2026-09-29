@@ -36,15 +36,15 @@ final class ProUpsellCatalogTest extends TestCase
     {
         $by_label = array_column(\wppilot_pro_integration_catalog(), null, 'label');
         $expected = [
-            'UpdraftPlus' => ['backups', 'class', 'UpdraftPlus', 3],
-            'Duplicator' => ['backups', 'class', 'Duplicator\\Package\\DupPackage', 3],
-            'BackWPup' => ['backups', 'class', 'BackWPup', 3],
-            'Wordfence' => ['security', 'constant', 'WORDFENCE_VERSION', 8],
-            'Solid Security' => ['security', 'class', 'ITSEC_Core', 8],
+            'UpdraftPlus' => ['backups', 'class', 'UpdraftPlus', 1],
+            'Duplicator' => ['backups', 'class', 'Duplicator\\Package\\DupPackage', 1],
+            'BackWPup' => ['backups', 'class', 'BackWPup', 1],
+            'Wordfence' => ['security', 'constant', 'WORDFENCE_VERSION', 5],
+            'Solid Security' => ['security', 'class', 'ITSEC_Core', 5],
             'The SEO Framework' => ['seo', 'constant', 'THE_SEO_FRAMEWORK_VERSION', 3],
             'Slim SEO' => ['seo', 'constant', 'SLIM_SEO_VER', 3],
             'SmartCrawl' => ['seo', 'constant', 'SMARTCRAWL_VERSION', 3],
-            'Forminator' => ['forms', 'constant', 'FORMINATOR_VERSION', 4],
+            'Forminator' => ['forms', 'constant', 'FORMINATOR_VERSION', 3],
             'WS Form' => ['forms', 'constant', 'WS_FORM_VERSION', 4],
             'Kadence Blocks patterns' => ['builder', 'constant', 'KADENCE_BLOCKS_VERSION', 2],
             'FunnelKit' => ['commerce', 'constant', 'WFFN_VERSION', 4],

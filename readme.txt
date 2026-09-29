@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.15.1
+Stable tag: 1.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,16 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.16.0 =
+* New, formerly WPPilot Pro: WooCommerce basics. wppilot/woocommerce-check-setup, list and read products and variations, product categories and tags, store settings, and read orders and customers (orders and customers also need manage_woocommerce), with the input and output Pro gives them. wppilot/woocommerce-edit-product edits one product's name, description, prices and stock, saves through WooCommerce so its lookup tables and caches follow, keeps backslashes, and can be undone from the Changes screen: the undo writes the old values back through WooCommerce and says which fields did not come back. Bulk prices and stock, order and customer writes, refunds, coupons, reports, shipping, tax, gateways and full product editing (SKU, categories, images, attributes) stay in Pro, whose richer edit-product takes over when Pro is active.
+* New, formerly WPPilot Pro: one post's SEO title, meta description and robots in Yoast SEO, Rank Math, All in One SEO, SEOPress, The SEO Framework, Slim SEO and SmartCrawl (a get and an edit per plugin, under the names Pro uses; only the active plugins' abilities register). A raw meta write could trip Yoast's 0/2/1 noindex codes or AIOSEO's all-or-nothing robots switch; these write the way each plugin's own editor does. Every write keeps a before-image of exactly what it changed and wppilot/rollback-change restores and checks it; AIOSEO, which keeps SEO in its own table, is restored through its own model. Slim SEO cannot force index and has no follow flag, and SEOPress has no per-post force-index; the descriptions say so. Focus keywords, canonicals, social previews, schema, redirects and bulk SEO stay in Pro, whose richer per-post abilities register first on a site running it.
+* New, formerly WPPilot Pro: read-only forms. List the forms of WPForms, Contact Form 7, Gravity Forms and Forminator, and read their entries (Contact Form 7's through Flamingo; WPForms entries need WPForms Pro). Entries come with email and phone answers, passwords, card data, uploads, signatures and the IP withheld, and email addresses and phone numbers cut out of free text; full values, exports and form editing are Pro's.
+* New, formerly WPPilot Pro: backup and security status. wppilot/backup-status and wppilot/backup-list read UpdraftPlus, Duplicator 5 and BackWPup; wppilot/security-plugin-status, wppilot/security-scan-findings and wppilot/security-lockouts read Wordfence and Solid Security, with IP addresses shown as /24 or /48 networks and logins masked. Starting a backup, the require-a-fresh-backup hold, safe updates, hardening, IP blocks and scans stay in Pro.
+* New, formerly WPPilot Pro: scheduled audits. A routine runs the read-only accessibility, content and media alt-text audits on WP-Cron, daily or weekly in the site's timezone, stores each run, compares it with the one before (new, resolved, changed) and emails the administrators it names. wppilot/routines-list and wppilot/routines-report read; wppilot/routines-save and wppilot/routines-delete can be undone from Changes; wppilot/routines-run-now queues a run. A Routines screen under Activity has a Run now button. Routines made with Pro keep running unchanged: the storage, cron hooks and undo are the same.
+* Works beside WPPilot Pro 1.10.0, which still carries its own copies of all of the above: Pro registers first, and each of these abilities stands aside for a name that is already registered instead of registering it twice, so nothing changes on a site running Pro 1.10.0 until Pro's next release. While Pro 1.10.0 runs routines, the free copy stays off, so no routine runs twice.
+* Kits: runtime 1.2 adds Runtime\unclaimed() and kit.json requires.any (a kit serving whichever of several plugins is active), and loads Pro-tier kits ahead of Free ones in an export, so a richer copy of an ability wins there as it does inside WPPilot. scripts/test-kit-coexistence.php loads Pro's kits in the order Pro's engine does and takes --installed-pro=<a Pro release> to prove Free stands aside for a release that still carries the same abilities.
+* 45 new abilities (213 in all). No existing ability changed its permissions; existing connections keep working and do not need re-authorising.
 
 = 1.15.1 =
 * Fixed: with Wordfence active, every MCP call made with an Application Password returned 401 and nothing said why. Wordfence switches Application Passwords off by default (its "Disable WordPress application passwords" setting), and the Connection Doctor, Diagnostics and the Connect screen only said "a plugin or code". They now name Wordfence and the exact setting to uncheck, name any other plugin that switches Application Passwords off by the file its filter lives in, and point to OAuth or an access token, which do not need Application Passwords.
@@ -434,6 +444,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.16.0 =
+WooCommerce reads and a basic product editor, one post's SEO title, description and robots for seven SEO plugins, read-only forms with contact details redacted, backup and security status, and scheduled audits, all formerly WPPilot Pro. Each stands aside while WPPilot Pro 1.10.0 still provides it. 45 new abilities; no permission changes.
 
 = 1.15.1 =
 Fixes Application Password 401s under Wordfence going unexplained (the Connection Doctor and Connect screen now name Wordfence and the setting to change), email addresses showing in full in change records, and the content audit missing The SEO Framework, Slim SEO and SmartCrawl. No new abilities or permission changes.

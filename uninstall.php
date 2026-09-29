@@ -203,6 +203,8 @@ function wppilot_uninstall_cron_hooks(): array
         'wppilot_changes_prune',
         // includes/telemetry/settings.php
         'wppilot_telemetry_ping',
+        // includes/kits/scheduled-audits: the hourly repair of the routines' schedule.
+        'wppilot_kit_routines_reconcile',
     ];
 }
 
@@ -269,6 +271,9 @@ function wppilot_uninstall_current_site(): void
     foreach (wppilot_uninstall_cron_hooks() as $hook) {
         wp_clear_scheduled_hook($hook);
     }
+    // includes/kits/scheduled-audits: one tick event per routine, each with the routine's id as
+    // its argument, which wp_clear_scheduled_hook() without that argument would leave behind.
+    wp_unschedule_hook('wppilot_kit_routines_tick');
 
     // Read before the options are deleted below, or the answer is gone by the
     // time it is asked for.
@@ -291,6 +296,9 @@ function wppilot_uninstall_current_site(): void
     // transients and their timeout twins.
     foreach ([
         'wppilot_oauth_pending_',
+        // includes/kits/scheduled-audits: the routines, and each routine's state, reports and lock
+        // (wppilot_kit_routines_state_<id>, _report_<id>, _lock_<id>).
+        'wppilot_kit_routines',
         // includes/preview/store.php: one option per pending preview, plus the
         // compare-and-set lock each apply claims.
         'wppilot_preview_',

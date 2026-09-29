@@ -33,6 +33,15 @@ declare(strict_types=1);
  * one it fires itself or one named after a kit. Both copies listening to plugins_loaded is the
  * point, not a collision.
  *
+ * --installed-pro=<unpacked Pro release> checks the other coexistence: this Free tree beside a Pro
+ * release that is already on people's sites and still carries its own copies of abilities Free
+ * has since taken over (Pro 1.10.0 beside Free 1.16.0). WPPilot's side then loads that release's
+ * kits the way its specialization engine does - categories and abilities at priority 10 of the
+ * Abilities API init actions, ahead of Free's kit loader at 20, and the routines kit's early boot
+ * on plugins_loaded 25 - in place of --pro-src, which still decides what the export carries. On
+ * top of every check above it fails unless each ability name both trees carry was registered
+ * once, by the release, with Free's copy standing aside.
+ *
  * Development-only: package.sh excludes scripts/.
  */
 
@@ -186,6 +195,128 @@ function static_names(array $files): array
     return $names;
 }
 
+/**
+ * Load an installed Pro release's kits the way its specialization engine does.
+ *
+ * Pro loads a kit inside the Abilities API init actions at priority 10 (Kits\load(): bootstrap,
+ * boot, then the ability files required directly), and registers the kit's first category there
+ * when nobody has. Its routines kit is also booted early, from plugins_loaded 25, by
+ * WPPilot\Pro\Kits\register_routines(), which is how Free's scheduled-audits kit knows to stand
+ * aside; that function is defined here under the same name so Free sees what a licensed site
+ * shows it. The rest of Pro (licence, its non-kit integrations) is not loaded; a live install
+ * covers those.
+ */
+function boot_installed_pro(string $installed): void
+{
+    $kits = [];
+    foreach (glob($installed . '/includes/kits/*/kit.json') ?: [] as $kit_json) {
+        $manifest = json_decode((string) file_get_contents($kit_json), true);
+        if (is_array($manifest)) {
+            $manifest['dir'] = dirname($kit_json);
+            $kits[(string) $manifest['slug']] = $manifest;
+        }
+    }
+    $boot = static function (array $manifest, bool $abilities): void {
+        /** @var array<string, array<string, mixed>> $booted */
+        static $booted = [];
+        $slug = (string) $manifest['slug'];
+        $reason = \WPPilot\Kits\Runtime\incompatibility($manifest);
+        if ($reason !== '') {
+            \WPPilot\Kits\Runtime\registry(['loaded' => [], 'skipped' => [$slug => $reason]]);
+            return;
+        }
+        if (!isset($booted[$slug])) {
+            /** @var mixed $descriptor */
+            $descriptor = require $manifest['dir'] . '/bootstrap.php';
+            $booted[$slug] = is_array($descriptor) ? $descriptor : [];
+            if (is_callable($booted[$slug]['boot'] ?? null)) {
+                ($booted[$slug]['boot'])(\WPPilot\Kits\Runtime\host());
+            }
+        }
+        if ($abilities) {
+            foreach ((array) ($booted[$slug]['ability_files'] ?? []) as $file) {
+                require_once (string) $file;
+            }
+            \WPPilot\Kits\Runtime\pending_kits($manifest, []);
+            \WPPilot\Kits\Runtime\registry(['loaded' => [$slug], 'skipped' => []]);
+        }
+    };
+    $GLOBALS['kit_coexistence_installed'] = ['kits' => $kits, 'boot' => $boot];
+    if (isset($kits['routines']) && !function_exists('WPPilot\Pro\Kits\register_routines')) {
+        eval('namespace WPPilot\Pro\Kits; function register_routines(): void { $i = $GLOBALS["kit_coexistence_installed"]; ($i["boot"])($i["kits"]["routines"], false); }');
+        add_action('plugins_loaded', 'WPPilot\Pro\Kits\register_routines', 25);
+    }
+    add_action('wp_abilities_api_categories_init', static function () use ($kits): void {
+        foreach ($kits as $manifest) {
+            foreach ((array) ($manifest['categories'] ?? []) as $slug => $category) {
+                if (!wp_has_ability_category((string) $slug)) {
+                    wp_register_ability_category((string) $slug, [
+                        'label' => (string) ($category['label'] ?? $slug),
+                        'description' => (string) ($category['description'] ?? ''),
+                    ]);
+                }
+                break;
+            }
+        }
+    }, 10);
+    add_action('wp_abilities_api_init', static function () use ($kits, $boot): void {
+        foreach ($kits as $manifest) {
+            $boot($manifest, true);
+        }
+    }, 10);
+}
+
+/**
+ * Whether the installed release's kits declare every ability a Free kit declares.
+ */
+function installed_pro_covers(string $kit_dir, string $installed): bool
+{
+    $manifest = json_decode((string) @file_get_contents($kit_dir . '/kit.json'), true);
+    $ours = array_map(static fn(array $a): string => (string) ($a['name'] ?? ''), (array) ($manifest['abilities'] ?? []));
+    if ($ours === []) {
+        return false;
+    }
+    $theirs = [];
+    foreach (glob($installed . '/includes/kits/*/kit.json') ?: [] as $kit_json) {
+        $other = json_decode((string) file_get_contents($kit_json), true);
+        foreach ((array) ($other['abilities'] ?? []) as $ability) {
+            $theirs[(string) ($ability['name'] ?? '')] = true;
+        }
+    }
+    return array_diff($ours, array_keys($theirs)) === [];
+}
+
+/**
+ * Every ability name both Free's kits and the installed release's kits carry must have been
+ * registered once, by the release.
+ *
+ * @return list<string>
+ */
+function installed_pro_problems(string $free, string $installed): array
+{
+    $declared = static function (string $root): array {
+        $names = [];
+        foreach (glob($root . '/includes/kits/*/kit.json') ?: [] as $kit_json) {
+            $manifest = json_decode((string) file_get_contents($kit_json), true);
+            foreach ((array) ($manifest['abilities'] ?? []) as $ability) {
+                $names[(string) ($ability['name'] ?? '')] = true;
+            }
+        }
+        return $names;
+    };
+    $shared = array_keys(array_intersect_key($declared($free), $declared($installed)));
+    sort($shared);
+    $problems = [];
+    foreach ($shared as $name) {
+        $owners = array_keys(\Kit_Coexistence::$names['ability'][$name] ?? []);
+        if ($owners !== ['wppilot-pro-installed']) {
+            $problems[] = sprintf('%s was registered by %s; expected the installed Pro release alone', $name, $owners === [] ? 'nobody' : implode(' and ', $owners));
+        }
+    }
+    echo 'Installed Pro registered, and Free stood aside for: ', $shared === [] ? '(no shared names)' : implode(', ', $shared), "\n";
+    return $problems;
+}
+
 function run_export(string $free, string $pro, string $out): void
 {
     $kits = array_keys(kit_dirs($free . '/includes/kits'));
@@ -238,7 +369,7 @@ function min_profile_above_production(array $meta): bool
  *
  * @return list<string> Problems.
  */
-function load_both(string $free, string $pro, string $export): array
+function load_both(string $free, string $pro, string $export, string $installed = ''): array
 {
     define('ABSPATH', $free . '/');
     define('WPPILOT_CHANGE_BULK_SNAPSHOT_BUDGET_BYTES', 1_048_576);
@@ -279,17 +410,28 @@ function load_both(string $free, string $pro, string $export): array
     // stand-ins so it loads and registers; its abilities are not executed below, because the
     // stand-ins have nothing behind them.
     $vendor_bound = [];
-    foreach (array_merge(glob($free . '/includes/kits/*/kit.json') ?: [], $pro !== '' ? (glob($pro . '/includes/kits/*/kit.json') ?: []) : []) as $kit_json) {
+    foreach (array_merge(glob($free . '/includes/kits/*/kit.json') ?: [], $pro !== '' ? (glob($pro . '/includes/kits/*/kit.json') ?: []) : [], $installed !== '' ? (glob($installed . '/includes/kits/*/kit.json') ?: []) : []) as $kit_json) {
         $kit = json_decode((string) file_get_contents($kit_json), true);
         $requires = is_array($kit['requires'] ?? null) ? $kit['requires'] : [];
-        $classes = array_values(array_filter((array) ($requires['classes'] ?? []), 'is_string'));
-        $functions = array_values(array_filter((array) ($requires['functions'] ?? []), 'is_string'));
-        if ($classes === [] && $functions === []) {
+        $any = is_array($requires['any'] ?? null) ? $requires['any'] : [];
+        $classes = array_values(array_filter(array_merge((array) ($requires['classes'] ?? []), (array) ($any['classes'] ?? [])), 'is_string'));
+        $functions = array_values(array_filter(array_merge((array) ($requires['functions'] ?? []), (array) ($any['functions'] ?? [])), 'is_string'));
+        $constants = array_values(array_filter((array) ($any['constants'] ?? []), 'is_string'));
+        if ($classes === [] && $functions === [] && $constants === []) {
             continue;
         }
+        // A kit that serves one of several plugins (requires.any) gets every one of them, so all
+        // of its vendor files load and register here. A version constant reads as a high version,
+        // so no vendor floor turns the kit away.
+        foreach ($constants as $constant) {
+            if (preg_match('/^[A-Z_][A-Z0-9_]*$/', $constant) === 1 && !defined($constant)) {
+                define($constant, '99.0.0');
+            }
+        }
         foreach ($classes as $class) {
-            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $class) === 1 && !class_exists($class)) {
-                eval("class {$class} {}");
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\\\\[A-Za-z_][A-Za-z0-9_]*)*$/', $class) === 1 && !class_exists($class)) {
+                $at = strrpos($class, '\\');
+                eval($at === false ? "class {$class} {}" : 'namespace ' . substr($class, 0, $at) . '; class ' . substr($class, $at + 1) . ' {}');
             }
         }
         foreach ($functions as $function) {
@@ -311,9 +453,15 @@ function load_both(string $free, string $pro, string $export): array
 
     // WPPilot's side, as wppilot.php boots it; then the export's, as the other plugin does.
     require_once $free . '/includes/kits/loader.php';
-    if ($pro !== '') {
+    if ($installed !== '') {
+        \Kit_Coexistence::$owners['wppilot-pro-installed'] = $installed . '/includes/kits/';
+        boot_installed_pro($installed);
         do_action('plugins_loaded');
-        \WPPilot\Kits\load_kits($pro . '/includes/kits');
+    } elseif ($pro !== '') {
+        // As Pro's specialization engine loads them: inside the Abilities API init actions at
+        // priority 10, ahead of Free's kit loader at 20, so a richer Pro copy of a name wins.
+        boot_installed_pro($pro);
+        do_action('plugins_loaded');
     }
     require_once $export . '/load.php';
     if ($pro === '') {
@@ -335,10 +483,17 @@ function load_both(string $free, string $pro, string $export): array
     $export_report = ('\\' . NS . '\\Runtime\\registry')();
     foreach (['WPPilot' => $wppilot_report, 'the export' => $export_report] as $side => $report) {
         foreach ($report['skipped'] as $slug => $reason) {
+            // Beside an installed release, a Free kit whose every ability that release carries
+            // itself (scheduled-audits beside Pro 1.10.0's routines) is meant to stay off; the
+            // stand-aside check below proves the release registered them instead.
+            if ($side === 'WPPilot' && $installed !== '' && installed_pro_covers($free . '/includes/kits/' . $slug, $installed)) {
+                echo "WPPilot stood aside with kit {$slug}: {$reason}\n";
+                continue;
+            }
             $problems[] = "{$side} skipped kit {$slug}: {$reason}";
         }
     }
-    if (count($export_report['loaded']) !== count($wppilot_report['loaded'])) {
+    if ($installed === '' && count($export_report['loaded']) !== count($wppilot_report['loaded'])) {
         $problems[] = sprintf('WPPilot loaded %d kits, the export %d', count($wppilot_report['loaded']), count($export_report['loaded']));
     }
 
@@ -409,15 +564,16 @@ function load_both(string $free, string $pro, string $export): array
 
     // Overlaps: what each copy named at run time, plus what its source names statically.
     $wppilot_files = files_under($free . '/includes/kits');
-    if ($pro !== '') {
-        $wppilot_files = array_merge($wppilot_files, files_under($pro . '/includes/kits'));
+    $wppilot_pro = $installed !== '' ? $installed : $pro;
+    if ($wppilot_pro !== '') {
+        $wppilot_files = array_merge($wppilot_files, files_under($wppilot_pro . '/includes/kits'));
     }
     $export_files = array_merge(files_under($export . '/runtime'), files_under($export . '/kits'), [$export . '/load.php']);
     $sides = ['wppilot' => static_names($wppilot_files), 'export' => static_names($export_files)];
     foreach (\Kit_Coexistence::$names as $kind => $names) {
         foreach ($names as $name => $owners) {
             foreach (array_keys($owners) as $owner) {
-                $side = $owner === 'wppilot-pro' ? 'wppilot' : $owner;
+                $side = in_array($owner, ['wppilot-pro', 'wppilot-pro-installed'], true) ? 'wppilot' : $owner;
                 if (isset($sides[$side])) {
                     $sides[$side][$kind][(string) $name] = true;
                 }
@@ -428,9 +584,10 @@ function load_both(string $free, string $pro, string $export): array
     $vendor = vendor_names(array_merge(
         glob($free . '/includes/kits/*/kit.json') ?: [],
         $pro !== '' ? (glob($pro . '/includes/kits/*/kit.json') ?: []) : [],
+        $installed !== '' ? (glob($installed . '/includes/kits/*/kit.json') ?: []) : [],
     ));
     $undeclared = [];
-    foreach ($pro !== '' ? UNDECLARED_VENDOR_NAMES : [] as $kind => $list) {
+    foreach ($pro !== '' || $installed !== '' ? UNDECLARED_VENDOR_NAMES : [] as $kind => $list) {
         foreach ($list as $name) {
             if (!isset($vendor[$kind][$name])) {
                 $vendor[$kind][$name] = true;
@@ -461,6 +618,10 @@ function load_both(string $free, string $pro, string $export): array
         }
     }
 
+    if ($installed !== '') {
+        $problems = array_merge($problems, installed_pro_problems($free, $installed));
+    }
+
     $counts = [];
     foreach (['ability', 'option', 'cron', 'hook'] as $kind) {
         $counts[] = sprintf('%s %d/%d', $kind, count($sides['wppilot'][$kind] ?? []), count($sides['export'][$kind] ?? []));
@@ -473,7 +634,7 @@ function load_both(string $free, string $pro, string $export): array
     return $problems;
 }
 
-$options = getopt('', ['pro-src:', 'phase:', 'export:']);
+$options = getopt('', ['pro-src:', 'phase:', 'export:', 'installed-pro:']);
 $options = is_array($options) ? $options : [];
 $free = str_replace('\\', '/', dirname(__DIR__));
 $pro = isset($options['pro-src']) ? rtrim(str_replace('\\', '/', (string) realpath((string) $options['pro-src'])), '/') : '';
@@ -481,9 +642,14 @@ if (isset($options['pro-src']) && ($pro === '' || !is_dir($pro . '/includes/kits
     fwrite(STDERR, "--pro-src has no includes/kits\n");
     exit(1);
 }
+$installed = isset($options['installed-pro']) ? rtrim(str_replace('\\', '/', (string) realpath((string) $options['installed-pro'])), '/') : '';
+if (isset($options['installed-pro']) && ($installed === '' || !is_dir($installed . '/includes/kits'))) {
+    fwrite(STDERR, "--installed-pro has no includes/kits\n");
+    exit(1);
+}
 
 if (($options['phase'] ?? '') === 'load') {
-    $problems = load_both($free, $pro, str_replace('\\', '/', (string) $options['export']));
+    $problems = load_both($free, $pro, str_replace('\\', '/', (string) $options['export']), $installed);
     if ($problems !== []) {
         fwrite(STDERR, "The exported kits do not coexist with WPPilot's:\n\n  - " . implode("\n  - ", $problems) . "\n");
         exit(1);
@@ -497,7 +663,8 @@ try {
     run_export($free, $pro, $export);
     $command = escapeshellarg(PHP_BINARY) . ' -d display_errors=stderr -d error_reporting=-1 ' . escapeshellarg(__FILE__)
         . ' --phase=load --export=' . escapeshellarg($export)
-        . ($pro !== '' ? ' --pro-src=' . escapeshellarg($pro) : '') . ' 2>&1';
+        . ($pro !== '' ? ' --pro-src=' . escapeshellarg($pro) : '')
+        . ($installed !== '' ? ' --installed-pro=' . escapeshellarg($installed) : '') . ' 2>&1';
     exec($command, $output, $code);
     echo implode("\n", $output), "\n";
     // A notice or warning is a failure too: a real site logs it on every request.

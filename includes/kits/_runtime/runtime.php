@@ -26,7 +26,8 @@ if (!defined('ABSPATH')) {
  * than loading code written against a different contract.
  *
  * 1.1 added require_profile() and the ProfileGate host interface.
- * 1.2 added unclaimed(), for kits that carry an ability another plugin may already register.
+ * 1.2 added unclaimed(), for kits that carry an ability another plugin may already register, and
+ * kit.json `requires.any`, for kits that serve whichever of several plugins is active.
  */
 const API_VERSION = '1.2';
 
@@ -247,7 +248,12 @@ function discover(string $kits_dir): array
         $manifest['dir'] = $dir;
         $found[] = $manifest;
     }
-    usort($found, static fn(array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
+    // Pro-tier kits first, then by slug. A Pro kit can carry a richer copy of an ability a Free kit
+    // also carries (the SEO plugins' per-post edits), and the Free copy stands aside through
+    // unclaimed() for whichever registered first. Inside WPPilot, Pro registers ahead of the kit
+    // loader anyway; an export that carries both tiers gets the same winner this way.
+    usort($found, static fn(array $a, array $b): int => [($a['tier'] ?? '') === 'pro' ? 0 : 1, (string) $a['slug']]
+        <=> [($b['tier'] ?? '') === 'pro' ? 0 : 1, (string) $b['slug']]);
     return $found;
 }
 
@@ -282,6 +288,21 @@ function incompatibility(array $manifest): string
         if (!function_exists((string) $function)) {
             return sprintf('needs %s(), which is not available', (string) $function);
         }
+    }
+    // `any`: a kit that serves whichever of several plugins is active (the SEO, form, backup and
+    // security kits) needs one of them, named by a constant, class or function it defines.
+    $any = is_array($requires['any'] ?? null) ? $requires['any'] : [];
+    if ($any !== []) {
+        $named = [];
+        foreach (['constants' => 'defined', 'classes' => 'class_exists', 'functions' => 'function_exists'] as $kind => $check) {
+            foreach (is_array($any[$kind] ?? null) ? $any[$kind] : [] as $symbol) {
+                if ($check((string) $symbol)) {
+                    return '';
+                }
+                $named[] = (string) $symbol;
+            }
+        }
+        return sprintf('needs one of %s, and none is active', implode(', ', $named));
     }
     return '';
 }

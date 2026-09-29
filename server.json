@@ -3,7 +3,7 @@
     "name": "co.wppilot/wppilot",
     "title": "WPPilot",
     "description": "WordPress MCP server: typed abilities with safety profiles, change evidence and undo.",
-    "version": "1.15.1",
+    "version": "1.16.0",
     "websiteUrl": "https://wppilot.co",
     "repository": {
         "url": "https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot",

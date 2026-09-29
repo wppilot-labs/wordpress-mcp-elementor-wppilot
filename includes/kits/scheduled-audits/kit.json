@@ -1,0 +1,52 @@
+{
+    "slug": "scheduled-audits",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\ScheduledAudits",
+    "tier": "free",
+    "runtime": "^1.2",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "kits": ["a11y-audit", "content-audit"]
+    },
+    "categories": {
+        "routines": {
+            "label": "Scheduled routines",
+            "description": "Audits the site runs on its own schedule, on the server, with no agent connected: accessibility, content (broken links, thin content, SEO meta, schema) and media alt text, run through the same gates as an agent's call, with the result emailed to chosen administrators and kept as a report that says what is new and what was fixed since the last run. Routines only read the site."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/routines-list",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/routines-report",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/routines-save",
+            "readonly": false,
+            "destructive": false,
+            "ledger": "restore:kits/routines-routine"
+        },
+        {
+            "name": "wppilot/routines-delete",
+            "readonly": false,
+            "destructive": true,
+            "ledger": "restore:kits/routines-routine"
+        },
+        {
+            "name": "wppilot/routines-run-now",
+            "readonly": false,
+            "destructive": false,
+            "ledger": "irreversible:Queues one run of the routine's read-only audits on WP-Cron; the run changes nothing on the site, and its report joins the routine's history"
+        }
+    ],
+    "skills": ["scheduled-audits"],
+    "tests": ["tests/Unit/Kits/ScheduledAudits"]
+}

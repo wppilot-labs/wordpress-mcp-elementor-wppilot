@@ -1,0 +1,102 @@
+{
+    "slug": "forms-basics",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\FormsBasics",
+    "tier": "free",
+    "runtime": "^1.2",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "vendor_floors": {
+            "WPForms": "1.8.0",
+            "Contact Form 7": "5.8.0",
+            "Flamingo": "2.4",
+            "Gravity Forms": "2.7"
+        },
+        "any": {
+            "constants": [
+                "WPFORMS_VERSION",
+                "WPCF7_VERSION"
+            ],
+            "classes": [
+                "WPCF7_ContactForm",
+                "GFForms",
+                "GFAPI",
+                "Forminator_API",
+                "Forminator_Base_Form_Model",
+                "Forminator_Form_Entry_Model"
+            ],
+            "functions": [
+                "wpforms"
+            ]
+        }
+    },
+    "vendor_storage": {
+        "meta": [
+            "_flamingo",
+            "_locale"
+        ]
+    },
+    "categories": {
+        "forms": {
+            "label": "Forms",
+            "description": "Read the site's forms and their submissions for WPForms, Contact Form 7 (entries through Flamingo), Gravity Forms and Forminator. Read-only. Entries come with email and phone answers, passwords, card data, uploads, signatures and IP addresses withheld, and contact details cut out of free text."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/wpforms-list-forms",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/wpforms-list-entries",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/cf7-list-forms",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/cf7-list-entries",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/gravityforms-list-forms",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/gravityforms-list-entries",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/forminator-list-forms",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/forminator-list-entries",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        }
+    ],
+    "skills": [
+        "forms-basics"
+    ],
+    "tests": [
+        "tests/Unit/Kits/FormsBasics"
+    ]
+}
