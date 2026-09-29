@@ -336,8 +336,8 @@ function wppilot_change_filter_time(string $value, bool $end_of_day): ?int
  * One ledger row as it leaves the site in an export.
  *
  * Flat, and without the rollback snapshot: a before-image is a full copy of a post, its meta and
- * its terms, which is the site's content rather than a record of what happened to it. Input is
- * already redacted at write time and is passed through as stored.
+ * its terms, which is the site's content rather than a record of what happened to it. Input was
+ * redacted by key name at write time; email addresses in its values are masked here.
  *
  * @param array<string, mixed> $entry
  * @return array<string, mixed>
@@ -364,8 +364,82 @@ function wppilot_change_export_row(array $entry): array
         'rollback_reason' => (string) ($rollback['reason'] ?? ''),
         'rolled_back_at' => (string) ($entry['rolled_back_at'] ?? ''),
         'confirmation' => is_array($entry['confirmation'] ?? null) ? (string) ($entry['confirmation']['method'] ?? '') : '',
-        'input' => is_array($entry['input'] ?? null) ? $entry['input'] : [],
+        'input' => is_array($entry['input'] ?? null) ? wppilot_redact_for_output($entry['input']) : [],
     ];
+}
+
+/**
+ * One ledger row as get-change and the Changes screen show it.
+ *
+ * Write-time redaction works on key names only, so an email address typed into an excerpt, a
+ * comment or an option value was stored and shown in full. Values are masked here, on the way
+ * out, and never in storage: the before-image under `rollback` is what undo restores and verifies
+ * against, and a masked copy there would make undo write the mask back into the site. The key-name
+ * redaction is applied again too, because before-images were never redacted at all.
+ *
+ * @param array<string, mixed> $entry
+ * @return array<string, mixed>
+ */
+function wppilot_change_for_output(array $entry): array
+{
+    foreach (['input', 'result', 'rollback', 'rollback_result', 'design'] as $key) {
+        if (array_key_exists($key, $entry)) {
+            // @mago-expect analysis:mixed-assignment -- Redaction preserves each value's shape.
+            $entry[$key] = wppilot_redact_for_output($entry[$key]);
+        }
+    }
+    return $entry;
+}
+
+/**
+ * Key-name redaction plus email masking, without the length cuts of wppilot_redact_for_log():
+ * this is for reading a record, where a shortened before-image would be a wrong one.
+ */
+function wppilot_redact_for_output(mixed $value, int $depth = 0): mixed
+{
+    if (is_string($value)) {
+        return wppilot_mask_emails($value);
+    }
+    if (!is_array($value)) {
+        return $value;
+    }
+    if ($depth > 32) {
+        return '[depth-limited]';
+    }
+    $result = [];
+    foreach ($value as $key => $item) {
+        if (is_string($key) && wppilot_change_key_is_sensitive($key)) {
+            $result[$key] = '[redacted]';
+            continue;
+        }
+        // @mago-expect analysis:mixed-assignment -- Redaction preserves each value's shape.
+        $result[$key] = wppilot_redact_for_output($item, $depth + 1);
+    }
+    return $result;
+}
+
+/**
+ * Mask every email address in a string as `j***@e***.com`.
+ *
+ * The first letter and the top-level domain survive so a reader can still tell two addresses
+ * apart and see that the field held an address; the rest does not. Retina file names such as
+ * `logo@2x.png` look like addresses to a plain pattern, so an image extension in place of a
+ * top-level domain is left alone.
+ */
+function wppilot_mask_emails(string $value): string
+{
+    if (!str_contains($value, '@')) {
+        return $value;
+    }
+    $masked = preg_replace_callback(
+        '/([A-Za-z0-9._%+\-]+)@((?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+)([A-Za-z]{2,24})\b(?<!\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg|\.avif)/',
+        static function (array $match): string {
+            $domain = rtrim($match[2], '.');
+            return substr($match[1], 0, 1) . '***@' . substr($domain, 0, 1) . '***.' . $match[3];
+        },
+        $value,
+    );
+    return is_string($masked) ? $masked : $value;
 }
 
 /** @return array<string, mixed>|null */

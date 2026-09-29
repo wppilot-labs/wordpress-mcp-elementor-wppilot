@@ -8,6 +8,24 @@
         "php": "8.0",
         "wp": "6.9"
     },
+    "vendor_storage": {
+        "meta": [
+            "_elementor_data",
+            "_yoast_wpseo_title",
+            "_yoast_wpseo_metadesc",
+            "rank_math_title",
+            "rank_math_description",
+            "_seopress_titles_title",
+            "_seopress_titles_desc",
+            "_aioseo_title",
+            "_aioseo_description",
+            "_genesis_title",
+            "_genesis_description",
+            "slim_seo",
+            "_wds_title",
+            "_wds_metadesc"
+        ]
+    },
     "categories": {
         "diagnostics": {
             "label": "Diagnostics",

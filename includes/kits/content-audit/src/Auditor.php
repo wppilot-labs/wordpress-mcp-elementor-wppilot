@@ -82,7 +82,13 @@ final class Auditor
     public function start(int $total): array
     {
         $sources = [];
-        if ($this->enabled('seo_meta')) {
+        // Where the host has an SEO provider registry (WPPilot Pro), the plugins it reports active
+        // are read through their own readers, which know storage the meta keys below do not
+        // (AIOSEO's table, Slim SEO's array) and ignore the leftovers of a deactivated plugin.
+        $providers = $this->enabled('seo_meta') ? $this->source->seo_providers() : [];
+        if ($providers !== []) {
+            $sources = array_keys($providers);
+        } elseif ($this->enabled('seo_meta')) {
             $keys = [];
             foreach (Fixes::SEO_SOURCES as $source) {
                 $keys[] = $source['title'];
@@ -116,6 +122,10 @@ final class Auditor
             // are the oldest and least representative of the current templates.
             'schema_stride' => $sample > 0 ? max(1, (int) ceil($total / $sample)) : 0,
             'seo_sources' => $sources,
+            // 'registry' or 'meta'; the labels are kept because a registry slug need not be one
+            // of Fixes::SEO_SOURCES, and a background job reports after the request that saw it.
+            'seo_via' => $providers !== [] ? 'registry' : 'meta',
+            'seo_labels' => $providers,
             'complete' => false,
             'notes' => [],
         ];
@@ -238,9 +248,10 @@ final class Auditor
                 'total' => (int) ($state['total'] ?? 0),
                 'complete' => ($state['complete'] ?? false) === true,
                 'seo_sources' => array_map(
-                    static fn(string $slug): string => Fixes::SEO_SOURCES[$slug]['label'] ?? $slug,
+                    fn(string $slug): string => $this->seo_label($slug, $state),
                     is_array($state['seo_sources'] ?? null) ? $state['seo_sources'] : [],
                 ),
+                'seo_read_via' => ($state['seo_via'] ?? 'meta') === 'registry' ? 'seo provider registry' : 'post meta',
                 'internal_http_checks' => (int) ($state['http_used'] ?? 0),
                 'external_checked' => (int) ($state['external_checked'] ?? 0),
                 'schema_pages_fetched' => (int) ($state['schema_sampled'] ?? 0),
@@ -445,35 +456,57 @@ final class Auditor
      */
     private function scan_seo(array $post, array $state): array
     {
-        $sources = array_values(array_intersect_key(Fixes::SEO_SOURCES, array_flip((array) $state['seo_sources'])));
-        $keys = [];
-        foreach ($sources as $source) {
-            $keys[] = $source['title'];
-            $keys[] = $source['description'];
-        }
-        $meta = $this->source->meta($post['id'], $keys);
-        $labels = array_column($sources, 'label');
+        $slugs = array_values(array_map('strval', (array) $state['seo_sources']));
+        $sources = array_values(array_intersect_key(Fixes::SEO_SOURCES, array_flip($slugs)));
+        $labels = array_map(fn(string $slug): string => $this->seo_label($slug, $state), $slugs);
         $abilities = array_column($sources, 'ability');
-        foreach (['description' => 'missing_meta_description', 'title' => 'missing_meta_title'] as $field => $type) {
-            $checked = array_column($sources, $field);
-            $has = false;
-            foreach ($checked as $key) {
-                if (($meta[$key] ?? '') !== '') {
-                    $has = true;
+        $values = ['title' => [], 'description' => []];
+        if (($state['seo_via'] ?? 'meta') === 'registry') {
+            foreach ($slugs as $slug) {
+                $seo = $this->source->seo_read($slug, $post['id']);
+                if ($seo !== null) {
+                    $values['title'][] = $seo['title'];
+                    $values['description'][] = $seo['description'];
                 }
             }
-            if ($has) {
+            // No provider could be read: that is not evidence that anything is missing.
+            if ($values['description'] === []) {
+                return $state;
+            }
+        } else {
+            $keys = [];
+            foreach ($sources as $source) {
+                $keys[] = $source['title'];
+                $keys[] = $source['description'];
+            }
+            $meta = $this->source->meta($post['id'], $keys);
+            foreach ($sources as $source) {
+                $values['title'][] = $meta[$source['title']] ?? '';
+                $values['description'][] = $meta[$source['description']] ?? '';
+            }
+        }
+        foreach (['description' => 'missing_meta_description', 'title' => 'missing_meta_title'] as $field => $type) {
+            if (array_filter($values[$field], static fn(string $value): bool => $value !== '') !== []) {
                 continue;
             }
             $state = $this->add($state, $type, $field === 'description' ? 'low' : 'info', $post, [
                 'source' => $labels,
-                'keys_checked' => $checked,
+                'keys_checked' => array_column($sources, $field),
                 'note' => $field === 'description'
                     ? 'No post-specific description is stored. Unless a post-type template in the SEO plugin supplies one, the page has none.'
                     : 'No post-specific SEO title is stored; the SEO plugin\'s title template applies.',
             ], $abilities);
         }
         return $state;
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function seo_label(string $slug, array $state): string
+    {
+        $labels = is_array($state['seo_labels'] ?? null) ? $state['seo_labels'] : [];
+        return (string) ($labels[$slug] ?? Fixes::SEO_SOURCES[$slug]['label'] ?? $slug);
     }
 
     /**

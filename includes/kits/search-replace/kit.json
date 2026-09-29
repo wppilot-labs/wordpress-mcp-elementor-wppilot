@@ -8,6 +8,9 @@
         "php": "8.0",
         "wp": "6.9"
     },
+    "vendor_storage": {
+        "meta": ["_elementor_data", "_elementor_edit_mode", "_elementor_css", "_elementor_element_cache", "_elementor_page_assets"]
+    },
     "categories": {
         "wordpress": {
             "label": "WordPress",

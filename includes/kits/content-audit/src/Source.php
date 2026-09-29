@@ -67,7 +67,8 @@ interface Source
     public function structural_ids(): array;
 
     /**
-     * Which of these post meta keys exist anywhere on the site.
+     * Which of these post meta keys exist anywhere on the site. A key written `base[field]` is
+     * present when `base` is.
      *
      * @param list<string> $keys
      * @return list<string>
@@ -75,10 +76,26 @@ interface Source
     public function present_meta_keys(array $keys): array;
 
     /**
-     * @param list<string> $keys
+     * @param list<string> $keys A key written `base[field]` reads that field of the array stored under `base`.
      * @return array<string, string> Key to its single value; '' when absent.
      */
     public function meta(int $id, array $keys): array;
+
+    /**
+     * The SEO plugins the host's provider registry reports active on this request, slug to
+     * label. Empty when the host offers no registry (a copy of this kit outside WPPilot Pro).
+     *
+     * @return array<string, string>
+     */
+    public function seo_providers(): array;
+
+    /**
+     * One post's stored SEO title and description, read through a registered provider. Null
+     * when the provider is gone or its reader fails.
+     *
+     * @return array{title: string, description: string}|null
+     */
+    public function seo_read(string $provider, int $id): ?array;
 
     /**
      * The page as a visitor receives it.

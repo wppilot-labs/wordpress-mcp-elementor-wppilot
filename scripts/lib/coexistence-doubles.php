@@ -330,6 +330,27 @@ function wp_get_current_user(): object
     return (object) ['ID' => Kit_Coexistence::$user, 'user_login' => 'user' . Kit_Coexistence::$user];
 }
 
+/** No other users: a kit listing administrators (routines' recipients) gets an empty list. */
+function get_users(array $args = []): array
+{
+    return [];
+}
+
+function wp_timezone_string(): string
+{
+    return 'UTC';
+}
+
+function wp_timezone(): DateTimeZone
+{
+    return new DateTimeZone('UTC');
+}
+
+function wp_date(string $format, ?int $timestamp = null, ?DateTimeZone $timezone = null): string|false
+{
+    return (new DateTimeImmutable('@' . ($timestamp ?? time())))->setTimezone($timezone ?? wp_timezone())->format($format);
+}
+
 function wp_cache_delete(int|string $key, string $group = ''): bool
 {
     return true;

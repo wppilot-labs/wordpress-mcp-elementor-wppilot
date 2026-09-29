@@ -484,11 +484,14 @@ function check_authorization_echo(array $class, array $evidence, string $stack, 
  * The most common 401 is not a firewall: WordPress switches Application Passwords off on a site
  * that is not served over HTTPS unless its environment type is `local`, and a security plugin can
  * switch them off with a filter. Every probe above can pass while every Basic-auth client is still
- * refused, so this is checked on its own and named plainly.
+ * refused, so this is checked on its own and named plainly. When the filter's owner is known
+ * (Wordfence's setting, or a plugin traced through its callback), the finding names it and the fix
+ * is that plugin's own switch, because "find the security plugin" leaves the admin guessing.
  *
+ * @param array{source: string, name: string, message: string, remedy: string, url: string}|null $blocker
  * @return array<string, mixed>
  */
-function check_application_passwords(bool $available, bool $is_ssl, string $environment, bool $tokens_available): array
+function check_application_passwords(bool $available, bool $is_ssl, string $environment, bool $tokens_available, ?array $blocker = null): array
 {
     $label = __('Application Passwords accepted', domain: 'wppilot');
     if ($available) {
@@ -500,6 +503,11 @@ function check_application_passwords(bool $available, bool $is_ssl, string $envi
         : '';
     if (!$is_ssl && $environment !== 'local') {
         return check('application_passwords', 'fail', $label, __('WordPress disables Application Passwords on a site that is not served over HTTPS, so every client using Basic auth gets 401.', domain: 'wppilot') . $alternative, $evidence, __('Serve the site over HTTPS. On a development site only, set define( "WP_ENVIRONMENT_TYPE", "local" ); in wp-config.php.', domain: 'wppilot'));
+    }
+    if ($blocker !== null) {
+        $evidence[] = 'Switched off by: ' . $blocker['name'];
+        $fix = $blocker['remedy'] . ($blocker['url'] !== '' ? ' ' . $blocker['url'] : '');
+        return check('application_passwords', 'fail', $label, $blocker['message'], $evidence, $fix);
     }
     return check('application_passwords', 'fail', $label, __('Application Passwords are switched off by a plugin or by code (the wp_is_application_passwords_available filter), so every client using Basic auth gets 401.', domain: 'wppilot') . $alternative, $evidence, __('Find the security plugin or snippet that disables Application Passwords and allow them, or connect with a WPPilot access token.', domain: 'wppilot'));
 }
@@ -778,6 +786,7 @@ function run(?callable $request = null): array
         is_ssl(),
         function_exists('wp_get_environment_type') ? wp_get_environment_type() : 'production',
         function_exists('wppilot_token_hash'),
+        function_exists('wppilot_app_passwords_blocker') ? \wppilot_app_passwords_blocker() : null,
     );
 
     // 3. Does Authorization reach PHP intact?

@@ -33,6 +33,7 @@ use function WPPilot\Troubleshoot\Doctor\summarize;
 require_once dirname(__DIR__) . '/doubles/mcp-surface.php';
 require_once dirname(__DIR__, 2) . '/includes/troubleshoot/checks.php';
 require_once dirname(__DIR__, 2) . '/includes/troubleshoot/doctor.php';
+require_once dirname(__DIR__, 2) . '/includes/app-password-blockers.php';
 
 /**
  * The Connection Doctor's classifiers, fed captured responses.
@@ -61,6 +62,57 @@ final class ConnectionDoctorTest extends TestCase
         self::assertStringContainsString('wp_is_application_passwords_available', $filtered['finding']);
 
         self::assertSame('pass', check_application_passwords(true, false, 'local', true)['status']);
+    }
+
+    /**
+     * Wordfence switches Application Passwords off by default with a bare `__return_false`, so the
+     * doctor has to read its setting to name it; the finding must carry Wordfence's own switch.
+     */
+    public function testWordfenceIsNamedWithItsExactSetting(): void
+    {
+        $blocker = \wppilot_app_passwords_blocker_from(true, ['/srv/wp/wp-includes/functions.php'], '/srv/wp/wp-content/plugins', '', '');
+        self::assertIsArray($blocker);
+        self::assertSame('wordfence', $blocker['source']);
+        self::assertStringContainsString('Wordfence', $blocker['message']);
+        self::assertStringContainsString('Disable WordPress application passwords', $blocker['remedy']);
+        self::assertStringContainsString('OAuth', $blocker['remedy']);
+
+        $check = check_application_passwords(false, true, 'production', true, $blocker);
+        self::assertSame('fail', $check['status']);
+        self::assertStringContainsString('Wordfence', $check['finding']);
+        self::assertStringContainsString('Disable WordPress application passwords', $check['fix']);
+        self::assertContains('Switched off by: Wordfence', $check['evidence']);
+    }
+
+    /**
+     * Another plugin's callback is traced to its folder; a core callback such as `__return_false`
+     * says nothing about who added it, so it must not be blamed on anyone.
+     */
+    public function testFilterCallbacksAreAttributedToTheirPlugin(): void
+    {
+        $plugins = 'C:\wp\wp-content\plugins';
+        $blocker = \wppilot_app_passwords_blocker_from(false, [
+            'C:\wp\wp-includes\functions.php',
+            'C:\wp\wp-content\plugins\lockdown\src\Rules.php',
+        ], $plugins, 'C:/wp/wp-content/mu-plugins', 'C:/wp/wp-content/themes');
+        self::assertIsArray($blocker);
+        self::assertSame('filter', $blocker['source']);
+        self::assertStringContainsString('lockdown (plugins/lockdown/src/Rules.php)', $blocker['message']);
+
+        $mu = \wppilot_app_passwords_blocker_from(false, ['/wp/wp-content/mu-plugins/no-app-pw.php'], '/wp/wp-content/plugins', '/wp/wp-content/mu-plugins', '');
+        self::assertIsArray($mu);
+        self::assertStringContainsString('mu-plugins/no-app-pw.php', $mu['name']);
+
+        self::assertNull(\wppilot_app_passwords_blocker_from(false, ['/wp/wp-includes/functions.php'], '/wp/wp-content/plugins', '', ''));
+        self::assertNull(\wppilot_app_passwords_blocker_from(false, [], '/wp/wp-content/plugins', '', ''));
+    }
+
+    public function testCallbackFilesAreReflected(): void
+    {
+        self::assertSame(__FILE__, \wppilot_callback_file(static fn(): bool => false));
+        self::assertSame(__FILE__, \wppilot_callback_file([self::class, 'response']));
+        self::assertSame('', \wppilot_callback_file('no_such_function_anywhere'));
+        self::assertSame('', \wppilot_callback_file(null));
     }
 
     protected function setUp(): void

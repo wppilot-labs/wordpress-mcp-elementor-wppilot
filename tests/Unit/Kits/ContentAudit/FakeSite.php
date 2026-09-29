@@ -46,6 +46,12 @@ final class FakeSite implements Source
     /** @var list<string> */
     public array $abilities = [];
 
+    /** @var array<string, string> Active SEO providers in the host's registry, slug => label. */
+    public array $providers = [];
+
+    /** @var array<string, array<int, array{title: string, description: string}|null>> slug => post => stored SEO. */
+    public array $providerSeo = [];
+
     public function add(int $id, string $slug, string $content = '', string $type = 'page', string $status = 'publish', string $builder = ''): void
     {
         $this->posts[$id] = ['title' => ucfirst($slug), 'type' => $type, 'status' => $status, 'content' => $content, 'builder' => $builder, 'slug' => $slug];
@@ -148,6 +154,21 @@ final class FakeSite implements Source
             $values[$key] = $this->meta[$id][$key] ?? '';
         }
         return $values;
+    }
+
+    public function seo_providers(): array
+    {
+        return $this->providers;
+    }
+
+    public function seo_read(string $provider, int $id): ?array
+    {
+        if (!isset($this->providers[$provider])) {
+            return null;
+        }
+        return array_key_exists($id, $this->providerSeo[$provider] ?? [])
+            ? $this->providerSeo[$provider][$id]
+            : ['title' => '', 'description' => ''];
     }
 
     public function fetch(string $url): array|WP_Error

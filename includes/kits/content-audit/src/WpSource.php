@@ -151,23 +151,109 @@ final class WpSource implements Source
         if ($keys === []) {
             return [];
         }
-        $placeholders = implode(',', array_fill(0, count($keys), '%s'));
+        $bases = array_values(array_unique(array_map(static fn(string $key): string => self::split_key($key)[0], $keys)));
+        $placeholders = implode(',', array_fill(0, count($bases), '%s'));
         $found = $wpdb->get_col($wpdb->prepare(
             "SELECT DISTINCT meta_key FROM {$wpdb->postmeta} WHERE meta_key IN ({$placeholders}) AND meta_value <> ''",
-            ...$keys,
+            ...$bases,
         ));
-        return array_values(array_map('strval', is_array($found) ? $found : []));
+        $found = array_map('strval', is_array($found) ? $found : []);
+        return array_values(array_filter($keys, static fn(string $key): bool => in_array(self::split_key($key)[0], $found, true)));
     }
 
     public function meta(int $id, array $keys): array
     {
         $values = [];
         foreach ($keys as $key) {
+            [$base, $field] = self::split_key($key);
             /** @var mixed $value */
-            $value = get_post_meta($id, $key, true);
+            $value = get_post_meta($id, $base, true);
+            if ($field !== null) {
+                $value = is_array($value) ? ($value[$field] ?? '') : '';
+            }
             $values[$key] = is_scalar($value) ? trim((string) $value) : '';
         }
         return $values;
+    }
+
+    public function seo_providers(): array
+    {
+        $labels = [];
+        foreach ($this->registry() as $slug => $provider) {
+            try {
+                if (is_callable($provider['active'] ?? null) && ($provider['active'])() === true) {
+                    $labels[$slug] = is_string($provider['label'] ?? null) ? $provider['label'] : $slug;
+                }
+            } catch (\Throwable) {
+                // A provider that cannot say whether it is active is not one.
+                continue;
+            }
+        }
+        return $labels;
+    }
+
+    public function seo_read(string $provider, int $id): ?array
+    {
+        $read = $this->registry()[$provider]['read'] ?? null;
+        if (!is_callable($read)) {
+            return null;
+        }
+        try {
+            /** @var mixed $seo */
+            $seo = $read($id);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!is_array($seo)) {
+            return null;
+        }
+        $text = static fn(mixed $value): string => is_scalar($value) ? trim((string) $value) : '';
+        return ['title' => $text($seo['title'] ?? ''), 'description' => $text($seo['description'] ?? '')];
+    }
+
+    /**
+     * Every provider the host's `seo-provider-registry` extension point lists (WPPilot Pro offers
+     * one; anywhere else it is null and the audit falls back to meta keys).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function registry(): array
+    {
+        // Providers register when the host's integrations load, inside wp_abilities_api_init.
+        // WordPress fires that lazily, on the first touch of the ability registry, and a
+        // background step under WP-Cron may not have touched it yet: the registry then reads
+        // empty and the audit falls back to meta keys, including a deactivated plugin's.
+        if (function_exists('wp_get_abilities')) {
+            wp_get_abilities();
+        }
+        /** @var mixed $all */
+        $all = Runtime\host()->extension('seo-provider-registry');
+        if (!is_callable($all)) {
+            return [];
+        }
+        try {
+            /** @var mixed $providers */
+            $providers = $all();
+        } catch (\Throwable) {
+            return [];
+        }
+        $valid = [];
+        foreach (is_array($providers) ? $providers : [] as $slug => $provider) {
+            if (is_string($slug) && is_array($provider)) {
+                $valid[$slug] = $provider;
+            }
+        }
+        return $valid;
+    }
+
+    /**
+     * `slim_seo[description]` to `['slim_seo', 'description']`; a plain key to `[key, null]`.
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    public static function split_key(string $key): array
+    {
+        return preg_match('/^([^\[\]]+)\[([^\[\]]+)\]$/', $key, $match) === 1 ? [$match[1], $match[2]] : [$key, null];
     }
 
     public function fetch(string $url): array|WP_Error

@@ -62,7 +62,8 @@ declare(strict_types=1);
  *   EXPORT.json   source git SHAs, kit versions, runtime API_VERSION, the rewrite map and the
  *                 sha256 of every emitted file, keys sorted
  *   runtime/      includes/kits/_runtime without hosts/wppilot.php (WPPilot-only glue)
- *   kits/<slug>/  each kit, minus any tests/ folder inside it
+ *   kits/<slug>/  each kit, minus any tests/ folder inside it, plus every kit a requested one
+ *                 names in kit.json `requires.kits` (transitively), reported on stdout
  *   tests/        the kit's tests from this repo (kit.json `tests`, else tests/Unit/Kits/<Kit>)
  *                 and, for Pro kits, <pro-src>/tests/kits/<slug>.php. They need a PHPUnit
  *                 harness with WordPress doubles in the receiving plugin to run.
@@ -704,9 +705,32 @@ function main(array $argv): int
         throw new ExportError("the kits fail scripts/check-kit-boundaries.php:\n" . implode("\n", $lint_output));
     }
 
-    // Resolve every requested kit before touching anything.
+    // Resolve every requested kit before touching anything, with the kits each one declares in
+    // kit.json `requires.kits`: a kit that runs another kit's abilities (routines runs the audits)
+    // would otherwise export cleanly and then name abilities its copy does not have.
     $kits = [];
-    $slugs = array_values(array_unique(array_filter(array_map('trim', explode(',', $options['kits'])))));
+    $requested = array_values(array_unique(array_filter(array_map('trim', explode(',', $options['kits'])))));
+    $slugs = $requested;
+    for ($i = 0; $i < count($slugs); $i++) {
+        $slug = $slugs[$i];
+        foreach ([$free, $pro] as $root) {
+            $file = "{$root}/includes/kits/{$slug}/kit.json";
+            if ($root === '' || !is_file($file)) {
+                continue;
+            }
+            $manifest = json_decode((string) file_get_contents($file), true);
+            $requires = is_array($manifest) && is_array($manifest['requires'] ?? null) ? $manifest['requires'] : [];
+            foreach (is_array($requires['kits'] ?? null) ? $requires['kits'] : [] as $required) {
+                if (is_string($required) && !in_array($required, $slugs, true)) {
+                    $slugs[] = $required;
+                }
+            }
+        }
+    }
+    $added = array_values(array_diff($slugs, $requested));
+    if ($added !== []) {
+        fwrite(STDOUT, 'export-kit: also exporting ' . implode(', ', $added) . ", which the requested kits require\n");
+    }
     sort($slugs, SORT_STRING);
     foreach ($slugs as $slug) {
         $candidates = array_filter([

@@ -1193,6 +1193,30 @@ function wppilot_render_mcp_dependency_inline_notice(?WP_Error $dependency_error
  */
 function wppilot_render_authorization_header_warning(): void
 {
+    // A security plugin switching Application Passwords off produces the same 401 as a stripped
+    // header, and it is the likelier cause (Wordfence ships with it on), so it is named here too,
+    // whichever connection method card is open.
+    $pw_status = wppilot_app_passwords_status();
+    $blocker = $pw_status['blocker'] ?? null;
+    if (!$pw_status['available'] && $pw_status['reason'] === 'filtered') {
+        ?>
+        <div id="wppilot-app-passwords-blocked-warning" class="notice notice-error wppilot-keep" role="alert">
+            <p><strong><?php echo esc_html(is_array($blocker) ? $blocker['message'] : $pw_status['message']); ?></strong></p>
+            <?php if (is_array($blocker)): ?>
+                <p>
+                    <?php echo esc_html($blocker['remedy']); ?>
+                    <?php if ($blocker['url'] !== ''): ?>
+                        <a href="<?php echo esc_url($blocker['url']); ?>"><?php
+                            /* translators: %s: plugin name, e.g. Wordfence. */
+                            echo esc_html(sprintf(__('Open the %s setting', domain: 'wppilot'), $blocker['name']));
+                        ?></a>
+                    <?php endif; ?>
+                </p>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
     if (wp_is_site_protected_by_basic_auth()) {
         return;
     }

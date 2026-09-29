@@ -180,6 +180,61 @@ final class AuditorTest extends TestCase
         self::assertCount(2, $report['findings']);
     }
 
+    public function testTheSeoFrameworkMetaIsReadAndItsAbilitySuggested(): void
+    {
+        $this->site->add(1, 'described', '');
+        $this->site->add(2, 'bare', '');
+        $this->site->meta = [1 => ['_genesis_description' => 'A page.']];
+        $this->site->abilities = ['test/tsf-update-post-seo'];
+
+        $report = $this->audit(['checks' => ['seo_meta']]);
+        $findings = $this->byType($report['findings']);
+
+        self::assertSame(['The SEO Framework'], $report['stats']['seo_sources']);
+        self::assertSame('post meta', $report['stats']['seo_read_via']);
+        self::assertCount(1, $findings['missing_meta_description']);
+        self::assertSame(2, $findings['missing_meta_description'][0]['post']['id']);
+        self::assertSame(['_genesis_description'], $findings['missing_meta_description'][0]['evidence']['keys_checked']);
+        self::assertSame(['test/tsf-update-post-seo'], $findings['missing_meta_description'][0]['suggested_fix']['abilities']);
+    }
+
+    /**
+     * With a provider registry (WPPilot Pro) the audit reads through it: a deactivated plugin's
+     * leftover meta is ignored, an unregistered fix ability is not suggested, and a provider the
+     * kit has no meta keys for is still read and named.
+     */
+    public function testRegistryProvidersAreReadInsteadOfMetaKeys(): void
+    {
+        $this->site->add(1, 'described', '');
+        $this->site->add(2, 'bare', '');
+        $this->site->add(3, 'unreadable', '');
+        $this->site->meta = [2 => ['_yoast_wpseo_metadesc' => 'Stale, Yoast is off.']];
+        $this->site->providers = ['smartcrawl' => 'SmartCrawl', 'acme-seo' => 'Acme SEO'];
+        $this->site->providerSeo = [
+            'smartcrawl' => [1 => ['title' => '', 'description' => 'Stored.'], 3 => null],
+            'acme-seo' => [3 => null],
+        ];
+
+        $report = $this->audit(['checks' => ['seo_meta']]);
+        $findings = $this->byType($report['findings']);
+
+        self::assertSame(['SmartCrawl', 'Acme SEO'], $report['stats']['seo_sources']);
+        self::assertSame('seo provider registry', $report['stats']['seo_read_via']);
+        self::assertSame([2], array_map(static fn(array $f): int => $f['post']['id'], $findings['missing_meta_description']));
+        self::assertSame(['SmartCrawl', 'Acme SEO'], $findings['missing_meta_description'][0]['evidence']['source']);
+        self::assertSame([], $findings['missing_meta_description'][0]['suggested_fix']['abilities'], 'smartcrawl-update-post-seo is not registered here');
+
+        $this->site->abilities = ['test/smartcrawl-update-post-seo'];
+        $findings = $this->byType($this->audit(['checks' => ['seo_meta']])['findings']);
+        self::assertSame(['test/smartcrawl-update-post-seo'], $findings['missing_meta_description'][0]['suggested_fix']['abilities']);
+    }
+
+    public function testSlimSeoArrayMetaKeysAreSplit(): void
+    {
+        self::assertSame(['slim_seo', 'description'], \WPPilot\Kits\ContentAudit\WpSource::split_key('slim_seo[description]'));
+        self::assertSame(['_wds_metadesc', null], \WPPilot\Kits\ContentAudit\WpSource::split_key('_wds_metadesc'));
+    }
+
     public function testNoSeoPluginIsOneSiteFindingNotOnePerPost(): void
     {
         $this->site->add(1, 'a', '');

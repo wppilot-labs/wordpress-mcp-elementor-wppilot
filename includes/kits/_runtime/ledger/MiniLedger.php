@@ -209,8 +209,40 @@ final class MiniLedger implements Ledger
             'status' => self::status($entry),
             'rollback_reason' => (string) ($rollback['reason'] ?? ''),
             'rolled_back_at' => (string) ($entry['rolled_back_at'] ?? ''),
-            'input' => is_array($entry['input'] ?? null) ? $entry['input'] : [],
+            'input' => is_array($entry['input'] ?? null) ? self::mask_emails($entry['input']) : [],
         ];
+    }
+
+    /**
+     * Mask email addresses in stored input on the way out, as `j***@e***.com`.
+     *
+     * Write-time redaction goes by key name, so an address typed into a text field is stored in
+     * full; masking here rather than at write time keeps what was recorded exact. Same pattern as
+     * the WPPilot ledger, including leaving retina names such as `logo@2x.png` alone.
+     */
+    public static function mask_emails(mixed $value, int $depth = 0): mixed
+    {
+        if (is_array($value)) {
+            if ($depth > 32) {
+                return '[depth-limited]';
+            }
+            foreach ($value as $key => $item) {
+                $value[$key] = self::mask_emails($item, $depth + 1);
+            }
+            return $value;
+        }
+        if (!is_string($value) || !str_contains($value, '@')) {
+            return $value;
+        }
+        $masked = preg_replace_callback(
+            '/([A-Za-z0-9._%+\-]+)@((?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+)([A-Za-z]{2,24})\b(?<!\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg|\.avif)/',
+            static function (array $match): string {
+                $domain = rtrim($match[2], '.');
+                return substr($match[1], 0, 1) . '***@' . substr($domain, 0, 1) . '***.' . $match[3];
+            },
+            $value
+        );
+        return is_string($masked) ? $masked : $value;
     }
 
     public function snapshot_budget(): int

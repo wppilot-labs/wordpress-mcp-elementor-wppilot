@@ -40,7 +40,8 @@ declare(strict_types=1);
  *     Runtime\require_profile() with its own name: before WordPress 7.1 the key alone is
  *     enforced by nothing outside the host's own gate.
  *
- * Per kit it also checks kit.json (slug, version, namespace, tier, runtime, abilities), that the
+ * Per kit it also checks kit.json (slug, version, namespace, tier, runtime, abilities, and the
+ * optional requires.kits and vendor_storage), that the
  * literal wp_register_ability() names in its PHP equal kit.json `abilities[].name` both ways,
  * that each declared skill has skills/<slug>/SKILL.md (and each SKILL.md is declared), and that
  * declared tests exist.
@@ -478,6 +479,62 @@ function check_manifest(array $manifest, string $slug, string $tier, string $whe
     if (!is_array($manifest['abilities'] ?? null)) {
         $report->add($where, 0, 'kit.json needs an `abilities` array (empty is fine)');
     }
+    $requires = is_array($manifest['requires'] ?? null) ? $manifest['requires'] : [];
+    if (isset($requires['kits'])) {
+        if (!is_array($requires['kits']) || array_values($requires['kits']) !== $requires['kits']) {
+            $report->add($where, 0, 'kit.json requires.kits must be a list of kit slugs');
+        } else {
+            foreach ($requires['kits'] as $required) {
+                if (!is_string($required) || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $required) !== 1 || $required === $slug) {
+                    $report->add($where, 0, 'kit.json requires.kits must name other kits by slug');
+                }
+            }
+        }
+    }
+    if (isset($manifest['vendor_storage'])) {
+        $storage = $manifest['vendor_storage'];
+        if (!is_array($storage) || ($storage !== [] && array_values($storage) === $storage)) {
+            $report->add($where, 0, 'kit.json vendor_storage must be an object of option, meta, transient and cron lists');
+            return;
+        }
+        foreach ($storage as $kind => $names) {
+            if (!in_array($kind, ['option', 'meta', 'transient', 'cron'], true)) {
+                $report->add($where, 0, "kit.json vendor_storage has an unknown kind `{$kind}` (option, meta, transient or cron)");
+                continue;
+            }
+            foreach (is_array($names) && array_values($names) === $names ? $names : [null] as $name) {
+                // A name the kit owns has to be renamed on export, which is what the coexistence
+                // gate catches; declaring it vendor-owned would silence that.
+                if (!is_string($name) || $name === '' || stripos($name, 'wppilot') !== false) {
+                    $report->add($where, 0, "kit.json vendor_storage.{$kind} must list the other plugin's names, none of them WPPilot's");
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * `requires.kits` must name kits that exist, and a Free kit may only require Free kits: Free is
+ * exported without Pro's source, so a Free kit needing a Pro kit could not be exported at all.
+ *
+ * @param array<string, array{tier: string, manifest: array<string, mixed>, where: string}> $kits
+ */
+function check_required_kits(array $kits, Report $report): void
+{
+    foreach ($kits as $kit) {
+        $requires = is_array($kit['manifest']['requires'] ?? null) ? $kit['manifest']['requires'] : [];
+        foreach (is_array($requires['kits'] ?? null) ? $requires['kits'] : [] as $required) {
+            if (!is_string($required)) {
+                continue;
+            }
+            if (!isset($kits[$required])) {
+                $report->add($kit['where'], 0, "kit.json requires kit {$required}, which does not exist");
+            } elseif ($kit['tier'] === 'free' && $kits[$required]['tier'] !== 'free') {
+                $report->add($kit['where'], 0, "a Free kit cannot require the Pro kit {$required}");
+            }
+        }
+    }
 }
 
 /**
@@ -486,6 +543,7 @@ function check_manifest(array $manifest, string $slug, string $tier, string $whe
 function check(string $free, string $pro): array
 {
     $report = new Report();
+    $all_kits = [];
     $sources = ['free' => $free];
     if ($pro !== '') {
         $sources['pro'] = $pro;
@@ -526,6 +584,7 @@ function check(string $free, string $pro): array
                 continue;
             }
             check_manifest($manifest, $slug, $tier, $kit_where . '/kit.json', $report);
+            $all_kits[$slug] = ['tier' => $tier, 'manifest' => $manifest, 'where' => $kit_where . '/kit.json'];
             if (!is_file($dir . '/bootstrap.php')) {
                 $report->add($kit_where, 0, 'no bootstrap.php');
             }
@@ -595,6 +654,7 @@ function check(string $free, string $pro): array
             }
         }
     }
+    check_required_kits($all_kits, $report);
 
     $problems = array_values(array_unique($report->problems));
     sort($problems, SORT_NATURAL);

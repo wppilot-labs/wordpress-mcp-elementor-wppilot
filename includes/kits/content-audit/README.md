@@ -23,7 +23,7 @@ fixes are other abilities, named in each finding with whether they are available
   background run (or a first page that covers the site) decides it.
 - **thin_content**: words in post content plus Elementor text fields, under `thin_words`
   (default 300). Block comments and shortcodes are not counted.
-- **seo_meta**: missing description or title in Yoast, Rank Math, SEOPress or AIOSEO post meta.
+- **seo_meta**: missing description or title in Yoast, Rank Math, SEOPress, AIOSEO, The SEO Framework, Slim SEO or SmartCrawl post meta. Where the host offers an `seo-provider-registry` extension, the active SEO plugins are read through their own readers instead, which also covers storage the meta keys miss.
   The plugin is detected by which of their meta keys exist on the site; no plugin API is called.
   AIOSEO keeps its data in its own table and mirrors only some of it to post meta, so it can be
   under-reported. The source used is in each finding and in `stats.seo_sources`.
