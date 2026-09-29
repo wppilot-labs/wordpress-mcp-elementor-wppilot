@@ -15,6 +15,7 @@ use WPPilot\Kits\Runtime\Ledger;
 use WPPilot\Kits\Runtime\PagedLedger;
 use WPPilot\Kits\Runtime\ProfileGate;
 use WPPilot\Kits\Runtime\Runner;
+use WPPilot\Kits\Runtime\SessionLedger;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -79,7 +80,8 @@ final class WPPilotHost implements Host, ProfileGate
     }
 
     /**
-     * Run an ability a kit ability is running on the agent's behalf; see Runtimeun_ability().
+     * Run an ability a kit ability is running on the agent's behalf; see Runtime
+un_ability().
      *
      * The whole gate pipeline applies — safety profile, the inner ability's own confirmation,
      * the confirm strip and every wppilot_pre_ability_execute control — under the `nested`
@@ -142,10 +144,63 @@ final class WPPilotHost implements Host, ProfileGate
     }
 }
 
-final class WPPilotLedger implements Ledger, PagedLedger
+// @mago-expect lint:too-many-methods -- One method per Ledger, PagedLedger and SessionLedger member, plus the filter callbacks they install.
+// @mago-expect lint:cyclomatic-complexity -- Same: the sum of small methods, none of them branchy.
+final class WPPilotLedger implements Ledger, PagedLedger, SessionLedger
 {
     /** @var array<string, callable> */
     private array $captures = [];
+
+    /** @var array<string, array{read: callable, target: callable}> */
+    private array $states = [];
+
+    public function register_state(string $type, callable $read, callable $target): void
+    {
+        if ($this->states === []) {
+            add_filter('wppilot_change_current_state', [$this, 'supply_current_state'], 10, 2);
+            add_filter('wppilot_change_payload_target', [$this, 'supply_payload_target'], 10, 2);
+        }
+        $this->states[$type] ??= ['read' => $read, 'target' => $target];
+    }
+
+    /**
+     * @param mixed $state
+     * @param array<string, mixed> $rollback
+     * @return mixed
+     */
+    public function supply_current_state(mixed $state, array $rollback): mixed
+    {
+        $reader = $this->states[(string) ($rollback['type'] ?? '')] ?? null;
+        if ($state !== null || $reader === null) {
+            return $state;
+        }
+        return ($reader['read'])(self::before_image($rollback));
+    }
+
+    /**
+     * @param mixed $target
+     * @param array<string, mixed> $rollback
+     * @return mixed
+     */
+    public function supply_payload_target(mixed $target, array $rollback): mixed
+    {
+        $type = (string) ($rollback['type'] ?? '');
+        $reader = $this->states[$type] ?? null;
+        if ((is_string($target) && $target !== '') || $reader === null) {
+            return $target;
+        }
+        $key = (string) ($reader['target'])(self::before_image($rollback));
+        return $key === '' ? '' : $type . ':' . $key;
+    }
+
+    /**
+     * @param array<string, mixed> $rollback
+     * @return array<string, mixed>
+     */
+    private static function before_image(array $rollback): array
+    {
+        return is_array($rollback['snapshot'] ?? null) ? $rollback['snapshot'] : [];
+    }
 
     public function capture_for(string $ability_name, callable $capture): void
     {

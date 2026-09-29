@@ -538,6 +538,29 @@ function fingerprint(?array $routine, ?array $reports): string
 }
 
 /**
+ * The routine a before-image names, as it is now, in the before-image's shape (with its runs when
+ * the before-image kept them): what a session undo checks nothing else has changed, and what a
+ * redo hands back to restore().
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|null
+ */
+function current_state(array $snapshot): ?array
+{
+    $id = (string) ($snapshot['routine_id'] ?? '');
+    return $id !== '' && array_key_exists('routine', $snapshot) ? snapshot($id, array_key_exists('reports', $snapshot)) : null;
+}
+
+/**
+ * @param array<string, mixed> $snapshot
+ */
+function state_target(array $snapshot): string
+{
+    $id = (string) ($snapshot['routine_id'] ?? '');
+    return $id === '' ? '' : $id . (array_key_exists('reports', $snapshot) ? ':with-reports' : ':definition');
+}
+
+/**
  * The undo for routines-save and routines-delete: put the one routine back as it was (or remove
  * it, if it did not exist), then re-read it. Other routines are left as they are now.
  *

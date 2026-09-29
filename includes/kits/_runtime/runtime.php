@@ -27,7 +27,8 @@ if (!defined('ABSPATH')) {
  *
  * 1.1 added require_profile() and the ProfileGate host interface.
  * 1.2 added unclaimed(), for kits that carry an ability another plugin may already register, and
- * kit.json `requires.any`, for kits that serve whichever of several plugins is active.
+ * kit.json `requires.any`, for kits that serve whichever of several plugins is active, and the
+ * SessionLedger host interface, for kits whose restore types a session undo should check and redo.
  */
 const API_VERSION = '1.2';
 

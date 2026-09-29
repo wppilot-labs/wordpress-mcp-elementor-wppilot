@@ -299,9 +299,20 @@ final class RoutinesTest extends TestCase
         R\save(['id' => 'weekly-check', 'label' => 'Renamed']);
         $edit_row = $ledger->rows[count($ledger->rows) - 1];
         self::assertSame('Weekly check', $edit_row['before']['routine']['label'], 'an edit keeps the previous definition');
+        // What a session undo compares and a redo puts back: the routine now, in the before-image's shape.
+        $redo = R\current_state($edit_row['before']);
+        self::assertSame(R\STRATEGY, $redo['type']);
+        self::assertSame('Renamed', $redo['routine']['label']);
+        self::assertArrayNotHasKey('reports', $redo, 'the state of an edit leaves the runs out, as its before-image does');
+        self::assertSame('weekly-check:definition', R\state_target($edit_row['before']));
         $restored = $restore(['snapshot' => $edit_row['before']]);
         self::assertTrue($restored['verified']);
         self::assertSame('Weekly check', R\get_routine('weekly-check')['label'], 'undoing an edit restores the definition');
+        self::assertNotSame($redo['fingerprint'], R\current_state($edit_row['before'])['fingerprint'], 'the undo moved the state');
+        $redone = $restore(['snapshot' => $redo]);
+        self::assertTrue($redone['verified'], 'a redo goes back through the same restore');
+        self::assertSame('Renamed', R\get_routine('weekly-check')['label']);
+        self::assertTrue($restore(['snapshot' => $edit_row['before']])['verified']);
 
         $runs_before = count(R\reports('weekly-check'));
         self::assertInstanceOf(WP_Error::class, R\delete(['id' => 'weekly-check']), 'delete needs confirm');
@@ -314,6 +325,8 @@ final class RoutinesTest extends TestCase
         self::assertFalse(R\wp_next_scheduled(R\RECONCILE_HOOK), 'and the repair, with no routines left');
         self::assertArrayNotHasKey(R\STATE_PREFIX . 'weekly-check', Site::$options, 'delete clears its state');
         $delete_row = $ledger->rows[count($ledger->rows) - 1];
+        self::assertSame('weekly-check:with-reports', R\state_target($delete_row['before']), 'a delete is keyed apart from an edit: its before-image also holds the runs');
+        self::assertNull(R\current_state($delete_row['before'])['routine']);
         $restored = $restore(['snapshot' => $delete_row['before']]);
         self::assertTrue($restored['verified']);
         self::assertCount($runs_before, R\reports('weekly-check'), 'undoing a delete brings back the routine and its reports');

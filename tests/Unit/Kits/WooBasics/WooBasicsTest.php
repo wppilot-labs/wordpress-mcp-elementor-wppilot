@@ -573,6 +573,33 @@ final class WooBasicsTest extends TestCase
         self::assertSame('Back\\slash', Store::$products[10]['name']);
     }
 
+    public function testSessionStateIsTheEditedFieldsNowAndARedoGoesBackThroughTheUndo(): void
+    {
+        $this->seedCatalog();
+        $input = ['id' => 10, 'regular_price' => '21'];
+        $before = (self::$capture)($input);
+        self::call(self::EDIT, $input);
+        $restore = self::$strategies[WooBasics\STRATEGY];
+
+        $after = WooBasics\current_state($before);
+        self::assertSame(WooBasics\STRATEGY, $after['type']);
+        self::assertSame($before['fields'], $after['fields'], 'the same fields as the before-image, so the two compare');
+        self::assertSame('21', $after['values']['regular_price']);
+        self::assertSame('10:regular_price,sale_price', WooBasics\state_target($before));
+
+        self::assertTrue($restore(['snapshot' => $before], [])['verified']);
+        self::assertSame($before['values'], WooBasics\current_state($before)['values'], 'after the undo the state is the before-image again');
+
+        $redo = $restore(['snapshot' => $after], []);
+        self::assertTrue($redo['verified'], 'a redo is the undo run with the state the undo replaced');
+        self::assertSame('21', Store::$products[10]['regular_price']);
+
+        Store::$posts[10]->post_status = 'trash';
+        self::assertSame(['type' => 'absent'], WooBasics\current_state($before), 'a trashed product is gone, which is a conflict');
+        self::assertNull(WooBasics\current_state(['product_id' => 10, 'fields' => []]));
+        self::assertSame('', WooBasics\state_target(['product_id' => 0, 'fields' => ['name']]));
+    }
+
     public function testUndoRefusesAGoneOrRetypedProduct(): void
     {
         $this->seedCatalog();

@@ -91,6 +91,27 @@ final class AioseoTest extends SeoBasicsCase
         self::assertSame('Keep me', $row['og_title']);
     }
 
+    public function testSessionStateIsTheCapturedColumnsNowAndARedoGoesBackThroughTheUndo(): void
+    {
+        $this->seed(['title' => 'Old', 'description' => 'Old description']);
+        $this->run_ability('wppilot/aioseo-edit-post-seo', ['post_id' => 10, 'seo_title' => self::SLASHY]);
+        $snapshot = $this->ledger->all()[0]['rollback']['snapshot'];
+
+        $after = Aioseo\current_state($snapshot);
+        self::assertSame(Aioseo\STRATEGY, $after['type']);
+        self::assertSame(['title' => self::SLASHY], $after['columns'], 'only the columns the before-image holds');
+        self::assertSame('10:title', Aioseo\state_target($snapshot));
+
+        $this->undo_last();
+        self::assertSame('Old', Post::$rows[10]['title']);
+        self::assertSame($snapshot['fingerprint'], Aioseo\current_state($snapshot)['fingerprint'], 'after the undo the state is the before-image again');
+
+        $redo = Aioseo\restore(['snapshot' => $after]);
+        self::assertTrue($redo['verified'], 'a redo is the undo run with the state the undo replaced');
+        self::assertSame(self::SLASHY, Post::$rows[10]['title']);
+        self::assertSame('Old description', Post::$rows[10]['description']);
+    }
+
     public function testExplicitRobotsKeepTheAdvancedFlagsAndNofollowAlonePromotesAnInheritingPost(): void
     {
         $this->seed(['robots_default' => '0', 'robots_noindex' => '0', 'robots_nosnippet' => '1']);

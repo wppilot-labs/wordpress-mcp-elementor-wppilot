@@ -160,6 +160,30 @@ interface PagedLedger
 }
 
 /**
+ * A ledger that files writes under agent sessions and can undo or redo a whole session.
+ *
+ * Optional, like PagedLedger: a kit checks `instanceof SessionLedger` and otherwise registers
+ * nothing more. Before undoing a session the host checks that nothing else changed each target
+ * since the session wrote to it, and a redo puts back the state the undo replaced, so both need
+ * to read a target's state now. The host can do that for its own restore types and for the
+ * runtime's post-partial; a kit with a restore type of its own says how here, or its changes are
+ * undone unchecked and cannot be redone.
+ */
+interface SessionLedger
+{
+    /**
+     * @param callable(array<string, mixed>): (array<string, mixed>|null) $read Given a before-image
+     *        of this type, the target's state now in the same shape and with the same `type`, so
+     *        it can be handed back to the restore as a redo; `['type' => 'absent']` when the
+     *        target is gone; null when it cannot be read.
+     * @param callable(array<string, mixed>): string $target Given a before-image of this type, a
+     *        key naming what it restores. Two before-images with the same key must describe the
+     *        same fields of the same object. '' leaves the change out of the check.
+     */
+    public function register_state(string $type, callable $read, callable $target): void;
+}
+
+/**
  * Background work in leased, time-boxed steps; see jobs/Runner.php.
  */
 interface Jobs

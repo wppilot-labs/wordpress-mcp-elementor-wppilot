@@ -9,6 +9,7 @@ namespace WPPilot\Kits\ScheduledAudits;
 
 use WP_Error;
 use WPPilot\Kits\Runtime\Host;
+use WPPilot\Kits\Runtime\SessionLedger;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -41,5 +42,13 @@ function register_hooks(Host $host): void
     add_action('update_option_' . OPTION, $changed, 10, 0);
     add_action('delete_option_' . OPTION, $changed, 10, 0);
 
-    $host->ledger()->register_strategy(STRATEGY, static fn(array $payload): array|WP_Error => restore($payload));
+    $ledger = $host->ledger();
+    $ledger->register_strategy(STRATEGY, static fn(array $payload): array|WP_Error => restore($payload));
+    if ($ledger instanceof SessionLedger) {
+        $ledger->register_state(
+            STRATEGY,
+            static fn(array $snapshot): ?array => current_state($snapshot),
+            static fn(array $snapshot): string => state_target($snapshot),
+        );
+    }
 }

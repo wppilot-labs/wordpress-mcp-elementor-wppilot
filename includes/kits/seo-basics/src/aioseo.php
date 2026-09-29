@@ -9,6 +9,7 @@ namespace WPPilot\Kits\SeoBasics\Aioseo;
 
 use WP_Error;
 use WPPilot\Kits\Runtime\Ledger;
+use WPPilot\Kits\Runtime\SessionLedger;
 use WPPilot\Kits\SeoBasics;
 
 if (!defined('ABSPATH')) {
@@ -313,9 +314,59 @@ function restore(array $payload): array|WP_Error
     ];
 }
 
+/**
+ * The columns a before-image names, as they are now, in the before-image's shape: what a session
+ * undo checks nothing else has changed, and what a redo hands back to restore().
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|null
+ */
+function current_state(array $snapshot): ?array
+{
+    if (!available()) {
+        return null;
+    }
+    $post_id = (int) ($snapshot['post_id'] ?? 0);
+    $known = array_merge(['title', 'description'], ROBOT_FLAGS, ROBOT_LIMITS, ['robots_max_imagepreview']);
+    $names = is_array($snapshot['columns'] ?? null)
+        ? array_values(array_intersect(array_map('strval', array_keys($snapshot['columns'])), $known))
+        : [];
+    if ($post_id <= 0 || $names === []) {
+        return null;
+    }
+    if (!get_post($post_id) instanceof \WP_Post) {
+        return ['type' => 'absent'];
+    }
+    $values = columns($post_id, $names);
+    return [
+        'type' => STRATEGY,
+        'post_id' => $post_id,
+        'columns' => $values,
+        'fingerprint' => fingerprint($post_id, $values),
+    ];
+}
+
+/**
+ * @param array<string, mixed> $snapshot
+ */
+function state_target(array $snapshot): string
+{
+    $names = is_array($snapshot['columns'] ?? null) ? array_map('strval', array_keys($snapshot['columns'])) : [];
+    sort($names, SORT_STRING);
+    $post_id = (int) ($snapshot['post_id'] ?? 0);
+    return $post_id > 0 && $names !== [] ? $post_id . ':' . implode(',', $names) : '';
+}
+
 function register(Ledger $ledger): void
 {
     $ledger->register_strategy(STRATEGY, static fn(array $payload): array|WP_Error => restore($payload));
+    if ($ledger instanceof SessionLedger) {
+        $ledger->register_state(
+            STRATEGY,
+            static fn(array $snapshot): ?array => current_state($snapshot),
+            static fn(array $snapshot): string => state_target($snapshot),
+        );
+    }
 }
 
 /**

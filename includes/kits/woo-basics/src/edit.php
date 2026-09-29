@@ -11,6 +11,7 @@ use WC_Product;
 use WP_Error;
 use WP_Post;
 use WPPilot\Kits\Runtime\Ledger;
+use WPPilot\Kits\Runtime\SessionLedger;
 
 if (!defined('ABSPATH')) {
     exit();
@@ -476,7 +477,61 @@ function restore(array $payload): array|WP_Error
     ];
 }
 
+/**
+ * The fields a before-image names, as they are on the product now, in the before-image's shape:
+ * what a session undo checks nothing else has changed, and what a redo hands back to restore().
+ *
+ * @param array<string, mixed> $snapshot
+ * @return array<string, mixed>|null
+ */
+function current_state(array $snapshot): ?array
+{
+    if (!class_exists('WooCommerce')) {
+        return null;
+    }
+    $id = (int) ($snapshot['product_id'] ?? 0);
+    $fields = is_array($snapshot['fields'] ?? null) ? array_values(array_intersect(
+        array_map('strval', $snapshot['fields']),
+        array_merge(['name', 'description'], PRICE_FIELDS, STOCK_RESTORE_FIELDS),
+    )) : [];
+    if ($id <= 0 || $fields === []) {
+        return null;
+    }
+    $post = get_post($id);
+    $product = $post instanceof WP_Post && $post->post_type === 'product' && $post->post_status !== 'trash'
+        ? wc_get_product($id)
+        : null;
+    if (!$product instanceof WC_Product) {
+        return ['type' => 'absent'];
+    }
+    return [
+        'type' => STRATEGY,
+        'product_id' => $id,
+        'product_type' => $product->get_type(),
+        'fields' => $fields,
+        'values' => product_values($product, $fields),
+    ];
+}
+
+/**
+ * @param array<string, mixed> $snapshot
+ */
+function state_target(array $snapshot): string
+{
+    $fields = is_array($snapshot['fields'] ?? null) ? array_map('strval', $snapshot['fields']) : [];
+    sort($fields, SORT_STRING);
+    $id = (int) ($snapshot['product_id'] ?? 0);
+    return $id > 0 && $fields !== [] ? $id . ':' . implode(',', $fields) : '';
+}
+
 function register_undo(Ledger $ledger): void
 {
     $ledger->register_strategy(STRATEGY, static fn(array $payload): array|WP_Error => restore($payload));
+    if ($ledger instanceof SessionLedger) {
+        $ledger->register_state(
+            STRATEGY,
+            static fn(array $snapshot): ?array => current_state($snapshot),
+            static fn(array $snapshot): string => state_target($snapshot),
+        );
+    }
 }
