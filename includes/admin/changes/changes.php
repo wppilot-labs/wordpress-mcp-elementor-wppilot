@@ -85,6 +85,8 @@ function render_page(): void
     if ($requested !== '') {
         $entry = \wppilot_get_change($requested);
         if ($entry !== null) {
+            // Only ever displayed here; undo re-reads the stored row by its id.
+            $entry = \wppilot_change_for_output($entry);
             require __DIR__ . '/templates/detail.php';
             return;
         }

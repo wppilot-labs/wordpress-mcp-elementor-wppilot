@@ -52,7 +52,7 @@ wp_register_ability('wppilot/get-change', [
     'output_schema' => ['type' => 'object'],
     'execute_callback' => static function (array $input): array|WP_Error {
         $entry = wppilot_get_change((string) $input['change_id']);
-        return $entry ?? new WP_Error('wppilot_change_not_found', __('Change record not found.', domain: 'wppilot'));
+        return $entry !== null ? wppilot_change_for_output($entry) : new WP_Error('wppilot_change_not_found', __('Change record not found.', domain: 'wppilot'));
     },
     'permission_callback' => 'wppilot_permission_callback',
     'meta' => [

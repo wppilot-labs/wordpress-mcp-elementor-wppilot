@@ -135,7 +135,7 @@ $pretty = static fn(mixed $value): string => (string) wp_json_encode(
 
     <div class="wppilot-panel">
         <h2><?php esc_html_e('Input', domain: 'wppilot'); ?></h2>
-        <p class="description"><?php esc_html_e('As the agent sent it, with secrets redacted when it was recorded.', domain: 'wppilot'); ?></p>
+        <p class="description"><?php esc_html_e('As the agent sent it, with secrets redacted and email addresses masked.', domain: 'wppilot'); ?></p>
         <pre class="wppilot-changes__json"><?php echo esc_html($pretty($entry['input'] ?? [])); ?></pre>
 
         <h2><?php esc_html_e('Result', domain: 'wppilot'); ?></h2>
