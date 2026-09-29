@@ -2297,7 +2297,10 @@ function wppilot_change_key_is_sensitive(string $key): bool
 {
     return (
         preg_match(
-            '/password|passwd|secret|token|authorization|api[_-]?key|private[_-]?key|license|cookie|credential|php[_-]?code|source[_-]?code/',
+            // Whole-word pass/pwd/pswd/auth (so "bypass" and "author" stay visible), plus the
+            // credential option names cache plugins use: LiteSpeed object-pswd and
+            // cdn-cloudflare_key, NitroPack siteId, Autoptimize ccss_key.
+            '/password|passwd|pswd|secret|token|authoriz|api[_-]?key|private[_-]?key|access[_-]?key|cloudflare[_-]?key|ccss[_-]?key|license|cookie|credential|php[_-]?code|source[_-]?code|(^|[^a-z])(pass|pwd|auth)([^a-z]|$)|siteid$/',
             strtolower($key),
         ) === 1
     );

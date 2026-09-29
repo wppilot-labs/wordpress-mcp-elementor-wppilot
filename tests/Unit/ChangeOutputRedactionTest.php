@@ -28,6 +28,29 @@ final class ChangeOutputRedactionTest extends TestCase
         yield 'no address' => ['Just text with an @ sign', 'Just text with an @ sign'];
     }
 
+    /** @return iterable<string, array{string, bool}> */
+    public static function keyNames(): iterable
+    {
+        yield 'litespeed object password' => ['litespeed.conf.object-pswd', true];
+        yield 'litespeed cloudflare key' => ['litespeed.conf.cdn-cloudflare_key', true];
+        yield 'nitropack site id' => ['nitropack-siteId', true];
+        yield 'autoptimize ccss key' => ['autoptimize_ccss_key', true];
+        yield 'smtp pass' => ['smtp_pass', true];
+        yield 'basic auth' => ['basic-auth', true];
+        yield 'api key' => ['stripe_api_key', true];
+        yield 'cookie settings still match' => ['cache_bypass_cookies_enabled', true];
+        yield 'bypass alone' => ['bypass_logged_in', false];
+        yield 'author stays visible' => ['post_author', false];
+        yield 'meta key stays visible' => ['meta_key', false];
+        yield 'keywords stay visible' => ['_yoast_wpseo_focuskw_keywords', false];
+    }
+
+    #[DataProvider('keyNames')]
+    public function testSensitiveKeyNames(string $key, bool $sensitive): void
+    {
+        self::assertSame($sensitive, \wppilot_change_key_is_sensitive($key), $key);
+    }
+
     #[DataProvider('emails')]
     public function testEmailsAreMasked(string $input, string $expected): void
     {
