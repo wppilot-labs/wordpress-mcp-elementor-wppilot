@@ -259,11 +259,24 @@ function wordpress_get_page_snapshot(array $input): array|WP_Error
         ],
         'builder_signals' => wordpress_builder_signals($post->ID),
         'seo' => [
-            'title' => wordpress_first_meta($post->ID, ['_yoast_wpseo_title', 'rank_math_title', '_aioseo_title']),
-            'description' => wordpress_first_meta(
-                $post->ID,
-                ['_yoast_wpseo_metadesc', 'rank_math_description', '_aioseo_description'],
-            ),
+            'title' => wordpress_first_meta($post->ID, [
+                '_yoast_wpseo_title',
+                'rank_math_title',
+                '_aioseo_title',
+                '_seopress_titles_title',
+                '_genesis_title',
+                'slim_seo[title]',
+                '_wds_title',
+            ]),
+            'description' => wordpress_first_meta($post->ID, [
+                '_yoast_wpseo_metadesc',
+                'rank_math_description',
+                '_aioseo_description',
+                '_seopress_titles_desc',
+                '_genesis_description',
+                'slim_seo[description]',
+                '_wds_metadesc',
+            ]),
         ],
     ];
 }
@@ -406,7 +419,14 @@ function wordpress_builder_signals(int $post_id): array
 function wordpress_first_meta(int $post_id, array $keys): string
 {
     foreach ($keys as $key) {
-        $value = get_post_meta($post_id, $key, single: true);
+        // `base[field]` reads one field of an array meta value: Slim SEO keeps every per-post
+        // setting in a single `slim_seo` array rather than a key each.
+        if (preg_match('/^([^\[\]]+)\[([^\[\]]+)\]$/', $key, $match) === 1) {
+            $row = get_post_meta($post_id, $match[1], single: true);
+            $value = is_array($row) ? ($row[$match[2]] ?? '') : '';
+        } else {
+            $value = get_post_meta($post_id, $key, single: true);
+        }
         if (is_scalar($value) && trim((string) $value) !== '') {
             return (string) $value;
         }

@@ -39,18 +39,27 @@ final class Fixes
         'seopress-create-redirect', 'aioseo-create-redirect', 'seo-bulk-update-meta',
         'yoast-edit-post-seo', 'rank-math-edit-post-seo', 'seopress-edit-post-seo',
         'aioseo-edit-post-seo', 'aioseo-edit-post-schema', 'seopress-edit-post-schema',
+        'tsf-update-post-seo', 'slim-seo-update-post-seo', 'smartcrawl-update-post-seo',
     ];
 
     /**
-     * SEO plugins recognised by the meta keys they store per post. Detection is by these keys
-     * only: no plugin API is called, so a plugin keeping its data in its own table (AIOSEO does,
-     * mirroring some of it to these keys) can be under-reported.
+     * SEO plugins recognised by the meta keys they store per post, keyed by the slug the host's
+     * SEO provider registry (WPPilot Pro) uses for the same plugin.
+     *
+     * Where the host offers that registry, the audit reads through it instead (see
+     * Source::seo_providers()), and these keys only label the evidence. Without it, detection is
+     * by these keys only: no plugin API is called, so a plugin keeping its data in its own table
+     * (AIOSEO does, mirroring some of it to these keys) can be under-reported. A key written
+     * `base[field]` is one field of the array Slim SEO stores under `base`.
      */
     public const SEO_SOURCES = [
         'yoast' => ['label' => 'Yoast SEO', 'title' => '_yoast_wpseo_title', 'description' => '_yoast_wpseo_metadesc', 'ability' => 'yoast-edit-post-seo'],
         'rank-math' => ['label' => 'Rank Math', 'title' => 'rank_math_title', 'description' => 'rank_math_description', 'ability' => 'rank-math-edit-post-seo'],
         'seopress' => ['label' => 'SEOPress', 'title' => '_seopress_titles_title', 'description' => '_seopress_titles_desc', 'ability' => 'seopress-edit-post-seo'],
         'aioseo' => ['label' => 'All in One SEO', 'title' => '_aioseo_title', 'description' => '_aioseo_description', 'ability' => 'aioseo-edit-post-seo'],
+        'tsf' => ['label' => 'The SEO Framework', 'title' => '_genesis_title', 'description' => '_genesis_description', 'ability' => 'tsf-update-post-seo'],
+        'slim-seo' => ['label' => 'Slim SEO', 'title' => 'slim_seo[title]', 'description' => 'slim_seo[description]', 'ability' => 'slim-seo-update-post-seo'],
+        'smartcrawl' => ['label' => 'SmartCrawl', 'title' => '_wds_title', 'description' => '_wds_metadesc', 'ability' => 'smartcrawl-update-post-seo'],
     ];
 
     /** @var array<string, bool> */
