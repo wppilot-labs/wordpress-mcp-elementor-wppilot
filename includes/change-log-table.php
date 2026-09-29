@@ -33,7 +33,11 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-const WPPILOT_CHANGES_SCHEMA_VERSION = 1;
+/**
+ * 2 (1.16.0): session_id, so one agent session's writes can be found and undone together, and
+ * redo_data, the state an undo replaced, so the undo can itself be undone.
+ */
+const WPPILOT_CHANGES_SCHEMA_VERSION = 2;
 
 const WPPILOT_CHANGES_SCHEMA_OPTION = 'wppilot_changes_schema_version';
 
@@ -74,6 +78,7 @@ const WPPILOT_CHANGES_PAYLOAD_COLUMNS = [
     'design' => 'design_data',
     'bulk_item' => 'bulk_item_data',
     'rollback_result' => 'rollback_result_data',
+    'redo' => 'redo_data',
 ];
 
 /** @return wpdb|null */
@@ -117,6 +122,7 @@ function wppilot_changes_schema_sql(string $table, string $charset_collate): str
             agent_label VARCHAR(191) NOT NULL DEFAULT '',
             agent_client VARCHAR(191) NOT NULL DEFAULT '',
             group_id VARCHAR(191) NOT NULL DEFAULT '',
+            session_id VARCHAR(64) NOT NULL DEFAULT '',
             status VARCHAR(20) NOT NULL DEFAULT 'not-reversible',
             rolled_back_at DATETIME NULL DEFAULT NULL,
             entry_data LONGTEXT NOT NULL,
@@ -126,12 +132,14 @@ function wppilot_changes_schema_sql(string $table, string $charset_collate): str
             design_data LONGTEXT NULL,
             bulk_item_data LONGTEXT NULL,
             rollback_result_data LONGTEXT NULL,
+            redo_data LONGTEXT NULL,
             PRIMARY KEY  (seq),
             UNIQUE KEY change_id (change_id),
             KEY recorded_at (recorded_at),
             KEY ability (ability),
             KEY user_id (user_id),
             KEY group_id (group_id),
+            KEY session_id (session_id),
             KEY status (status)
         ) {$charset_collate};";
 }
@@ -161,7 +169,7 @@ function wppilot_changes_schema_install(): ?string
     $create_error = (string) ($wpdb->last_error ?? '');
     $columns = implode(', ', array_merge(
         ['seq', 'change_id', 'recorded_at', 'kind', 'ability', 'risk', 'user_id', 'agent_credential'],
-        ['agent_label', 'agent_client', 'group_id', 'status', 'rolled_back_at', 'entry_data'],
+        ['agent_label', 'agent_client', 'group_id', 'session_id', 'status', 'rolled_back_at', 'entry_data'],
         array_values(WPPILOT_CHANGES_PAYLOAD_COLUMNS),
     ));
     $ready = $wpdb->query("SELECT {$columns} FROM {$table} LIMIT 1") !== false;
@@ -486,6 +494,7 @@ function wppilot_change_row_columns(array $entry): array
         'agent_label' => wppilot_change_index_text($agent['label'] ?? '', 191),
         'agent_client' => wppilot_change_index_text($agent['client'] ?? '', 191),
         'group_id' => wppilot_change_index_text($group, 191),
+        'session_id' => wppilot_change_index_text($entry['session'] ?? '', 64),
         'status' => wppilot_change_status($entry),
         'rolled_back_at' => wppilot_change_sql_time($entry['rolled_back_at'] ?? null),
         'entry_data' => wppilot_change_encode_payload(serialize($shell)),
@@ -534,6 +543,7 @@ function wppilot_change_row_from_record(array $record): array
             'risk' => (string) ($record['risk'] ?? ''),
             'recorded_at' => is_string($record['recorded_at'] ?? null) ? gmdate('c', (int) strtotime($record['recorded_at'] . ' UTC')) : '',
             'group' => (string) ($record['group_id'] ?? ''),
+            'session' => (string) ($record['session_id'] ?? ''),
             'user' => ['id' => (int) ($record['user_id'] ?? 0), 'login' => ''],
             'agent' => ['label' => (string) ($record['agent_label'] ?? ''), 'client' => (string) ($record['agent_client'] ?? '')],
             'rolled_back' => ($record['status'] ?? '') === 'rolled-back',
@@ -598,6 +608,11 @@ function wppilot_change_filter_sql(array $filters): array
     if ($group !== '') {
         $where[] = 'group_id = %s';
         $args[] = $group;
+    }
+    $session = (string) ($filters['session'] ?? '');
+    if ($session !== '') {
+        $where[] = 'session_id = %s';
+        $args[] = $session;
     }
     $status = (string) ($filters['status'] ?? '');
     if ($status !== '') {
@@ -1024,6 +1039,8 @@ function wppilot_change_legacy_bridge(?bool $set = null): bool
  */
 function wppilot_change_rows_before_store(array $entries, bool $legacy_filter): array
 {
+    // Session and after-state first, so a listener sees the row as it will be stored.
+    $entries = array_map('wppilot_change_row_with_session', $entries);
     $entries = wppilot_change_rows_or(apply_filters('wppilot_change_rows_before_store', $entries), $entries);
     if (!$legacy_filter) {
         return $entries;
@@ -1073,6 +1090,19 @@ function wppilot_change_intercept_option_write(mixed $value, mixed $old_value = 
         return $value;
     }
     $rows = wppilot_change_rows_or($value, []);
+    if ($rows !== []) {
+        // Rows the table does not have yet were written in this request, so they belong to its
+        // session. Rows it has are older and keep whatever they were recorded with.
+        $existing = wppilot_change_table_existing_ids(array_map(
+            static fn(array $row): string => (string) wppilot_change_row_with_id($row)['id'],
+            $rows,
+        )) ?? [];
+        foreach ($rows as $index => $row) {
+            if (!isset($existing[(string) wppilot_change_row_with_id($row)['id']])) {
+                $rows[$index] = wppilot_change_row_with_session($row);
+            }
+        }
+    }
     if ($rows !== [] && wppilot_change_table_insert_missing($rows) === null) {
         // Let the write through so the rows are not lost; a later migration merges them back.
         wppilot_change_table_fail_over(wppilot_changes_last_error('The ledger table refused a row.'));
@@ -1140,9 +1170,15 @@ function wppilot_changes_prune(?int $now = null): array
             [serialize(['reversible' => false, 'reason' => $reason, 'pruned_at' => gmdate('c', $now)]), $cutoff, WPPILOT_CHANGES_PRUNE_MIN_BYTES],
         ));
         // Already undone: the image only documents a restore that has happened.
+        // The redo image goes with it: redoing a month-old undo would overwrite a month of edits.
         $undone = $wpdb->query(wppilot_changes_prepare(
-            "UPDATE {$table} SET rollback_data = %s WHERE status = 'rolled-back' AND recorded_at < %s AND LENGTH(rollback_data) > %d",
-            [serialize(['reversible' => false, 'reason' => 'This change was undone; its before-image has since been removed to keep the ledger small.', 'pruned_at' => gmdate('c', $now)]), $cutoff, WPPILOT_CHANGES_PRUNE_MIN_BYTES],
+            "UPDATE {$table} SET rollback_data = %s, redo_data = %s WHERE status = 'rolled-back' AND recorded_at < %s AND LENGTH(rollback_data) > %d",
+            [
+                serialize(['reversible' => false, 'reason' => 'This change was undone; its before-image has since been removed to keep the ledger small.', 'pruned_at' => gmdate('c', $now)]),
+                serialize(['available' => false, 'reason' => 'The state this undo replaced was removed to keep the ledger small, so it can no longer be redone.']),
+                $cutoff,
+                WPPILOT_CHANGES_PRUNE_MIN_BYTES,
+            ],
         ));
         $summary['snapshots_pruned'] = (is_int($undoable) ? $undoable : 0) + (is_int($undone) ? $undone : 0);
     }

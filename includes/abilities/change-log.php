@@ -102,6 +102,9 @@ function wppilot_change_public_summary(array $entry): array
         'duration_ms' => (float) ($entry['duration_ms'] ?? 0),
         'user' => $entry['user'] ?? [],
         'agent' => $entry['agent'] ?? [],
+        // The agent session the write belongs to, for wppilot/undo-session. Empty for writes no
+        // agent made and for rows recorded before 1.16.0.
+        'session_id' => (string) ($entry['session'] ?? ''),
         'reversible' => ($rollback['reversible'] ?? false) === true,
         'rollback_reason' => (string) ($rollback['reason'] ?? ''),
         'rolled_back' => ($entry['rolled_back'] ?? false) === true,

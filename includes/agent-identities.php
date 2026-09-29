@@ -192,7 +192,11 @@ function wppilot_agent_attribute_token_request(mixed $result, mixed $server, WP_
     $client = function_exists('wppilot_connection_client')
         ? wppilot_connection_client($request)
         : ['name' => '', 'version' => ''];
-    wppilot_current_agent(wppilot_resolve_agent('token', get_current_user_id(), $client));
+    $agent = wppilot_resolve_agent('token', get_current_user_id(), $client);
+    wppilot_current_agent($agent);
+    if (function_exists('wppilot_session_from_request')) {
+        wppilot_session_from_request($request, $agent);
+    }
 
     return $result;
 }

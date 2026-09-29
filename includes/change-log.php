@@ -176,6 +176,7 @@ function wppilot_with_change_log_lock(callable $write): mixed
  *     user_id?: int,
  *     agent?: string,
  *     group?: string,
+ *     session?: string,
  *     status?: string,
  *     since?: string,
  *     until?: string,
@@ -250,6 +251,7 @@ function wppilot_query_change_log_option(array $filters): array
     $user_id = (int) ($filters['user_id'] ?? 0);
     $agent = strtolower(trim((string) ($filters['agent'] ?? '')));
     $group = (string) ($filters['group'] ?? '');
+    $session = (string) ($filters['session'] ?? '');
     $status = (string) ($filters['status'] ?? '');
     $since = wppilot_change_filter_time((string) ($filters['since'] ?? ''), end_of_day: false);
     $until = wppilot_change_filter_time((string) ($filters['until'] ?? ''), end_of_day: true);
@@ -270,6 +272,9 @@ function wppilot_query_change_log_option(array $filters): array
             continue;
         }
         if ($group !== '' && ($entry['group'] ?? null) !== $group) {
+            continue;
+        }
+        if ($session !== '' && ($entry['session'] ?? null) !== $session) {
             continue;
         }
         if ($status !== '' && wppilot_change_status($entry) !== $status) {
@@ -675,7 +680,16 @@ function wppilot_rollback_group(string $group): array|WP_Error
  *
  * @var list<string>
  */
-const WPPILOT_CHANGE_META_ABILITIES = ['wppilot/rollback-change', 'wppilot/apply-preview'];
+const WPPILOT_CHANGE_META_ABILITIES = [
+    // The legacy MCP transport's execute tool runs the target through WP_Ability::execute(), which
+    // records the target. Its own row said only "No supported before-image" — one per call, reads
+    // included — and would make every legacy session look like it held irreversible changes.
+    'mcp-adapter/execute-ability',
+    'wppilot/rollback-change',
+    'wppilot/apply-preview',
+    'wppilot/undo-session',
+    'wppilot/redo-session',
+];
 
 function wppilot_change_ability_is_meta(string $ability_name): bool
 {
@@ -1183,8 +1197,12 @@ function wppilot_snapshot_menu_order(int $menu_id): ?array
     ];
 }
 
-/** @return array<string, mixed>|null */
-function wppilot_snapshot_post(int $post_id): ?array
+/**
+ * @param bool $bounded False skips the size cap. Only for a fingerprint that is compared and then
+ *                      dropped (the session conflict check); nothing unbounded is ever stored.
+ * @return array<string, mixed>|null
+ */
+function wppilot_snapshot_post(int $post_id, bool $bounded = true): ?array
 {
     // @mago-expect analysis:mixed-assignment -- ARRAY_A is validated immediately below.
     $post = get_post($post_id, output: 'ARRAY_A');
@@ -1231,8 +1249,8 @@ function wppilot_snapshot_post(int $post_id): ?array
         'excluded_meta_keys' => $excluded_meta_keys,
         'terms' => $terms,
     ];
-    $encoded = wp_json_encode($snapshot);
-    if (!is_string($encoded) || strlen($encoded) > WPPILOT_CHANGE_SNAPSHOT_MAX_BYTES) {
+    $encoded = $bounded ? wp_json_encode($snapshot) : '';
+    if ($bounded && (!is_string($encoded) || strlen($encoded) > WPPILOT_CHANGE_SNAPSHOT_MAX_BYTES)) {
         return ['type' => 'oversize', 'post_id' => $post_id, 'bytes' => is_string($encoded) ? strlen($encoded) : 0];
     }
     $snapshot['fingerprint'] = wppilot_post_snapshot_fingerprint($snapshot);
@@ -1854,6 +1872,51 @@ function wppilot_rollback_change(string $id): array|WP_Error
         );
     }
 
+    // The state this undo is about to replace, kept so the undo can itself be undone (redo-session).
+    // Taken before the restore, which is the only moment it still exists.
+    $redo = function_exists('wppilot_change_redo_image') ? wppilot_change_redo_image($rollback) : null;
+    $result = wppilot_change_run_restore($rollback, $entry);
+    if ($result instanceof WP_Error) {
+        return $result;
+    }
+    if (($result['verified'] ?? false) !== true) {
+        $mismatched = is_array($result['mismatched'] ?? null) ? array_slice($result['mismatched'], 0, 12) : [];
+        return new WP_Error(
+            'wppilot_rollback_unverified',
+            __('Rollback ran but the observed state did not match the before-image.', domain: 'wppilot')
+                . ($mismatched !== [] ? ' ' . sprintf(
+                    /* translators: %s: comma-separated field names */
+                    __('Still different: %s.', domain: 'wppilot'),
+                    implode(', ', array_map('strval', $mismatched)),
+                ) : ''),
+            $result,
+        );
+    }
+    $entry['rolled_back'] = true;
+    $entry['rolled_back_at'] = gmdate('c');
+    $entry['rollback_result'] = $result;
+    if ($redo !== null) {
+        $entry['redo'] = $redo;
+        // What the undo left behind: a redo proceeds only while the target still looks like this.
+        $undone = wppilot_change_state_digest(wppilot_change_current_state($rollback, bounded: false));
+        if ($undone !== null) {
+            $entry['undone_digest'] = $undone;
+        }
+    }
+    wppilot_replace_change($id, $entry);
+    return ['change_id' => $id, 'rolled_back' => true, 'verified' => true, 'details' => $result];
+}
+
+/**
+ * Run the restore a rollback payload describes, with the ledger suppressed, and hand back what it
+ * reported. Undo and redo both come through here, so a restore strategy is written once.
+ *
+ * @param array<string, mixed> $rollback
+ * @param array<string, mixed> $entry
+ * @return array<string, mixed>|WP_Error
+ */
+function wppilot_change_run_restore(array $rollback, array $entry): array|WP_Error
+{
     wppilot_change_is_suppressed(true);
     try {
         $result = match ($rollback['type'] ?? '') {
@@ -1896,27 +1959,8 @@ function wppilot_rollback_change(string $id): array|WP_Error
     } finally {
         wppilot_change_is_suppressed(false);
     }
-    if ($result instanceof WP_Error) {
-        return $result;
-    }
-    if (($result['verified'] ?? false) !== true) {
-        $mismatched = is_array($result['mismatched'] ?? null) ? array_slice($result['mismatched'], 0, 12) : [];
-        return new WP_Error(
-            'wppilot_rollback_unverified',
-            __('Rollback ran but the observed state did not match the before-image.', domain: 'wppilot')
-                . ($mismatched !== [] ? ' ' . sprintf(
-                    /* translators: %s: comma-separated field names */
-                    __('Still different: %s.', domain: 'wppilot'),
-                    implode(', ', array_map('strval', $mismatched)),
-                ) : ''),
-            $result,
-        );
-    }
-    $entry['rolled_back'] = true;
-    $entry['rolled_back_at'] = gmdate('c');
-    $entry['rollback_result'] = $result;
-    wppilot_replace_change($id, $entry);
-    return ['change_id' => $id, 'rolled_back' => true, 'verified' => true, 'details' => $result];
+
+    return $result;
 }
 
 /** @return array<string, mixed>|WP_Error */

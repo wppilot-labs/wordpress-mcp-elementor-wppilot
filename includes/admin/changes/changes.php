@@ -34,7 +34,7 @@ const UNDO_MATCHING_MAX = 200;
 const EXPORT_PAGE = 200;
 
 /** The query-string keys the screen and its downloads accept as filters. */
-const FILTER_KEYS = ['kind', 'ability', 'user_id', 'agent', 'group', 'status', 'since', 'until'];
+const FILTER_KEYS = ['kind', 'ability', 'user_id', 'agent', 'group', 'session', 'status', 'since', 'until'];
 
 function current_user_can_manage(): bool
 {
@@ -72,6 +72,8 @@ function register_post_handlers(): void
     add_action('admin_post_wppilot_changes_undo_group', __NAMESPACE__ . '\\handle_undo_group');
     add_action('admin_post_wppilot_changes_undo_matching', __NAMESPACE__ . '\\handle_undo_matching');
     add_action('admin_post_wppilot_changes_export', __NAMESPACE__ . '\\handle_export');
+    add_action('admin_post_wppilot_changes_undo_session', __NAMESPACE__ . '\\handle_undo_session');
+    add_action('admin_post_wppilot_changes_redo_session', __NAMESPACE__ . '\\handle_redo_session');
 }
 
 function render_page(): void
@@ -173,6 +175,93 @@ function handle_undo_matching(): void
     $result = \wppilot_rollback_changes(array_map(static fn(array $row): string => (string) ($row['id'] ?? ''), $rows));
     unset($filters['status']);
     redirect_with_notice(summary_notice_type($result), summary_message($result), $filters);
+}
+
+/**
+ * Undo or redo one agent session from the screen. The same run the MCP abilities perform: planned
+ * first, refused whole on a conflict, stopped at the first change that does not verify.
+ */
+function handle_undo_session(): void
+{
+    require_capability_and_nonce('wppilot_changes_undo_session');
+    handle_session_run('undo');
+}
+
+function handle_redo_session(): void
+{
+    require_capability_and_nonce('wppilot_changes_redo_session');
+    handle_session_run('redo');
+}
+
+function handle_session_run(string $operation): void
+{
+    $session = posted('session');
+    $allow_partial = posted('allow_partial') === '1';
+    $result = $operation === 'undo'
+        ? \wppilot_undo_session($session, $allow_partial)
+        : \wppilot_redo_session($session, $allow_partial);
+    if ($result instanceof WP_Error) {
+        redirect_with_notice('error', $result->get_error_message(), ['session' => $session]);
+    }
+    redirect_with_notice(session_notice_type($result), session_message($result), ['session' => $session]);
+}
+
+/**
+ * @param array<string, mixed> $result
+ */
+function session_notice_type(array $result): string
+{
+    return match ((string) ($result['status'] ?? '')) {
+        'completed' => 'success',
+        'nothing-to-do' => 'info',
+        'stopped' => 'warning',
+        default => 'error',
+    };
+}
+
+/**
+ * The run's own message, plus the first few conflicts or the failure by name, so the notice says
+ * what to look at without opening anything.
+ *
+ * @param array<string, mixed> $result
+ */
+function session_message(array $result): string
+{
+    $message = (string) ($result['message'] ?? '');
+    $details = [];
+    // @mago-expect analysis:mixed-assignment -- Conflict rows are checked below.
+    foreach (array_slice(is_array($result['conflicts'] ?? null) ? $result['conflicts'] : [], 0, 5) as $conflict) {
+        if (!is_array($conflict)) {
+            continue;
+        }
+        $changed = is_array($conflict['changed'] ?? null) ? implode(', ', array_map('strval', array_slice($conflict['changed'], 0, 6))) : '';
+        $details[] = sprintf(
+            /* translators: 1: ability name, 2: target, 3: fields that differ */
+            __('%1$s on %2$s (changed: %3$s)', domain: 'wppilot'),
+            (string) ($conflict['ability'] ?? ''),
+            (string) ($conflict['target'] ?? ''),
+            $changed !== '' ? $changed : __('unknown', domain: 'wppilot'),
+        );
+    }
+    $failed = is_array($result['failed'] ?? null) ? $result['failed'] : null;
+    if ($failed !== null) {
+        $details[] = sprintf(
+            /* translators: 1: ability name, 2: change id */
+            __('Failed: %1$s (%2$s)', domain: 'wppilot'),
+            (string) ($failed['ability'] ?? ''),
+            (string) ($failed['change_id'] ?? ''),
+        );
+    }
+
+    return $details === [] ? $message : $message . ' ' . implode('; ', $details) . '.';
+}
+
+/**
+ * A session id short enough for a table cell.
+ */
+function session_label(string $session): string
+{
+    return strlen($session) > 18 ? substr($session, 0, 18) . '…' : $session;
 }
 
 /**

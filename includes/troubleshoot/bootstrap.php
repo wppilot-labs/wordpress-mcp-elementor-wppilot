@@ -49,7 +49,12 @@ function record_mcp_request(mixed $result, mixed $server, WP_REST_Request $reque
 
     // Hand the same identity to the change ledger, which runs later in this
     // request and cannot resolve it for itself: it never sees the request.
-    \wppilot_current_agent(\wppilot_resolve_agent($method, $user_id, $client));
+    $agent = \wppilot_resolve_agent($method, $user_id, $client);
+    \wppilot_current_agent($agent);
+    // And which run of that agent this is, so a session's writes can be undone together.
+    if (function_exists('wppilot_session_from_request')) {
+        \wppilot_session_from_request($request, $agent);
+    }
 
     // @mago-expect analysis:mixed-assignment
     $stored = get_option('wppilot_mcp_last_request', default_value: []);

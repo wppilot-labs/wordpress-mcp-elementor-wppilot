@@ -145,6 +145,7 @@ function wppilot_register_builtin_abilities(): void
     require_once $dir . 'discover-abilities.php';
     require_once $dir . 'agent-context.php';
     require_once $dir . 'change-log.php';
+    require_once $dir . 'sessions.php';
     require_once $dir . 'diagnostics.php';
     require_once $dir . 'preview.php';
     wppilot_load_wordpress_abilities();
