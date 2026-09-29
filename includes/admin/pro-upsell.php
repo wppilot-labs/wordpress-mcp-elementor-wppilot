@@ -61,6 +61,7 @@ function wppilot_pro_integration_catalog(): array
         ['label' => 'GenerateBlocks', 'category' => 'builder', 'constant' => 'GENERATEBLOCKS_VERSION', 'abilities' => 3],
         ['label' => 'Kadence', 'category' => 'builder', 'class' => 'Kadence\\Theme', 'abilities' => 5],
         ['label' => 'Kadence Blocks', 'category' => 'builder', 'constant' => 'KADENCE_BLOCKS_VERSION', 'abilities' => 3],
+        ['label' => 'Kadence Blocks patterns', 'category' => 'builder', 'constant' => 'KADENCE_BLOCKS_VERSION', 'abilities' => 2],
         // Custom fields and content modeling.
         ['label' => 'Advanced Custom Fields', 'category' => 'content', 'class' => 'ACF', 'abilities' => 23],
         ['label' => 'JetEngine', 'category' => 'content', 'function' => 'jet_engine', 'abilities' => 26],
@@ -73,6 +74,9 @@ function wppilot_pro_integration_catalog(): array
         ['label' => 'Rank Math SEO', 'category' => 'seo', 'constant' => 'RANK_MATH_VERSION', 'abilities' => 8],
         ['label' => 'All in One SEO', 'category' => 'seo', 'constant' => 'AIOSEO_VERSION', 'abilities' => 12],
         ['label' => 'SeoPress', 'category' => 'seo', 'constant' => 'SEOPRESS_VERSION', 'abilities' => 16],
+        ['label' => 'The SEO Framework', 'category' => 'seo', 'constant' => 'THE_SEO_FRAMEWORK_VERSION', 'abilities' => 3],
+        ['label' => 'Slim SEO', 'category' => 'seo', 'constant' => 'SLIM_SEO_VER', 'abilities' => 3],
+        ['label' => 'SmartCrawl', 'category' => 'seo', 'constant' => 'SMARTCRAWL_VERSION', 'abilities' => 3],
         // Forms.
         ['label' => 'Contact Form 7', 'category' => 'forms', 'constant' => 'WPCF7_VERSION', 'abilities' => 9],
         ['label' => 'WPForms', 'category' => 'forms', 'constant' => 'WPFORMS_VERSION', 'abilities' => 28],
@@ -80,8 +84,18 @@ function wppilot_pro_integration_catalog(): array
         ['label' => 'Fluent Forms', 'category' => 'forms', 'constant' => 'FLUENTFORM_VERSION', 'abilities' => 37],
         ['label' => 'Formidable Forms', 'category' => 'forms', 'class' => 'FrmAppHelper', 'abilities' => 39],
         ['label' => 'Ninja Forms', 'category' => 'forms', 'class' => 'Ninja_Forms', 'abilities' => 21],
+        ['label' => 'Forminator', 'category' => 'forms', 'constant' => 'FORMINATOR_VERSION', 'abilities' => 4],
+        ['label' => 'WS Form', 'category' => 'forms', 'constant' => 'WS_FORM_VERSION', 'abilities' => 4],
+        // Backups and security. One Pro kit serves each group, so every plugin in it shows the
+        // kit's whole ability count.
+        ['label' => 'UpdraftPlus', 'category' => 'backups', 'class' => 'UpdraftPlus', 'abilities' => 3],
+        ['label' => 'Duplicator', 'category' => 'backups', 'class' => 'Duplicator\\Package\\DupPackage', 'abilities' => 3],
+        ['label' => 'BackWPup', 'category' => 'backups', 'class' => 'BackWPup', 'abilities' => 3],
+        ['label' => 'Wordfence', 'category' => 'security', 'constant' => 'WORDFENCE_VERSION', 'abilities' => 3],
+        ['label' => 'Solid Security', 'category' => 'security', 'class' => 'ITSEC_Core', 'abilities' => 3],
         // Commerce, dev tools, dynamic content.
         ['label' => 'WooCommerce', 'category' => 'commerce', 'class' => 'WooCommerce', 'abilities' => 35],
+        ['label' => 'FunnelKit', 'category' => 'commerce', 'constant' => 'WFFN_VERSION', 'abilities' => 4],
         ['label' => 'Code Snippets', 'category' => 'dev', 'constant' => 'CODE_SNIPPETS_VERSION', 'abilities' => 11],
         ['label' => 'Dynamic Shortcodes', 'category' => 'dynamic', 'constant' => 'DYNAMIC_SHORTCODES_VERSION', 'abilities' => 9],
     ];
