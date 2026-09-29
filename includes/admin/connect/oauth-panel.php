@@ -96,13 +96,21 @@ function wppilot_render_oauth_config_section(string $rest_url): void
         'cursor' => 'Cursor',
         'vscode' => 'VS Code',
         'github-copilot' => 'GitHub Copilot',
-        'windsurf' => 'Windsurf',
+        'windsurf' => 'Devin Desktop (Windsurf)',
         'cline' => 'Cline',
         'roo-code' => 'Roo Code',
-        'amazon-q' => 'Amazon Q',
+        'amazon-q' => 'Amazon Q / Kiro',
         'zed' => 'Zed',
         'kilo-code' => 'Kilo Code',
         'opencode' => 'OpenCode',
+        // These have had OAuth entries in the local (bridge) set for a while but
+        // no tab to reach them, so the method was unreachable for them.
+        'factory-droid' => 'Factory Droid',
+        'kimi-cli' => 'Kimi Code CLI',
+        'qwen-code' => 'Qwen Code',
+        'gemini-cli' => 'Gemini CLI',
+        'zcode' => 'ZCode (GLM)',
+        'openclaw' => 'OpenClaw',
     ];
     ?>
     <h2 class="wppilot-step-heading">

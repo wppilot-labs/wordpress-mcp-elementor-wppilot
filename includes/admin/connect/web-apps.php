@@ -50,7 +50,7 @@ function wppilot_web_apps(): array
             'oauth' => 'mistral',
             'bearer_steps' => 'mistral-lechat',
         ],
-        'manus' => ['label' => 'Manus', 'oauth' => 'manus', 'bearer_steps' => null],
+        'manus' => ['label' => 'Manus', 'oauth' => 'manus', 'bearer_steps' => 'manus'],
     ];
 }
 

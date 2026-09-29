@@ -32,9 +32,9 @@ declare(strict_types=1);
  *     password, access token — are actually available, so the Connect screen
  *     offers each client the ones that work rather than a generic list the user
  *     has to filter themselves. A client is listed for `token` only where it can
- *     send a static Authorization header — including three of the hosted web UIs,
- *     which now store one per connector. ChatGPT, Manus and the Codex desktop app
- *     have nowhere to put one and stay OAuth-only.
+ *     send a static Authorization header — including four of the hosted web UIs,
+ *     which now store one per connector. ChatGPT and the Codex desktop app have
+ *     nowhere to put one and stay OAuth-only.
  *
  * The registry is split by that OAuth route rather than listed flat, so no entry
  * has to restate it and no entry can contradict the group it sits in. A client
@@ -61,7 +61,7 @@ function wppilot_clients_native_oauth(): array
             'match' => ['claude-code', 'claude code'],
             'methods' => ['oauth', 'token', 'password'],
             'note' => __(
-                'Add the server, then run /mcp inside Claude Code to complete the browser sign-in. With an access token there is no sign-in step, but /mcp still reports the server as needing authentication — a display bug that does not stop the tools working.',
+                'Add the server, then run /mcp inside Claude Code to complete the browser sign-in. With an access token there is no sign-in step: /mcp shows the server as connected, or as failed with the HTTP status if the token is wrong.',
                 domain: 'wppilot',
             ),
         ],
@@ -92,12 +92,12 @@ function wppilot_clients_native_oauth(): array
 function wppilot_clients_web_ui(): array
 {
     return [
-        // Not all OAuth-only any more: claude.ai, Le Chat and Perplexity each
-        // store a fixed Authorization header per connector, which is what makes
-        // an access token usable from a browser at all. ChatGPT's developer mode
-        // offers OAuth or no authentication and has no header field, and Manus
-        // and the Codex app take OAuth client credentials rather than a header,
-        // so those three stay OAuth-only.
+        // Not all OAuth-only any more: claude.ai, Le Chat, Perplexity and Manus
+        // each accept a fixed credential per connector, which is what makes an
+        // access token usable from a browser at all. ChatGPT's developer mode
+        // offers OAuth or no authentication and has no header field, and the
+        // Codex app takes OAuth client credentials rather than a header, so those
+        // two stay OAuth-only.
         'claude-web' => [
             'label' => __('Claude (web)', domain: 'wppilot'),
             'match' => ['claude-web'],
@@ -130,10 +130,14 @@ function wppilot_clients_web_ui(): array
                 domain: 'wppilot',
             ),
         ],
+        // Manus's own custom-MCP documentation lists "API key, Bearer token, or
+        // other credentials" as the authentication a custom server can use
+        // (https://manus.im/docs/integrations/custom-mcp, checked 2026-09-30), so
+        // the access token is offered alongside OAuth.
         'manus' => [
             'label' => 'Manus',
             'match' => ['manus'],
-            'methods' => ['oauth'],
+            'methods' => ['oauth', 'token'],
             'note' => __(
                 'Settings, Connectors, Add connectors, Custom MCP, Direct configuration. Manus connects from its own servers, so this site must be reachable over public HTTPS.',
                 domain: 'wppilot',
@@ -206,13 +210,21 @@ function wppilot_clients_native_oauth_editors(): array
             'methods' => ['oauth', 'token', 'password'],
             'note' => __('Add the server with /mcp inside Droid, or put it in ~/.factory/mcp.json.', domain: 'wppilot'),
         ],
-        // Kimi Code CLI takes a whole server in one command, like Claude Code,
-        // and stores it in a standard mcpServers file.
+        // Kimi Code CLI is the Node.js rewrite that replaced the Python kimi-cli.
+        // It reads ~/.kimi-code/mcp.json (per project .kimi-code/mcp.json), edits
+        // servers through /mcp-config in the TUI, and signs in to an OAuth server
+        // with /mcp-config login <name>. `kimi migrate` carries a legacy
+        // ~/.kimi/mcp.json across. Source, checked 2026-09-30:
+        // https://moonshotai.github.io/kimi-code/en/customization/mcp.html and
+        // https://moonshotai.github.io/kimi-code/en/guides/migration.html
         'kimi-cli' => [
             'label' => __('Kimi Code CLI', domain: 'wppilot'),
             'match' => ['kimi', 'kimi-cli', 'kimi code'],
             'methods' => ['oauth', 'token', 'password'],
-            'note' => __('Servers live in ~/.kimi/mcp.json, or add one with kimi mcp add.', domain: 'wppilot'),
+            'note' => __(
+                'Servers live in ~/.kimi-code/mcp.json, or add one with /mcp-config inside Kimi Code. Still on the legacy Python kimi-cli? Run kimi migrate after installing Kimi Code.',
+                domain: 'wppilot',
+            ),
         ],
         // Qwen Code and Gemini CLI share a lineage and a quirk: a remote server's
         // URL goes in `httpUrl`, not `url`. A snippet copied from any other
@@ -238,11 +250,22 @@ function wppilot_clients_native_oauth_editors(): array
                 domain: 'wppilot',
             ),
         ],
+        // The snippets are for Copilot CLI, which reads ~/.copilot/mcp-config.json
+        // or a repository's .mcp.json / .github/mcp.json under `mcpServers` and
+        // rejects VS Code's `servers` key. Copilot Chat in VS Code uses the VS Code
+        // configuration, and the cloud agent cannot use OAuth servers. Sources,
+        // checked 2026-09-30:
+        // https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+        // https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference
+        // https://docs.github.com/en/copilot/concepts/agents/cloud-agent/mcp-and-cloud-agent
         'github-copilot' => [
             'label' => 'GitHub Copilot',
             'match' => ['github copilot', 'copilot'],
             'methods' => ['oauth', 'token', 'password'],
-            'note' => __('Uses the VS Code MCP configuration.', domain: 'wppilot'),
+            'note' => __(
+                'These snippets are for Copilot CLI. Copilot Chat in VS Code uses the VS Code configuration — use the VS Code tab. The Copilot cloud agent cannot use OAuth servers; give it an access token instead.',
+                domain: 'wppilot',
+            ),
         ],
         'antigravity-cli' => [
             'label' => 'Antigravity CLI',
@@ -255,9 +278,126 @@ function wppilot_clients_native_oauth_editors(): array
             'match' => ['antigravity-ide', 'antigravity ide', 'antigravity'],
             'methods' => ['oauth', 'token', 'password'],
             'note' => __(
-                'Open MCP Servers in the IDE, add the server, then complete the browser sign-in.',
+                'Click … at the top of the agent side panel, choose MCP Servers, then Manage MCP Servers and View raw config.',
                 domain: 'wppilot',
             ),
+        ],
+    ];
+}
+
+/**
+ * Editors and agents that used to reach OAuth through the mcp-remote wrapper and
+ * now document a sign-in of their own.
+ *
+ * Split from the list above to keep either function readable; they share the
+ * native route. Moved out of the proxied group on 2026-09-30 after each vendor's
+ * page was re-checked (cited per entry).
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function wppilot_clients_native_oauth_extensions(): array
+{
+    return [
+        // Cognition rebranded Windsurf to Devin Desktop on 2 June 2026 and
+        // redirected windsurf.com to devin.ai/desktop. Existing installs keep
+        // identifying themselves as "windsurf" (and older Codeium builds as
+        // "codeium"), and the rebrand ported MCP connections rather than
+        // resetting them, so both old identifiers stay matched — dropping them
+        // would turn every already-connected editor into an unlabelled row on
+        // the Overview screen.
+        // The registry key stays `windsurf`: it is the lookup key for the
+        // generated config snippet, the OAuth panel, and the pre-registered
+        // OAuth client allowlist, and it is recorded against existing
+        // connections. Renaming it would orphan all of those. Only what the
+        // rebrand actually changed — the display name and the identifiers the
+        // client reports — moves.
+        // Devin's MCP page documents ~/.config/devin/mcp_config.json (Windows
+        // %APPDATA%\devin\mcp_config.json) and native OAuth on every transport;
+        // its transition FAQ says the app reads the legacy Windsurf/Codeium paths
+        // too. Sources, checked 2026-09-30:
+        // https://docs.devin.ai/desktop/cascade/mcp
+        // https://docs.devin.ai/desktop/devin-desktop-faq
+        'windsurf' => [
+            'label' => 'Devin Desktop (Windsurf)',
+            'match' => ['devin-desktop', 'devin desktop', 'devin', 'windsurf', 'codeium'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'Open the MCP config from the Cascade panel: the … menu, then Open MCP config file. Remote servers use "serverUrl" rather than "url".',
+                domain: 'wppilot',
+            ),
+        ],
+        // Zed connects to remote servers natively (`url` + `headers`) and runs
+        // the MCP OAuth flow when no Authorization header is set, so no bridge.
+        // Source, checked 2026-09-30: https://zed.dev/docs/ai/mcp
+        'zed' => [
+            'label' => 'Zed',
+            'match' => ['zed'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'Settings, AI, MCP Servers, Add Server, then Add Remote Server. Without an Authorization header Zed runs the OAuth sign-in itself.',
+                domain: 'wppilot',
+            ),
+        ],
+        // Cline supports OAuth for remote MCP servers (CHANGELOG: "Support
+        // pre-registered OAuth clients for remote MCP servers"), and a remote
+        // entry needs "type": "streamableHttp" or it falls back to SSE.
+        // Sources, checked 2026-09-30: https://docs.cline.bot/mcp/mcp-overview
+        // https://github.com/cline/cline/blob/main/CHANGELOG.md
+        'cline' => [
+            'label' => 'Cline',
+            'match' => ['cline'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => '',
+        ],
+        // Self-hosted agent. Servers live under `mcp.servers` in
+        // ~/.openclaw/openclaw.json; a remote one needs
+        // "transport": "streamable-http" (omitted, OpenClaw uses SSE), and
+        // "auth": "oauth" plus `openclaw mcp login <name>` for OAuth. Sources,
+        // checked 2026-09-30: https://docs.openclaw.ai/cli/mcp/transports
+        // https://docs.openclaw.ai/gateway/configuration
+        'openclaw' => [
+            'label' => 'OpenClaw',
+            'match' => ['openclaw', 'open-claw'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'Servers live under mcp.servers in ~/.openclaw/openclaw.json, or save one with openclaw mcp set.',
+                domain: 'wppilot',
+            ),
+        ],
+        // Kilo Code moved MCP servers into kilo.jsonc under the top-level `mcp`
+        // key (OpenCode's shape: `local` / `remote`), and starts OAuth itself
+        // for a remote server that asks for it. Source, checked 2026-09-30:
+        // https://kilo.ai/docs/automate/mcp/using-in-kilo-code
+        'kilo-code' => [
+            'label' => 'Kilo Code',
+            'match' => ['kilo-code', 'kilo code', 'kilocode'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'Settings, Agent Behaviour, MCP Servers — or edit kilo.jsonc, where servers sit under "mcp".',
+                domain: 'wppilot',
+            ),
+        ],
+        // Amazon Q Developer in the IDE opens a browser to authorize an HTTP
+        // server that asks for it, and Kiro, its successor, runs the OAuth flow
+        // natively from ~/.kiro/settings/mcp.json. Sources, checked 2026-09-30:
+        // https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html
+        // https://kiro.dev/docs/mcp/configuration/
+        'amazon-q' => [
+            'label' => 'Amazon Q / Kiro',
+            'match' => ['amazon-q', 'amazon q', 'amazonq', 'kiro'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => __(
+                'Kiro reads ~/.kiro/settings/mcp.json. Amazon Q Developer reads ~/.aws/amazonq/mcp.json, or add the server from its MCP configuration screen.',
+                domain: 'wppilot',
+            ),
+        ],
+        // OpenCode detects a 401 and runs the OAuth flow for a remote server
+        // itself. Source, checked 2026-09-30: https://opencode.ai/docs/mcp-servers/
+        'opencode' => [
+            'label' => 'OpenCode',
+            'match' => ['opencode'],
+            'methods' => ['oauth', 'token', 'password'],
+            'note' => '',
         ],
     ];
 }
@@ -274,51 +414,11 @@ function wppilot_clients_native_oauth_editors(): array
 function wppilot_clients_proxied_oauth(): array
 {
     return [
-        // Cognition rebranded Windsurf to Devin Desktop on 2 June 2026 and
-        // redirected windsurf.com to devin.ai/desktop. Existing installs keep
-        // identifying themselves as "windsurf" (and older Codeium builds as
-        // "codeium"), and the rebrand ported MCP connections rather than
-        // resetting them, so both old identifiers stay matched — dropping them
-        // would turn every already-connected editor into an unlabelled row on
-        // the Overview screen.
-        // The registry key stays `windsurf`: it is the lookup key for the
-        // generated config snippet, the OAuth panel, and the pre-registered
-        // OAuth client allowlist, and it is recorded against existing
-        // connections. Renaming it would orphan all of those. Only what the
-        // rebrand actually changed — the display name and the identifiers the
-        // client reports — moves.
-        'windsurf' => [
-            'label' => 'Devin Desktop (Windsurf)',
-            'match' => ['devin-desktop', 'devin desktop', 'devin', 'windsurf', 'codeium'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => __(
-                'MCP configuration still lives at the Windsurf path, and remote servers use "serverUrl" rather than "url".',
-                domain: 'wppilot',
-            ),
-        ],
-        'zed' => [
-            'label' => 'Zed',
-            'match' => ['zed'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => __('Configured as a context server.', domain: 'wppilot'),
-        ],
-        'cline' => [
-            'label' => 'Cline',
-            'match' => ['cline'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => '',
-        ],
-        // Self-hosted Node agent with native MCP client support since early
-        // 2026. It runs on the operator's own machine or server, so the
-        // mcp-remote proxy this group uses is available to it.
-        'openclaw' => [
-            'label' => 'OpenClaw',
-            'match' => ['openclaw', 'open-claw'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => __('Add the server to your OpenClaw MCP configuration and restart the agent.', domain: 'wppilot'),
-        ],
         // The extension was discontinued on 15 May 2026 and its repository
-        // archived, with Cline named as the migration target. It stays in the
+        // archived; the README names ZooCode (a community fork) and Cline as the
+        // alternatives (https://github.com/RooCodeInc/Roo-Code, checked
+        // 2026-09-30). No native OAuth flow has been verified for it, so it
+        // stays in the proxied group. It stays in the
         // registry because installs already in the field keep working and keep
         // identifying themselves — dropping the entry would turn a live
         // connection into an unlabelled row — but the note says so, since anyone
@@ -328,27 +428,9 @@ function wppilot_clients_proxied_oauth(): array
             'match' => ['roo-code', 'roo code', 'roocode'],
             'methods' => ['oauth', 'token', 'password'],
             'note' => __(
-                'Discontinued in May 2026. Existing installs still connect; for a new setup use Cline.',
+                'Discontinued in May 2026. Existing installs still connect; for a new setup use Cline or ZooCode.',
                 domain: 'wppilot',
             ),
-        ],
-        'kilo-code' => [
-            'label' => 'Kilo Code',
-            'match' => ['kilo-code', 'kilo code', 'kilocode'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => '',
-        ],
-        'amazon-q' => [
-            'label' => 'Amazon Q',
-            'match' => ['amazon-q', 'amazon q', 'amazonq'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => '',
-        ],
-        'opencode' => [
-            'label' => 'OpenCode',
-            'match' => ['opencode'],
-            'methods' => ['oauth', 'token', 'password'],
-            'note' => '',
         ],
     ];
 }
@@ -416,6 +498,7 @@ function wppilot_clients(): array
         wppilot_clients_with_oauth_route(wppilot_clients_native_oauth(), oauth: 'native'),
         wppilot_clients_with_oauth_route(wppilot_clients_web_ui(), oauth: 'native'),
         wppilot_clients_with_oauth_route(wppilot_clients_native_oauth_editors(), oauth: 'native'),
+        wppilot_clients_with_oauth_route(wppilot_clients_native_oauth_extensions(), oauth: 'native'),
         wppilot_clients_with_oauth_route(wppilot_clients_proxied_oauth(), oauth: 'proxy'),
         wppilot_client_proxy_shapes(),
     );

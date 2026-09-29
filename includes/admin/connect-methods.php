@@ -465,12 +465,163 @@ function wppilot_build_oauth_web_ui_configs(string $mcp_url, string $mcp_name): 
 function wppilot_build_oauth_public_configs(string $mcp_url, string $mcp_name): array
 {
     $bridge = wppilot_build_oauth_bridge_configs($mcp_url, $mcp_name, []);
-    $tail = ['cline', 'roo-code', 'amazon-q', 'zed', 'kilo-code', 'opencode'];
+    // Only Roo Code is left on the bridge: every other client that used to be
+    // here now documents its own OAuth flow (see wppilot_build_oauth_native_more()).
+    $tail = ['roo-code'];
 
     return array_merge(
         array_intersect_key($bridge, array_flip($tail)),
         wppilot_build_oauth_native_configs($mcp_url, $mcp_name),
+        wppilot_build_oauth_native_more($mcp_url, $mcp_name),
+        wppilot_build_oauth_native_agents($mcp_url, $mcp_name),
     );
+}
+
+/**
+ * Native OAuth entries for the clients whose own documentation now describes a
+ * browser sign-in against a remote URL. Each gets the bare remote shape its
+ * docs show — no header, so the client discovers this site's OAuth metadata —
+ * plus the one command that starts the sign-in where the client needs one.
+ * Sources, all checked 2026-09-30, are on each entry.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function wppilot_build_oauth_native_more(string $mcp_url, string $mcp_name): array
+{
+    $opts = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+    $opencode = (string) json_encode(['mcp' => [$mcp_name => ['type' => 'remote', 'url' => $mcp_url]]], $opts);
+
+    return [
+        // https://zed.dev/docs/ai/mcp — no Authorization header means Zed runs
+        // the standard MCP OAuth flow.
+        'zed' => wppilot_oauth_code_entry(
+            (string) json_encode(['context_servers' => [$mcp_name => ['url' => $mcp_url]]], $opts),
+            wppilot_oauth_add_to('settings.json'),
+            wppilot_zed_paths(),
+        ),
+        // https://docs.cline.bot/mcp/mcp-overview — omitting `type` means SSE.
+        'cline' => wppilot_oauth_code_entry(
+            wppilot_oauth_json('mcpServers', $mcp_name, ['type' => 'streamableHttp', 'url' => $mcp_url]),
+            wppilot_oauth_add_to('cline_mcp_settings.json'),
+            [
+                __('Via UI', domain: 'wppilot') => __(
+                    'Cline sidebar → MCP Servers → Configure MCP Servers',
+                    domain: 'wppilot',
+                ),
+                'Cline CLI' => '~/.cline/mcp.json',
+            ],
+        ),
+        // https://kilo.ai/docs/automate/mcp/using-in-kilo-code
+        'kilo-code' => wppilot_oauth_code_entry(
+            $opencode,
+            wppilot_oauth_add_to('kilo.jsonc'),
+            wppilot_kilo_code_paths(),
+        ),
+        // https://opencode.ai/docs/mcp-servers/ — `opencode mcp auth <name>`
+        // starts the sign-in by hand if the automatic one did not.
+        'opencode' => wppilot_oauth_code_entry(
+            $opencode,
+            wppilot_oauth_add_to('opencode.json'),
+            [
+                __('Project', domain: 'wppilot') => 'opencode.json',
+                __('Global', domain: 'wppilot') => '~/.config/opencode/opencode.json',
+            ],
+        ),
+        // https://kiro.dev/docs/mcp/configuration/ and
+        // https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html
+        'amazon-q' => wppilot_oauth_code_entry(
+            wppilot_oauth_json('mcpServers', $mcp_name, ['url' => $mcp_url]),
+            wppilot_oauth_add_to('mcp.json'),
+            wppilot_amazon_q_kiro_paths(),
+        ),
+    ];
+}
+
+/**
+ * The terminal agents in the same position as wppilot_build_oauth_native_more(): each documents
+ * its own OAuth sign-in, and each starts it differently, which is why the entries differ in kind.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function wppilot_build_oauth_native_agents(string $mcp_url, string $mcp_name): array
+{
+    $sq = static fn(string $v): string => "'" . str_replace(search: "'", replace: "'\\''", subject: $v) . "'";
+
+    return [
+        // https://docs.openclaw.ai/cli/mcp/transports
+        'openclaw' => [
+            'kind' => 'code',
+            'code' => implode("\n", [
+                'openclaw mcp set ' . $sq($mcp_name) . ' ' . $sq((string) json_encode([
+                    'url' => $mcp_url,
+                    'transport' => 'streamable-http',
+                    'auth' => 'oauth',
+                ], JSON_UNESCAPED_SLASHES)),
+                'openclaw mcp login ' . $sq($mcp_name),
+            ]),
+            'hint' => __(
+                'Run both commands. The login prints an authorization URL — approve it in the browser and OpenClaw finishes the exchange.',
+                domain: 'wppilot',
+            ),
+            'paths' => [],
+            'isShell' => true,
+        ],
+        // https://moonshotai.github.io/kimi-code/en/customization/mcp.html
+        'kimi-cli' => wppilot_oauth_code_entry(
+            wppilot_oauth_json('mcpServers', $mcp_name, ['url' => $mcp_url]),
+            wppilot_oauth_add_to('mcp.json'),
+            wppilot_kimi_code_paths(),
+            sprintf(
+                /* translators: %s: sign-in command in <code> tags */
+                __('To sign in, start a new Kimi Code session and run %s.', domain: 'wppilot'),
+                '<code>/mcp-config login ' . esc_html($mcp_name) . '</code>',
+            ),
+        ),
+        // https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp/ —
+        // client id and endpoints are optional with dynamic registration.
+        'qwen-code' => wppilot_oauth_code_entry(
+            wppilot_oauth_json('mcpServers', $mcp_name, ['httpUrl' => $mcp_url, 'oauth' => ['enabled' => true]]),
+            wppilot_oauth_add_to('settings.json'),
+            [
+                __('Global', domain: 'wppilot') => '~/.qwen/settings.json',
+                __('Project', domain: 'wppilot') => '.qwen/settings.json',
+            ],
+        ),
+        // https://zcode.z.ai/en/docs/mcp-services — the manager's form, then an
+        // "Open authorization" button on the server's row.
+        'zcode' => [
+            'kind' => 'code',
+            'code' => '',
+            'hint' => '',
+            'paths' => [],
+            'isShell' => false,
+            'steps' => [
+                [
+                    'title' => __('Add the server', domain: 'wppilot'),
+                    'body' => __(
+                        'In ZCode open Settings, MCP Servers, and click New MCP Server. Choose HTTP as the type, name it, and paste this URL. Enable OAuth for it.',
+                        domain: 'wppilot',
+                    ),
+                    'copy' => $mcp_url,
+                ],
+                [
+                    'title' => __('Authorize', domain: 'wppilot'),
+                    'body' => __(
+                        'An Open authorization button appears on the server\'s row. Click it, approve in the browser, and ZCode reconnects and loads the tools.',
+                        domain: 'wppilot',
+                    ),
+                ],
+            ],
+        ],
+        // https://docs.factory.ai/cli/configuration/mcp
+        'factory-droid' => [
+            'kind' => 'code',
+            'code' => 'droid mcp add ' . $sq($mcp_name) . ' ' . $sq($mcp_url) . ' --type http',
+            'hint' => __('Run in your terminal, then open /mcp inside Droid and complete the browser sign-in.', domain: 'wppilot'),
+            'paths' => [],
+            'isShell' => true,
+        ],
+    ];
 }
 
 /**
@@ -560,6 +711,32 @@ function wppilot_oauth_codex_bridge_cli_note(string $mcp_name, string $mcp_url, 
 
     /* translators: %s: codex mcp add command in <code> tags */
     return sprintf(__('Prefer the terminal? Run %s.', domain: 'wppilot'), '<code>' . $cmd . '</code>');
+}
+
+/**
+ * Note under the Copilot snippets: which Copilot surface the file is for, and the one surface that
+ * cannot use this method at all. HTML, like the Codex notes; the name is the client-side placeholder.
+ */
+function wppilot_oauth_copilot_bridge_note(): string
+{
+    return __(
+        'This is Copilot CLI\'s file. Copilot Chat in VS Code uses the VS Code configuration instead, and the Copilot cloud agent cannot use OAuth servers at all — give it an access token.',
+        domain: 'wppilot',
+    );
+}
+
+/**
+ * The native-OAuth Copilot note: the bridge note plus the command that restarts Copilot CLI's own
+ * sign-in.
+ */
+function wppilot_oauth_copilot_note(string $mcp_name): string
+{
+    return sprintf(
+        /* translators: 1: which Copilot surfaces this is for, 2: /mcp auth command in <code> tags */
+        __('%1$s To sign in again later, run %2$s.', domain: 'wppilot'),
+        wppilot_oauth_copilot_bridge_note(),
+        '<code>/mcp auth ' . esc_html($mcp_name) . '</code>',
+    );
 }
 
 /**
@@ -672,20 +849,23 @@ function wppilot_build_oauth_native_configs(string $mcp_url, string $mcp_name): 
                 ),
             ],
         ),
+        // Copilot CLI: `mcpServers`, `type: "http"`, required `tools`; it runs
+        // the OAuth flow itself and /mcp auth <name> restarts it. Sources,
+        // checked 2026-09-30:
+        // https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference
+        // https://docs.github.com/en/copilot/concepts/agents/cloud-agent/mcp-and-cloud-agent
         'github-copilot' => wppilot_oauth_code_entry(
-            wppilot_oauth_json('servers', $mcp_name, ['type' => 'http', 'url' => $mcp_url]),
-            wppilot_oauth_add_to('mcp.json'),
-            [__('Project', domain: 'wppilot') => '.github/copilot/mcp.json'],
+            wppilot_oauth_json('mcpServers', $mcp_name, ['type' => 'http', 'url' => $mcp_url, 'tools' => ['*']]),
+            wppilot_oauth_add_to('mcp-config.json'),
+            wppilot_copilot_cli_paths(),
+            wppilot_oauth_copilot_note($mcp_name),
         ),
         'antigravity-cli' => $antigravity_entry,
         'antigravity-ide' => $antigravity_entry,
         'windsurf' => wppilot_oauth_code_entry(
             wppilot_oauth_json('mcpServers', $mcp_name, ['serverUrl' => $mcp_url]),
             wppilot_oauth_add_to('mcp_config.json'),
-            [
-                'macOS / Linux' => '~/.codeium/windsurf/mcp_config.json',
-                'Windows' => '%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json',
-            ],
+            wppilot_devin_desktop_paths(),
         ),
     ];
 }
@@ -724,15 +904,17 @@ function wppilot_build_oauth_bridge_special(string $mcp_url, string $mcp_name, a
 {
     $opts = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
 
-    $zed_json = (string) json_encode([
-        'context_servers' => [$mcp_name => array_merge(['source' => 'custom', 'enabled' => true], $server)],
-    ], $opts);
+    $zed_json = (string) json_encode(['context_servers' => [$mcp_name => $server]], $opts);
 
     $opencode_server = ['type' => 'local', 'command' => ['npx', '-y', 'mcp-remote', $mcp_url]];
     if ($env !== []) {
         $opencode_server['environment'] = $env;
     }
     $opencode_json = (string) json_encode(['mcp' => [$mcp_name => $opencode_server]], $opts);
+    $copilot_json = (string) json_encode([
+        'mcpServers' => [$mcp_name => array_merge(['type' => 'local'], $server, ['tools' => ['*']])],
+    ], $opts);
+    $openclaw_json = (string) json_encode(['mcp' => ['servers' => [$mcp_name => $server]]], $opts);
 
     return [
         'claude-code' => [
@@ -755,6 +937,22 @@ function wppilot_build_oauth_bridge_special(string $mcp_url, string $mcp_name, a
             __('Project', domain: 'wppilot') => 'opencode.json',
             __('Global', domain: 'wppilot') => '~/.config/opencode/opencode.json',
         ]),
+        'kilo-code' => wppilot_oauth_code_entry(
+            $opencode_json,
+            wppilot_oauth_add_to('kilo.jsonc'),
+            wppilot_kilo_code_paths(),
+        ),
+        'github-copilot' => wppilot_oauth_code_entry(
+            $copilot_json,
+            wppilot_oauth_add_to('mcp-config.json'),
+            wppilot_copilot_cli_paths(),
+            wppilot_oauth_copilot_bridge_note(),
+        ),
+        'openclaw' => wppilot_oauth_code_entry(
+            $openclaw_json,
+            wppilot_oauth_add_to('openclaw.json'),
+            wppilot_openclaw_paths(),
+        ),
     ];
 }
 
@@ -787,8 +985,14 @@ function wppilot_build_oauth_bridge_standard(string $mcp_servers_json, string $s
             __('Global', domain: 'wppilot') => '~/.cursor/mcp.json',
             __('Project', domain: 'wppilot') => '.cursor/mcp.json',
         ]),
-        'kimi-cli' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('mcp.json'), [
-            __('Global', domain: 'wppilot') => '~/.kimi/mcp.json',
+        'kimi-cli' => wppilot_oauth_code_entry(
+            $mcp_servers_json,
+            wppilot_oauth_add_to('mcp.json'),
+            wppilot_kimi_code_paths(),
+        ),
+        'factory-droid' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('mcp.json'), [
+            __('Global', domain: 'wppilot') => '~/.factory/mcp.json',
+            __('Project', domain: 'wppilot') => '.factory/mcp.json',
         ]),
         'qwen-code' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('settings.json'), [
             __('Global', domain: 'wppilot') => '~/.qwen/settings.json',
@@ -810,13 +1014,11 @@ function wppilot_build_oauth_bridge_standard(string $mcp_servers_json, string $s
                 domain: 'wppilot',
             ),
         ]),
-        'github-copilot' => wppilot_oauth_code_entry($servers_json, wppilot_oauth_add_to('mcp.json'), [
-            __('Project', domain: 'wppilot') => '.github/copilot/mcp.json',
-        ]),
-        'windsurf' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('mcp_config.json'), [
-            'macOS / Linux' => '~/.codeium/windsurf/mcp_config.json',
-            'Windows' => '%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json',
-        ]),
+        'windsurf' => wppilot_oauth_code_entry(
+            $mcp_servers_json,
+            wppilot_oauth_add_to('mcp_config.json'),
+            wppilot_devin_desktop_paths(),
+        ),
         'cline' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('cline_mcp_settings.json'), [
             __('Via UI', domain: 'wppilot') => __(
                 'Cline sidebar → MCP Servers → Configure MCP Servers',
@@ -830,16 +1032,10 @@ function wppilot_build_oauth_bridge_standard(string $mcp_servers_json, string $s
                 domain: 'wppilot',
             ),
         ]),
-        'amazon-q' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('mcp.json'), [
-            __('Global', domain: 'wppilot') => '~/.aws/amazonq/mcp.json',
-            __('Project', domain: 'wppilot') => '.amazonq/mcp.json',
-        ]),
-        'kilo-code' => wppilot_oauth_code_entry($mcp_servers_json, wppilot_oauth_add_to('mcp.json'), [
-            __('Project', domain: 'wppilot') => '.kilocode/mcp.json',
-            __('Via UI', domain: 'wppilot') => __(
-                'Kilo Code sidebar → MCP Servers → Configure MCP Servers',
-                domain: 'wppilot',
-            ),
-        ]),
+        'amazon-q' => wppilot_oauth_code_entry(
+            $mcp_servers_json,
+            wppilot_oauth_add_to('mcp.json'),
+            wppilot_amazon_q_kiro_paths(),
+        ),
     ];
 }
