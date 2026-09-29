@@ -33,10 +33,13 @@ function regressions(): array
             if (($password['last_used'] ?? null) === null) {
                 continue;
             }
-            $found[] = __(
-                'Application Passwords have been disabled (likely by a security plugin), so AI clients connected with the password method cannot authenticate anymore.',
-                domain: 'wppilot',
-            );
+            // Name the plugin when it is known: that turns the notice into the fix.
+            $found[] = is_array($status['blocker'] ?? null)
+                ? $status['message']
+                : __(
+                    'Application Passwords have been disabled (likely by a security plugin), so AI clients connected with the password method cannot authenticate anymore.',
+                    domain: 'wppilot',
+                );
             break;
         }
     }

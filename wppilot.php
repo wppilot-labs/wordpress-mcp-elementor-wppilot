@@ -246,6 +246,7 @@ require_once __DIR__ . '/includes/filesystem.php';
 require_once __DIR__ . '/includes/sandbox/guards.php';
 require_once __DIR__ . '/includes/capabilities.php';
 require_once __DIR__ . '/includes/environment.php';
+require_once __DIR__ . '/includes/app-password-blockers.php';
 require_once __DIR__ . '/includes/agent-context.php';
 require_once __DIR__ . '/includes/admin/nav.php';
 require_once __DIR__ . '/includes/admin/ui.php';

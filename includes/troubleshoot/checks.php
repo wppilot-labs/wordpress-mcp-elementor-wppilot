@@ -1334,6 +1334,10 @@ function check_app_passwords(): array
         );
     }
     if ($status['reason'] === 'filtered') {
+        $blocker = $status['blocker'] ?? null;
+        if (is_array($blocker)) {
+            return fail('app_passwords', $label, $blocker['message'], $blocker['remedy']);
+        }
         return fail('app_passwords', $label, $status['message']);
     }
     return warn('app_passwords', $label, $status['message']);

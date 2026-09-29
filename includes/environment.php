@@ -343,12 +343,16 @@ function wppilot_is_domain_mismatch()
  * Distinguishes between the HTTPS/local-env requirement (`wp_is_application_passwords_supported()`)
  * and a filter-based override (typical of security plugins hooking `wp_is_application_passwords_available`).
  *
- * @return array{available: bool, reason: 'available'|'unsupported'|'filtered', message: string}
+ * When a filter is the cause, `blocker` names who installed it where that can be told (see
+ * wppilot_app_passwords_blocker()), and `message` then carries that plugin's exact fix instead of
+ * the generic "check your security plugin" advice.
+ *
+ * @return array{available: bool, reason: 'available'|'unsupported'|'filtered', message: string, blocker: array{source: string, name: string, message: string, remedy: string, url: string}|null}
  */
 function wppilot_app_passwords_status(): array
 {
     if (wp_is_application_passwords_available()) {
-        return ['available' => true, 'reason' => 'available', 'message' => ''];
+        return ['available' => true, 'reason' => 'available', 'message' => '', 'blocker' => null];
     }
 
     if (!wp_is_application_passwords_supported()) {
@@ -359,6 +363,17 @@ function wppilot_app_passwords_status(): array
                 'Application Passwords require HTTPS or WP_ENVIRONMENT_TYPE set to "local".',
                 domain: 'wppilot',
             ),
+            'blocker' => null,
+        ];
+    }
+
+    $blocker = wppilot_app_passwords_blocker();
+    if ($blocker !== null) {
+        return [
+            'available' => false,
+            'reason' => 'filtered',
+            'message' => $blocker['message'] . ' ' . $blocker['remedy'],
+            'blocker' => $blocker,
         ];
     }
 
@@ -366,8 +381,9 @@ function wppilot_app_passwords_status(): array
         'available' => false,
         'reason' => 'filtered',
         'message' => __(
-            'Application Passwords have been disabled on this site, likely by a security plugin. Check your security plugin settings (e.g. Solid Security, Wordfence, All In One WP Security) and re-enable Application Passwords to continue.',
+            'Application Passwords have been disabled on this site, likely by a security plugin. Check your security plugin settings (e.g. Solid Security, Wordfence, All In One WP Security) and re-enable Application Passwords, or connect with OAuth or a WPPilot access token, which do not use them.',
             domain: 'wppilot',
         ),
+        'blocker' => null,
     ];
 }
