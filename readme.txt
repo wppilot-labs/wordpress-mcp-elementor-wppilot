@@ -454,7 +454,7 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 == Upgrade Notice ==
 
 = 1.16.0 =
-WooCommerce reads and a basic product editor, one post's SEO title, description and robots for seven SEO plugins, read-only forms with contact details redacted, backup and security status, and scheduled audits, all formerly WPPilot Pro. Each stands aside while WPPilot Pro 1.10.0 still provides it. 45 new abilities; no permission changes.
+WooCommerce reads and a basic product editor, one post's SEO title, description and robots for seven SEO plugins, read-only forms with contact details redacted, backup and security status, and scheduled audits, all formerly WPPilot Pro. Each stands aside while WPPilot Pro 1.10.0 still provides it. Also new: undo or redo everything one agent session did, and a local connection over WP-CLI (wp wppilot mcp serve). 48 new abilities; no permission changes.
 
 = 1.15.1 =
 Fixes Application Password 401s under Wordfence going unexplained (the Connection Doctor and Connect screen now name Wordfence and the setting to change), email addresses showing in full in change records, and the content audit missing The SEO Framework, Slim SEO and SmartCrawl. No new abilities or permission changes.
