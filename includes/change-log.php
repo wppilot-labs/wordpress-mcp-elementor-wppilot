@@ -1276,6 +1276,12 @@ function wppilot_build_rollback_payload(string $ability_name, ?array $before, mi
     if ($ability_name === 'wppilot/delete-menu-item') {
         return ['reversible' => false, 'reason' => 'The menu item was permanently deleted.'];
     }
+    // Checked here, not with the other core deletions below: its before-image is a
+    // comment-status snapshot, which the generic branch would file as a reversible
+    // status restore for a comment that no longer exists.
+    if ($ability_name === 'wppilot/delete-comment') {
+        return ['reversible' => false, 'reason' => 'The comment was permanently deleted.'];
+    }
     if (in_array(
         $ability_name,
         ['wppilot/woocommerce-delete-coupon', 'wppilot/woocommerce-create-refund'],
@@ -1367,9 +1373,6 @@ function wppilot_build_core_rollback_payload(string $ability_name, array $before
             'reversible' => false,
             'reason' => 'The menu and all of its items were permanently deleted.',
         ];
-    }
-    if ($ability_name === 'wppilot/delete-comment') {
-        return ['reversible' => false, 'reason' => 'The comment was permanently deleted.'];
     }
     if (($before['type'] ?? null) === 'term-create') {
         $term_id = is_array($result) ? (int) ($result['term_id'] ?? $result['menu_id'] ?? 0) : 0;
