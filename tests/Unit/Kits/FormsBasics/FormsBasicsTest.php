@@ -85,7 +85,12 @@ final class FormsBasicsTest extends TestCase
             self::assertArrayNotHasKey('include_sensitive', $args['input_schema']['properties'], "{$name} has no way to ask for the withheld values");
             self::assertArrayNotHasKey('search', $args['input_schema']['properties'], "{$name} cannot confirm a guessed value by search");
             self::assertStringContainsString('[REDACTED]', $args['description'], $name);
-            self::assertStringContainsString('Pro edition', $args['description'], $name);
+            // Pro has no reveal for Forminator, so its description sends a person to Forminator's own screen.
+            self::assertStringContainsString(
+                $name === 'wppilot/forminator-list-entries' ? 'Forminator > Submissions' : 'Pro edition',
+                $args['description'],
+                $name,
+            );
         }
     }
 
