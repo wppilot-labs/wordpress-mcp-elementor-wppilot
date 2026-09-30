@@ -181,6 +181,7 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Fixed: wppilot/delete-comment deletes a comment permanently, but the change log filed it as a reversible status change, so the Changes screen and session undo offered an undo that could only fail. It is now recorded as irreversible.
 * Fixed: wppilot/delete-theme failed on every MCP call with "undefined function delete_theme()", because WordPress does not load its theme admin functions on REST requests.
 * Fixed: wppilot/adopt-design-from-site threw a TypeError on themes whose spacing sizes have numeric slugs, such as Twenty Twenty-Five.
+* Fixed: wppilot/update-media and wppilot/upload-media dropped backslashes from alt text, because WordPress unslashes meta on write.
 * Fixed: the approval, OAuth consent, Block Editor Queue, visual runtime and Connected Apps screens logged a PHP deprecation on every load because they had no title.
 * Fixed: the Dashboard's list of recent changes logged a WordPress notice for every change made by an ability that is no longer registered, such as an SEO plugin's edit after that plugin was switched off. It now reads the label only for abilities still registered.
 * Fixed: every call made through the legacy MCP transport recorded a second change row for the adapter's execute tool, reads included, each saying "No supported before-image". The target ability's own row is unchanged; the extra row is no longer written.
