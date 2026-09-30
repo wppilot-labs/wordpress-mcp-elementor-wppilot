@@ -296,7 +296,7 @@ function to_markdown(string $name, array $gathered): string
 {
     $lines = ['---', 'name: ' . scrub($name)];
 
-    /** @var array<string, string> $colors */
+    /** @var array<array-key, string> $colors */
     $colors = $gathered['colors'];
     if ($colors !== []) {
         $lines[] = 'colors:';
@@ -304,7 +304,7 @@ function to_markdown(string $name, array $gathered): string
             $lines[] = sprintf('  %s: "%s"', scrub((string) $key), scrub($value));
         }
     }
-    /** @var array<string, array<string, string>> $typography */
+    /** @var array<array-key, array<string, string>> $typography */
     $typography = $gathered['typography'];
     if ($typography !== []) {
         $lines[] = 'typography:';
@@ -315,7 +315,7 @@ function to_markdown(string $name, array $gathered): string
             }
         }
     }
-    /** @var array<string, string> $spacing */
+    /** @var array<array-key, string> $spacing */
     $spacing = $gathered['spacing'];
     if ($spacing !== []) {
         $lines[] = 'spacing:';
