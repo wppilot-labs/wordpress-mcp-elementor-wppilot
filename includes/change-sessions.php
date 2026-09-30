@@ -389,7 +389,7 @@ function wppilot_session_volatile_meta_keys(): array
  * @param array{fingerprint: string, parts: array<string, string>} $observed
  * @return list<string>
  */
-function wppilot_change_digest_diff(array $expected, array $observed): array
+function wppilot_change_digest_diff(array $expected, array $observed, int $limit = 20): array
 {
     if ($expected['fingerprint'] === 'absent' || $observed['fingerprint'] === 'absent') {
         return [$observed['fingerprint'] === 'absent' ? 'target deleted' : 'target recreated'];
@@ -401,7 +401,80 @@ function wppilot_change_digest_diff(array $expected, array $observed): array
         }
     }
 
-    return array_slice($names, 0, 20);
+    return array_slice($names, 0, max(1, $limit));
+}
+
+/**
+ * The object a target names, whichever shape of it a before-image holds.
+ *
+ * A whole-post snapshot (`post:12`) and a post-partial one (`post-partial:12:m._yoast_wpseo_title`)
+ * are different targets, since only snapshots of one shape compare, but the same post: a session
+ * that updates a post and then sets its SEO title writes both.
+ */
+function wppilot_change_target_object(string $target): string
+{
+    return preg_match('/^post-partial:(\d+):/', $target, $match) === 1 ? 'post:' . $match[1] : $target;
+}
+
+/**
+ * Whether every difference between two states of one target lies in parts this session writes
+ * through its other targets on the same object.
+ *
+ * Then the difference is the session's own doing, not a conflict: undoing (or redoing) the session
+ * in order puts those parts back before this target is reached, and the check made just before
+ * this target is touched (wppilot_session_undo_one(), wppilot_session_redo_one()) compares the
+ * whole state again. States without per-part hashes never qualify.
+ *
+ * @param array{fingerprint: string, parts: array<string, string>} $expected
+ * @param array{fingerprint: string, parts: array<string, string>} $observed
+ * @param array<string, true> $covered
+ */
+function wppilot_session_difference_is_own(array $expected, array $observed, array $covered): bool
+{
+    if ($covered === [] || $expected['parts'] === [] || $observed['parts'] === []) {
+        return false;
+    }
+    foreach (wppilot_change_digest_diff($expected, $observed, PHP_INT_MAX) as $name) {
+        if (!isset($covered[$name])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * The parts this session writes to a target's object through its other targets.
+ *
+ * @param array<string, array<string, array<string, true>>> $written Object, then target, then part names.
+ * @return array<string, true>
+ */
+function wppilot_session_covered_parts(array $written, string $target): array
+{
+    $covered = [];
+    foreach ($written[wppilot_change_target_object($target)] ?? [] as $other => $parts) {
+        if ($other !== $target) {
+            $covered += $parts;
+        }
+    }
+
+    return $covered;
+}
+
+/**
+ * Record the parts a row writes, for wppilot_session_covered_parts().
+ *
+ * @param array<string, array<string, array<string, true>>> $written
+ * @param array{fingerprint: string, parts: array<string, string>}|null $after
+ */
+function wppilot_session_note_written(array &$written, string $target, ?array $after): void
+{
+    if ($target === '' || $after === null) {
+        return;
+    }
+    foreach (array_keys($after['parts']) as $name) {
+        $written[wppilot_change_target_object($target)][$target][(string) $name] = true;
+    }
 }
 
 /**
@@ -708,6 +781,8 @@ function wppilot_session_plan_undo(string $session, array $rows, array $current)
     $plan = ['pending' => [], 'conflicts' => [], 'irreversible' => [], 'unchecked' => [], 'already' => 0];
     /** @var array<string, array<string, mixed>> $newer Per target, the newest pending row seen so far. */
     $newer = [];
+    /** @var array<string, array<string, array<string, true>>> $written Parts newer pending rows write, per object and target. */
+    $written = [];
     foreach ($rows as $row) {
         if ($row['status'] === 'rolled-back') {
             $plan['already']++;
@@ -729,18 +804,26 @@ function wppilot_session_plan_undo(string $session, array $rows, array $current)
             $now = $current[$target] ?? null;
             if ($now === null) {
                 $plan['unchecked'][] = wppilot_session_row_brief($row, ['reason' => 'The target\'s current state could not be read.']);
-            } elseif (!hash_equals($after['fingerprint'], $now['fingerprint'])) {
+            } elseif (
+                !hash_equals($after['fingerprint'], $now['fingerprint'])
+                && !wppilot_session_difference_is_own($after, $now, wppilot_session_covered_parts($written, $target))
+            ) {
                 $plan['conflicts'][] = wppilot_session_conflict($session, $row, $after, $now, 'changed-since');
             }
         } else {
             // An older session write to the same target: the newer write's before-image must be
             // exactly what this one left, or something else wrote to it in between.
             $before = $newer[$target]['before'];
-            if (is_array($before) && !hash_equals($after['fingerprint'], $before['fingerprint'])) {
+            if (
+                is_array($before)
+                && !hash_equals($after['fingerprint'], $before['fingerprint'])
+                && !wppilot_session_difference_is_own($after, $before, wppilot_session_covered_parts($written, $target))
+            ) {
                 $plan['conflicts'][] = wppilot_session_conflict($session, $row, $after, $before, 'changed-between', (string) $newer[$target]['id']);
             }
         }
         $newer[$target] = $row;
+        wppilot_session_note_written($written, $target, $after);
     }
 
     return $plan;
@@ -758,6 +841,8 @@ function wppilot_session_plan_redo(string $session, array $rows, array $current)
     $plan = ['pending' => [], 'conflicts' => [], 'unavailable' => [], 'unchecked' => [], 'active' => 0];
     /** @var array<string, array<string, mixed>> $older Per target, the oldest pending row seen so far. */
     $older = [];
+    /** @var array<string, array<string, array<string, true>>> $written Parts older pending rows write back, per object and target. */
+    $written = [];
     foreach (array_reverse($rows) as $row) {
         if ($row['status'] !== 'rolled-back') {
             $plan['active']++;
@@ -779,18 +864,26 @@ function wppilot_session_plan_redo(string $session, array $rows, array $current)
             $now = $current[$target] ?? null;
             if ($now === null) {
                 $plan['unchecked'][] = wppilot_session_row_brief($row, ['reason' => 'The target\'s current state could not be read.']);
-            } elseif (!hash_equals($undone['fingerprint'], $now['fingerprint'])) {
+            } elseif (
+                !hash_equals($undone['fingerprint'], $now['fingerprint'])
+                && !wppilot_session_difference_is_own($undone, $now, wppilot_session_covered_parts($written, $target))
+            ) {
                 $plan['conflicts'][] = wppilot_session_conflict($session, $row, $undone, $now, 'changed-since-undo');
             }
         } else {
             // A newer write to the same target: redoing the older one must land exactly where this
             // one's undo left off.
             $redo = $older[$target]['redo'];
-            if (is_array($redo) && !hash_equals($undone['fingerprint'], $redo['fingerprint'])) {
+            if (
+                is_array($redo)
+                && !hash_equals($undone['fingerprint'], $redo['fingerprint'])
+                && !wppilot_session_difference_is_own($undone, $redo, wppilot_session_covered_parts($written, $target))
+            ) {
                 $plan['conflicts'][] = wppilot_session_conflict($session, $row, $undone, $redo, 'changed-between', (string) $older[$target]['id']);
             }
         }
         $older[$target] = $row;
+        wppilot_session_note_written($written, $target, is_array($row['after']) ? $row['after'] : null);
     }
 
     return $plan;
