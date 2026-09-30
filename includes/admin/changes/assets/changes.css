@@ -113,3 +113,30 @@
 		justify-content: flex-start;
 	}
 }
+
+.wppilot-changes__session,
+.wppilot-changes__sessions {
+	margin: 0 0 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	border-radius: 6px;
+}
+
+.wppilot-changes__sessions h2 {
+	margin-top: 0;
+	font-size: 14px;
+}
+
+.wppilot-changes__session-facts {
+	margin: 0 0 0.75rem;
+}
+
+.wppilot-changes__session-conflict {
+	color: #b32d2e;
+}
+
+.wppilot-changes__session form {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}

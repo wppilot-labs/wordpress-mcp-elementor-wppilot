@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: WordPress MCP server with free Elementor MCP editing. Connects Claude, Codex, Cursor and other AI clients to typed WordPress abilities over MCP, with OAuth 2.1, safety profiles, change evidence and rollback.
- * Version: 1.15.1
+ * Version: 1.16.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -258,10 +258,12 @@ require_once __DIR__ . '/includes/gate-pipeline.php';
 require_once __DIR__ . '/includes/confirmation.php';
 require_once __DIR__ . '/includes/change-log.php';
 require_once __DIR__ . '/includes/change-log-table.php';
+require_once __DIR__ . '/includes/change-sessions.php';
 require_once __DIR__ . '/includes/clients.php';
 require_once __DIR__ . '/includes/connections.php';
 require_once __DIR__ . '/includes/tokens.php';
 require_once __DIR__ . '/includes/agent-identities.php';
+require_once __DIR__ . '/includes/agent-sessions.php';
 require_once __DIR__ . '/includes/ledger-map.php';
 require_once __DIR__ . '/includes/privacy.php';
 require_once __DIR__ . '/includes/rest/transport-hardening.php';
@@ -327,6 +329,9 @@ require_once __DIR__ . '/includes/admin/sidebar.php';
 require_once __DIR__ . '/includes/prompt-library/packs.php';
 require_once __DIR__ . '/includes/prompt-library/admin.php';
 require_once __DIR__ . '/includes/oauth/bootstrap.php';
+// `wp wppilot mcp serve`. Registers nothing outside WP-CLI.
+require_once __DIR__ . '/includes/cli/mcp-serve.php';
+\WPPilot\Cli\McpServe\register();
 require_once __DIR__ . '/includes/troubleshoot/bootstrap.php';
 require_once __DIR__ . '/includes/admin/instructions.php';
 require_once __DIR__ . '/includes/admin/settings.php';

@@ -54,8 +54,9 @@ final class KitRuntimeTest extends TestCase
     {
         return [
             'same major, older minor' => ['^1.0', true],
-            'same major and minor' => ['^1.1', true],
-            'newer minor than the runtime' => ['^1.2', false],
+            'same major, the previous minor' => ['^1.1', true],
+            'same major and minor' => ['^1.2', true],
+            'newer minor than the runtime' => ['^1.3', false],
             'other major' => ['^2.0', false],
             'no caret' => ['1.0', false],
             'garbage' => ['latest', false],

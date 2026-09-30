@@ -1,0 +1,52 @@
+{
+    "slug": "security-status",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\SecurityStatus",
+    "tier": "free",
+    "runtime": "^1.2",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "any": {
+            "constants": [
+                "WORDFENCE_VERSION"
+            ],
+            "classes": [
+                "wordfence",
+                "ITSEC_Core"
+            ]
+        }
+    },
+    "categories": {
+        "security": {
+            "label": "Security",
+            "description": "What the site's security plugin (Wordfence, Solid Security) reports: whether its firewall, scans and login protection are on, the open findings from its latest scan, and who it is blocking. Read-only. IPs are truncated to their network, usernames masked and email addresses removed."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/security-plugin-status",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/security-scan-findings",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        },
+        {
+            "name": "wppilot/security-lockouts",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        }
+    ],
+    "skills": [
+        "security-status"
+    ],
+    "tests": [
+        "tests/Unit/Kits/SecurityStatus"
+    ]
+}

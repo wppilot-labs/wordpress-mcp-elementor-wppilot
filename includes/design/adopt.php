@@ -296,31 +296,32 @@ function to_markdown(string $name, array $gathered): string
 {
     $lines = ['---', 'name: ' . scrub($name)];
 
-    /** @var array<string, string> $colors */
+    /** @var array<array-key, string> $colors */
     $colors = $gathered['colors'];
     if ($colors !== []) {
         $lines[] = 'colors:';
         foreach (array_slice($colors, offset: 0, length: 24, preserve_keys: true) as $key => $value) {
-            $lines[] = sprintf('  %s: "%s"', scrub($key), scrub($value));
+            $lines[] = sprintf('  %s: "%s"', scrub((string) $key), scrub($value));
         }
     }
-    /** @var array<string, array<string, string>> $typography */
+    /** @var array<array-key, array<string, string>> $typography */
     $typography = $gathered['typography'];
     if ($typography !== []) {
         $lines[] = 'typography:';
         foreach (array_slice($typography, offset: 0, length: 8, preserve_keys: true) as $role => $props) {
-            $lines[] = sprintf('  %s:', scrub($role));
+            $lines[] = sprintf('  %s:', scrub((string) $role));
             foreach ($props as $prop => $value) {
                 $lines[] = sprintf('    %s: "%s"', $prop, scrub((string) $value));
             }
         }
     }
-    /** @var array<string, string> $spacing */
+    /** @var array<array-key, string> $spacing */
     $spacing = $gathered['spacing'];
     if ($spacing !== []) {
         $lines[] = 'spacing:';
         foreach (array_slice($spacing, offset: 0, length: 10, preserve_keys: true) as $key => $value) {
-            $lines[] = sprintf('  %s: "%s"', scrub($key), scrub($value));
+            // PHP turns a numeric slug such as Twenty Twenty-Five's "20" into an int key.
+            $lines[] = sprintf('  %s: "%s"', scrub((string) $key), scrub($value));
         }
     }
     $lines[] = '---';

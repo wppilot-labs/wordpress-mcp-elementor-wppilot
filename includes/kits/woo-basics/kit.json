@@ -1,0 +1,49 @@
+{
+    "slug": "woo-basics",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\WooBasics",
+    "tier": "free",
+    "runtime": "^1.2",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "classes": ["WooCommerce"],
+        "functions": ["wc_get_orders", "wc_get_product"]
+    },
+    "vendor_storage": {
+        "option": [
+            "woocommerce_checkout_page_id",
+            "woocommerce_currency_pos",
+            "woocommerce_weight_unit",
+            "woocommerce_dimension_unit",
+            "woocommerce_store_address",
+            "woocommerce_store_address_2",
+            "woocommerce_store_city",
+            "woocommerce_store_postcode"
+        ],
+        "meta": ["thumbnail_id", "display_type", "order"]
+    },
+    "categories": {
+        "woocommerce": {
+            "label": "WooCommerce",
+            "description": "Abilities for the WooCommerce store: products, variations, categories and tags, store settings, orders and customers, and basic product edits."
+        }
+    },
+    "abilities": [
+        {"name": "wppilot/woocommerce-check-setup", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-list-products", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-get-product", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-list-product-variations", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-get-product-variation", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-list-product-categories", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-list-product-tags", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-get-store-settings", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-list-orders", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-get-order", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-list-customers", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-get-customer", "readonly": true, "destructive": false, "ledger": "self"},
+        {"name": "wppilot/woocommerce-edit-product", "readonly": false, "destructive": false, "ledger": "restore:kits/woo-basics-product"}
+    ],
+    "skills": ["woo-basics"],
+    "tests": ["tests/Unit/Kits/WooBasics"]
+}

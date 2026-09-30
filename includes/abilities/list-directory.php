@@ -88,6 +88,10 @@ wp_register_ability('wppilot/list-directory', [
     'meta' => [
         'show_in_rest' => true,
         'mcp' => ['public' => true],
+        // A read, so the risk class alone would let it run on Production Safe and even Read
+        // Only, where it could read wp-config.php: the database password and the auth salts.
+        // Those profiles promise no server filesystem access, so it is Developer Full Access only.
+        'safety' => ['min_profile' => 'developer', 'audit_reads' => true],
         'annotations' => [
             'instructions' => 'TIP: AI-written PHP plugins live in wp-content/wppilot-sandbox/. Check wp-content/wppilot-sandbox/.crashed to see if safe mode is active.',
             'readonly' => true,

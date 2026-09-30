@@ -745,6 +745,7 @@ function wppilot_dashboard_client_card(array $client): void
         'password' => __('Application password', domain: 'wppilot'),
         'oauth' => __('OAuth', domain: 'wppilot'),
         'token' => __('Access token', domain: 'wppilot'),
+        'stdio' => __('WP-CLI stdio', domain: 'wppilot'),
     ];
     $methods = [];
     foreach ($client['methods'] as $method) {

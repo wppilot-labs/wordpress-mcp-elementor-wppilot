@@ -26,8 +26,11 @@ if (!defined('ABSPATH')) {
  * than loading code written against a different contract.
  *
  * 1.1 added require_profile() and the ProfileGate host interface.
+ * 1.2 added unclaimed(), for kits that carry an ability another plugin may already register, and
+ * kit.json `requires.any`, for kits that serve whichever of several plugins is active, and the
+ * SessionLedger host interface, for kits whose restore types a session undo should check and redo.
  */
-const API_VERSION = '1.1';
+const API_VERSION = '1.2';
 
 require_once __DIR__ . '/host.php';
 require_once __DIR__ . '/ledger/post-partial.php';
@@ -59,6 +62,27 @@ function has_host(): bool
     } catch (\LogicException) {
         return false;
     }
+}
+
+/**
+ * Whether this copy may register an ability under this name: false when something registered it
+ * first.
+ *
+ * Some kits carry abilities an older release of a companion plugin still registers itself under
+ * the same name — WPPilot 1.16.0 took the WooCommerce reads, the backup and security status
+ * reads, the basic per-post SEO and form reads and the scheduled audits from Pro 1.10.0, which
+ * keeps registering its own copies until its next release, and a richer Pro version of a write
+ * keeps its name on purpose. Registering a name twice is refused by core with a doing_it_wrong
+ * notice on every request, so the kit checks first and stands aside: the first registration
+ * wins, and on a WPPilot site that is Pro's, which loads its integrations at
+ * wp_abilities_api_init priority 10, ahead of the kit loader's 20.
+ *
+ * A kit that stands aside must also leave the name's ledger capture alone, since the ability that
+ * runs is not its own: call Ledger::capture_for() only inside the same check.
+ */
+function unclaimed(string $ability_name): bool
+{
+    return !wp_has_ability($ability_name);
 }
 
 /**
@@ -225,7 +249,12 @@ function discover(string $kits_dir): array
         $manifest['dir'] = $dir;
         $found[] = $manifest;
     }
-    usort($found, static fn(array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
+    // Pro-tier kits first, then by slug. A Pro kit can carry a richer copy of an ability a Free kit
+    // also carries (the SEO plugins' per-post edits), and the Free copy stands aside through
+    // unclaimed() for whichever registered first. Inside WPPilot, Pro registers ahead of the kit
+    // loader anyway; an export that carries both tiers gets the same winner this way.
+    usort($found, static fn(array $a, array $b): int => [($a['tier'] ?? '') === 'pro' ? 0 : 1, (string) $a['slug']]
+        <=> [($b['tier'] ?? '') === 'pro' ? 0 : 1, (string) $b['slug']]);
     return $found;
 }
 
@@ -260,6 +289,21 @@ function incompatibility(array $manifest): string
         if (!function_exists((string) $function)) {
             return sprintf('needs %s(), which is not available', (string) $function);
         }
+    }
+    // `any`: a kit that serves whichever of several plugins is active (the SEO, form, backup and
+    // security kits) needs one of them, named by a constant, class or function it defines.
+    $any = is_array($requires['any'] ?? null) ? $requires['any'] : [];
+    if ($any !== []) {
+        $named = [];
+        foreach (['constants' => 'defined', 'classes' => 'class_exists', 'functions' => 'function_exists'] as $kind => $check) {
+            foreach (is_array($any[$kind] ?? null) ? $any[$kind] : [] as $symbol) {
+                if ($check((string) $symbol)) {
+                    return '';
+                }
+                $named[] = (string) $symbol;
+            }
+        }
+        return sprintf('needs one of %s, and none is active', implode(', ', $named));
     }
     return '';
 }

@@ -376,3 +376,27 @@ function wppilot_admin_tab_label(string $title, string $fallback): string
 
     return $label === '' ? $fallback : $label;
 }
+
+/**
+ * Give WPPilot's link-only screens (approval, OAuth consent, Block Editor Queue, visual runtime,
+ * connected apps) their title.
+ *
+ * They are registered with no parent so they stay out of the menu, and get_admin_page_title()
+ * never looks there, so it leaves the global null. admin-header.php then passes that null to
+ * strip_tags(), which PHP 8.1 and later report as deprecated on every visit.
+ */
+function wppilot_title_hidden_admin_page(): void
+{
+    global $title, $plugin_page, $submenu;
+
+    if (!empty($title) || !is_string($plugin_page) || !str_starts_with($plugin_page, 'wppilot')) {
+        return;
+    }
+    foreach (is_array($submenu[''] ?? null) ? $submenu[''] : [] as $item) {
+        if (is_array($item) && ($item[2] ?? null) === $plugin_page && is_string($item[3] ?? null)) {
+            $title = $item[3];
+            return;
+        }
+    }
+}
+add_action('admin_init', 'wppilot_title_hidden_admin_page');

@@ -811,6 +811,8 @@ function wordpress_delete_theme(array $input): array|WP_Error
     }
 
     require_once ABSPATH . 'wp-admin/includes/file.php';
+    // delete_theme() lives here, and wp-admin/includes is not loaded on a REST or MCP request.
+    require_once ABSPATH . 'wp-admin/includes/theme.php';
 
     $summary = wordpress_theme_summary($theme);
     /** @var mixed $deleted */

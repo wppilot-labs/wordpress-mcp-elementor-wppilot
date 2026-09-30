@@ -18,7 +18,8 @@ copy can run beside WPPilot's own is `scripts/test-kit-coexistence.php`.
 | `runtime` | The runtime major it is written against, as `^1.0`. |
 | `requires.php`, `requires.wp` | Minimum versions; the runtime skips the kit below them and says why. |
 | `requires.classes`, `requires.functions` | What the vendor plugin must provide; the kit is skipped while it is inactive. |
-| `requires.kits` | Other kits this one runs or reads (Pro's `routines` runs `a11y-audit` and `content-audit`). The exporter adds them to every export of this kit, transitively. A Free kit may only require Free kits. |
+| `requires.any` | `{"constants": [], "classes": [], "functions": []}`: for a kit serving whichever of several plugins is active, the symbols of which at least one must exist; the kit is skipped while none does. The coexistence check stands every one of them in, so all the kit's vendor files register there. Runtime 1.2. |
+| `requires.kits` | Other kits this one runs or reads (`scheduled-audits` runs `a11y-audit` and `content-audit`). The exporter adds them to every export of this kit, transitively. A Free kit may only require Free kits. |
 | `vendor_storage` | Storage names another plugin owns that this kit reads or writes, by kind: `{"option": [], "meta": [], "transient": [], "cron": []}`. See below. |
 | `categories` | Ability categories the kit registers when the host has not. |
 | `abilities` | Every ability the kit registers, with `readonly`, `destructive` and `ledger`. |

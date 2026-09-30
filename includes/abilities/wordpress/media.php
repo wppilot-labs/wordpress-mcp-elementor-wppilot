@@ -235,7 +235,7 @@ function wordpress_import_media_url(array $input): array|WP_Error
         update_post_meta(
             (int) $attachment_id,
             meta_key: '_wp_attachment_image_alt',
-            meta_value: (string) $input['alt'],
+            meta_value: wp_slash((string) $input['alt']),
         );
     }
     $attachment = get_post((int) $attachment_id);
@@ -271,7 +271,7 @@ function wordpress_update_media(array $input): array|WP_Error
         }
     }
     if (array_key_exists('alt', $input)) {
-        update_post_meta($attachment_id, meta_key: '_wp_attachment_image_alt', meta_value: (string) $input['alt']);
+        update_post_meta($attachment_id, meta_key: '_wp_attachment_image_alt', meta_value: wp_slash((string) $input['alt']));
     }
     $updated_attachment = get_post($attachment_id);
     return (

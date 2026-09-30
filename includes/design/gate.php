@@ -86,6 +86,8 @@ const EXEMPT_PREFIXES = [
     'wppilot/read-file',
     'wppilot/delete-file',
     'wppilot/rollback-change',
+    'wppilot/undo-session',
+    'wppilot/redo-session',
 ];
 
 /** The configured mode, defaulting to off. */

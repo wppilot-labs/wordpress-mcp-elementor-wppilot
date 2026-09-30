@@ -19,6 +19,7 @@ declare(strict_types=1);
  *   web-apps.php          the browser-based AI apps, grouped by app rather than credential
  *   client-configs.php    generated config for each supported client
  *   token-configs.php     generated config for the Access token method
+ *   stdio-panel.php       the local WP-CLI stdio connection (wp wppilot mcp serve)
  *   page.php              the top-level render and shared sections
  */
 
@@ -36,4 +37,5 @@ require_once __DIR__ . '/tokens-panel.php';
 require_once __DIR__ . '/web-apps.php';
 require_once __DIR__ . '/client-configs.php';
 require_once __DIR__ . '/token-configs.php';
+require_once __DIR__ . '/stdio-panel.php';
 require_once __DIR__ . '/page.php';

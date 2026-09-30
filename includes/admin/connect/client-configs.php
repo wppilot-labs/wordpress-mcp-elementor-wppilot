@@ -107,6 +107,113 @@ function wppilot_build_npx_server(string $rest_url, string $username, string $di
 }
 
 /**
+ * Config-file locations shared by the three connection methods.
+ *
+ * Kept in one place because each method's builder used to restate them, and a
+ * vendor moving a file then needed three identical edits — the ones below had
+ * drifted into being wrong in all three at once. Each carries the vendor page
+ * it was checked against.
+ */
+
+/**
+ * Devin Desktop (formerly Windsurf). Devin's MCP page gives the ~/.config/devin
+ * path; its transition FAQ says the app still reads the legacy Windsurf/Codeium
+ * locations, so a Windsurf install that has not updated keeps working there.
+ * Sources, checked 2026-09-30: https://docs.devin.ai/desktop/cascade/mcp and
+ * https://docs.devin.ai/desktop/devin-desktop-faq
+ *
+ * @return array<string, string>
+ */
+function wppilot_devin_desktop_paths(): array
+{
+    return [
+        'Devin Desktop — macOS / Linux' => '~/.config/devin/mcp_config.json',
+        'Devin Desktop — Windows' => '%APPDATA%\\devin\\mcp_config.json',
+        __('Windsurf (before the rename)', domain: 'wppilot') => '~/.codeium/windsurf/mcp_config.json',
+    ];
+}
+
+/**
+ * Copilot CLI. Source, checked 2026-09-30:
+ * https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+ *
+ * @return array<string, string>
+ */
+function wppilot_copilot_cli_paths(): array
+{
+    return [
+        __('User', domain: 'wppilot') => '~/.copilot/mcp-config.json',
+        __('Project (committed)', domain: 'wppilot') => '.github/mcp.json',
+        __('Project (local)', domain: 'wppilot') => '.mcp.json',
+    ];
+}
+
+/**
+ * Kimi Code CLI. Source, checked 2026-09-30:
+ * https://moonshotai.github.io/kimi-code/en/customization/mcp.html
+ *
+ * @return array<string, string>
+ */
+function wppilot_kimi_code_paths(): array
+{
+    return [
+        __('Global', domain: 'wppilot') => '~/.kimi-code/mcp.json',
+        __('Project', domain: 'wppilot') => '.kimi-code/mcp.json',
+    ];
+}
+
+/**
+ * Kilo Code. Source, checked 2026-09-30:
+ * https://kilo.ai/docs/automate/mcp/using-in-kilo-code
+ *
+ * @return array<string, string>
+ */
+function wppilot_kilo_code_paths(): array
+{
+    return [
+        __('Global', domain: 'wppilot') => '~/.config/kilo/kilo.jsonc',
+        __('Project', domain: 'wppilot') => 'kilo.jsonc',
+    ];
+}
+
+/**
+ * Kiro, then the Amazon Q Developer files it replaces. Sources, checked
+ * 2026-09-30: https://kiro.dev/docs/mcp/configuration/ and
+ * https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html
+ *
+ * @return array<string, string>
+ */
+function wppilot_amazon_q_kiro_paths(): array
+{
+    return [
+        'Kiro — ' . __('Global', domain: 'wppilot') => '~/.kiro/settings/mcp.json',
+        'Kiro — ' . __('Workspace', domain: 'wppilot') => '.kiro/settings/mcp.json',
+        'Amazon Q — ' . __('Global', domain: 'wppilot') => '~/.aws/amazonq/mcp.json',
+        'Amazon Q — ' . __('Project', domain: 'wppilot') => '.amazonq/mcp.json',
+    ];
+}
+
+/**
+ * Zed. The settings file is opened with the `zed: open settings file` action.
+ *
+ * @return array<string, string>
+ */
+function wppilot_zed_paths(): array
+{
+    return ['macOS / Linux' => '~/.config/zed/settings.json'];
+}
+
+/**
+ * OpenClaw. Source, checked 2026-09-30: https://docs.openclaw.ai/gateway/configuration
+ *
+ * @return array<string, string>
+ */
+function wppilot_openclaw_paths(): array
+{
+    return [__('Global', domain: 'wppilot') => '~/.openclaw/openclaw.json'];
+}
+
+/**
  * Build the MCPB bundle manifest (manifest.json contents) for this site.
  *
  * The bundle wraps the same npx proxy used by the JSON snippets, with the
@@ -161,19 +268,22 @@ function wppilot_build_mcpb_manifest(
     ];
 }
 
-/** @param array<string, mixed> $npx_server */
+/**
+ * Zed local server: `command`, `args`, `env` under `context_servers`. The
+ * `source: "custom"` marker is no longer in Zed's documentation.
+ * Source, checked 2026-09-30: https://zed.dev/docs/ai/mcp
+ *
+ * @param array<string, mixed> $npx_server
+ */
 function wppilot_build_zed_json(string $mcp_name, array $npx_server, int $opts): string
 {
-    return (string) json_encode([
-        'context_servers' => [
-            $mcp_name => array_merge([
-                'source' => 'custom',
-                'enabled' => true,
-            ], $npx_server),
-        ],
-    ], $opts);
+    return (string) json_encode(['context_servers' => [$mcp_name => $npx_server]], $opts);
 }
 
+/**
+ * OpenCode local server. Kilo Code uses the identical `mcp` / `local` shape in
+ * kilo.jsonc, so it shares this builder.
+ */
 function wppilot_build_opencode_json(
     string $mcp_name,
     string $rest_url,
@@ -336,6 +446,34 @@ function wppilot_build_configs(string $rest_url, string $username, string $displ
             ],
             'isShell' => false,
         ],
+        'kilo-code' => [
+            'code' => wppilot_build_opencode_json($mcp_name, $rest_url, $username, $display_password, $opts),
+            'hint' => sprintf($add_to, '<code>kilo.jsonc</code>'),
+            'paths' => wppilot_kilo_code_paths(),
+            'isShell' => false,
+        ],
+        // Copilot CLI marks a stdio server `type: "local"` and requires `tools`.
+        'github-copilot' => [
+            'code' => (string) json_encode([
+                'mcpServers' => [$mcp_name => array_merge(['type' => 'local'], $npx_server, ['tools' => ['*']])],
+            ], $opts),
+            'hint' => sprintf(
+                /* translators: %s: config file name wrapped in <code> tags */
+                __(
+                    'For Copilot CLI: add to %s. Copilot Chat in VS Code reads the VS Code configuration instead — use the VS Code tab.',
+                    domain: 'wppilot',
+                ),
+                '<code>mcp-config.json</code>',
+            ),
+            'paths' => wppilot_copilot_cli_paths(),
+            'isShell' => false,
+        ],
+        'openclaw' => [
+            'code' => (string) json_encode(['mcp' => ['servers' => [$mcp_name => $npx_server]]], $opts),
+            'hint' => sprintf($add_to, '<code>openclaw.json</code>'),
+            'paths' => wppilot_openclaw_paths(),
+            'isShell' => false,
+        ],
     ];
 
     return array_merge(
@@ -398,10 +536,7 @@ function wppilot_build_standard_configs(string $mcp_servers_json, string $vscode
         'windsurf' => [
             'code' => $mcp_servers_json,
             'hint' => sprintf($add_to, '<code>mcp_config.json</code>'),
-            'paths' => [
-                'macOS / Linux' => '~/.codeium/windsurf/mcp_config.json',
-                'Windows' => '%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json',
-            ],
+            'paths' => wppilot_devin_desktop_paths(),
             'isShell' => false,
         ],
         'cline' => [
@@ -427,33 +562,10 @@ function wppilot_build_standard_configs(string $mcp_servers_json, string $vscode
             ],
             'isShell' => false,
         ],
-        'kilo-code' => [
-            'code' => $mcp_servers_json,
-            'hint' => sprintf($add_to, '<code>mcp.json</code>'),
-            'paths' => [
-                __('Project', domain: 'wppilot') => '.kilocode/mcp.json',
-                __('Via UI', domain: 'wppilot') => __(
-                    'Kilo Code sidebar → MCP Servers → Configure MCP Servers',
-                    domain: 'wppilot',
-                ),
-            ],
-            'isShell' => false,
-        ],
-        'github-copilot' => [
-            'code' => $vscode_servers_json,
-            'hint' => sprintf($add_to, '<code>mcp.json</code>'),
-            'paths' => [
-                __('Project', domain: 'wppilot') => '.github/copilot/mcp.json',
-            ],
-            'isShell' => false,
-        ],
         'amazon-q' => [
             'code' => $mcp_servers_json,
             'hint' => sprintf($add_to, '<code>mcp.json</code>'),
-            'paths' => [
-                __('Global', domain: 'wppilot') => '~/.aws/amazonq/mcp.json',
-                __('Project', domain: 'wppilot') => '.amazonq/mcp.json',
-            ],
+            'paths' => wppilot_amazon_q_kiro_paths(),
             'isShell' => false,
         ],
         'antigravity-cli' => [
@@ -496,7 +608,7 @@ function wppilot_build_cli_agent_configs(string $mcp_servers_json): array
         'kimi-cli' => [
             'code' => $mcp_servers_json,
             'hint' => sprintf($add_to, '<code>mcp.json</code>'),
-            'paths' => [__('Global', domain: 'wppilot') => '~/.kimi/mcp.json'],
+            'paths' => wppilot_kimi_code_paths(),
             'isShell' => false,
         ],
         // Qwen Code and Gemini CLI put MCP servers in settings.json. The

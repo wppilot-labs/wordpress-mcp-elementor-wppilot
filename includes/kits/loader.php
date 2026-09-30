@@ -60,6 +60,9 @@ function report(): array
 
 require_once __DIR__ . '/_runtime/runtime.php';
 require_once __DIR__ . '/_runtime/hosts/wppilot.php';
+// The scheduled-audits kit's WPPilot side: it answers whether WPPilot Pro 1.10.0 still runs this
+// site's routines before the kits boot, so it loads here, on every request, not with the screens.
+require_once dirname(__DIR__) . '/admin/routines.php';
 
 // After every plugin file is loaded, so a kit's `requires.classes` sees WooCommerce and friends;
 // before init, so kit abilities are queued before the Abilities API collects them.

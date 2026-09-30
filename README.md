@@ -108,6 +108,33 @@ An access token borrows the capabilities of the user who created it, and that ch
 
 None of the three is a product licence. WPPilot needs no activation key, entitlement check or subscription service to run.
 
+### Local connection over WP-CLI (stdio)
+
+A client that runs on the same machine as the site - Claude Code, Cursor, a CI job - can start WPPilot itself instead of connecting over HTTP, with no credential to create. `wp wppilot mcp serve` serves the same MCP server as `/wp-json/mcp/wppilot` over stdin/stdout, as the WordPress user named in WP-CLI's `--user`, with the same abilities, safety profile, confirmations and permission checks:
+
+```bash
+# Claude Code
+claude mcp add wppilot-local -- wp --path=/var/www/html wppilot mcp serve --user=admin
+
+# WordPress in Docker
+claude mcp add wppilot-local -- docker exec -i <container> wp --path=/var/www/html wppilot mcp serve --user=admin
+```
+
+Cursor and other clients that take a command (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "wppilot-local": {
+      "command": "wp",
+      "args": ["--path=/var/www/html", "wppilot", "mcp", "serve", "--user=admin"]
+    }
+  }
+}
+```
+
+The **Connect** screen shows these with this site's path and your login filled in. Nothing is written to stdout except protocol messages, and each process is one agent session on the Changes screen.
+
 ## Safety model
 
 | Profile | What it allows |
@@ -118,11 +145,13 @@ None of the three is a product licence. WPPilot needs no activation key, entitle
 
 On top of the profile: WordPress user capabilities still apply, individual abilities can be switched off, destructive operations require an explicit confirmation flag, writes are rate-limited per credential, and supported changes are recorded in a redacted change ledger with rollback.
 
+**Undo a whole agent session.** Every write an agent makes is filed under its session - one MCP connection, one `wp wppilot mcp serve` process, or one credential and client until it has been idle for 30 minutes. `wppilot/undo-session` (or **Undo session** on the Changes screen) takes back everything that session did, newest first, verifying each change against its before-image. It refuses without touching anything when something else changed a target after the session did, stops at the first change that fails verification and says exactly what was and was not undone, and never skips a change that cannot be undone without saying so. `wppilot/redo-session` puts an undone session back, under the same checks. `wppilot/list-sessions` shows each session and what undo and redo would do right now.
+
 Every ledger entry names the agent behind the write, not only the WordPress user. Claude Code, Cursor and Codex usually connect as the same administrator, so the user alone cannot answer which of them made a change: the OAuth client id or application-password UUID can, and it is what the ledger records, alongside the client name the agent introduced itself with. A write with no agent behind it - wp-admin, WP-CLI, cron - is recorded as `direct` rather than credited to the last agent seen. OAuth client ids are stored hashed.
 
 ## What the free plugin can do
 
-168 registered abilities on a fresh install, plus one MCP prompt per skill you save. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+216 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, and developer abilities only under Developer Full Access, so a fresh install with none of those plugins registers 154 on the default profile. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -140,7 +169,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Design system** | `19` | Typed design tokens, saved designs and activation, plus the checks that grade a built page against them: contrast, composition, layout grammars and a rendered-page verification pass. |
 | **Preview** | `8` | Compute what a write would change without performing it, then apply the reviewed result. Plus a view link, so an agent with a browser can look at the page it built - including one still in draft - and a capture store that compares two screenshots of a page and reports which regions moved. |
 | **Skills** | `4` + prompts | Reusable skills and site-wide instructions. Each saved skill also registers one MCP prompt, so this grows with the skills you write. |
-| **Changes** | `5` | Read the redacted change ledger, attributed to the agent credential that made each write, export it as rows for a client report or an audit, and roll a change back. |
+| **Changes** | `8` | Read the redacted change ledger, attributed to the agent credential that made each write, export it as rows for a client report or an audit, roll a change back, and undo or redo everything one agent session did. |
 | **Diagnostics** | `4` | Scoped health, performance and configuration-security checks, and a Connection Doctor that finds what blocks an MCP client (firewalls, a stripped Authorization header, disabled Application Passwords) and names the fix. |
 | **Search and replace** | `4` | Preview a search-and-replace across posts and their meta (serialized and builder JSON included) as a reviewed plan, apply only posts unchanged since, 100 per call or as a background job, cancel it, and undo one post or the whole run. |
 | **Media and accessibility** | `5` | Resize, crop, rotate or flip an image as a copy or in place, with undo. Audit a served page against WCAG 2.2, find images with missing or filename alt text, show an image to the model so it can write real alt text, and set alt text in bulk with undo. |
@@ -148,6 +177,11 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Block Notes** | `4` | Leave a note on a block for a person, reply, resolve, and read the notes they resolved. Every one can be undone. |
 | **Site tools** | `8` | WP-Cron list, run and delete (undoable), Site Health tests, transient flush, and - on Developer Full Access, audited - an options explorer and a read-only database SELECT with redaction. |
 | **Multisite** | `2` | List a network's sites and run an ability on one of them through that site's own safety profile and gates. Loads only on a multisite network. |
+| **WooCommerce** | `13` | Check the setup, list and read products, variations, categories, tags and store settings, read orders and customers, and edit one product's name, description, prices and stock with undo. Pro adds bulk prices and stock, order and customer writes, refunds, coupons, reports and full product editing. |
+| **SEO** | `14` | One post's SEO title, meta description and robots in Yoast SEO, Rank Math, All in One SEO, SEOPress, The SEO Framework, Slim SEO and SmartCrawl, read and set with undo. Pro adds focus keywords, canonicals, social previews, schema, redirects and bulk SEO. |
+| **Forms** | `8` | List the forms of WPForms, Contact Form 7, Gravity Forms and Forminator and read their entries with email addresses, phone numbers and sensitive fields withheld. Pro adds full values, exports and form editing. |
+| **Backups and security** | `5` | Backup status and history (UpdraftPlus, Duplicator, BackWPup); security plugin status, scan findings and lockouts with IPs shown as networks (Wordfence, Solid Security). Pro starts backups, holds risky calls until a fresh backup exists, hardens settings and blocks IPs. |
+| **Scheduled audits** | `5` | Routines that run the accessibility, content and alt-text audits on a schedule, store each report, compare it with the last and email what changed. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 
 Content creation is draft-first: an absent, blank or malformed status resolves to `draft` before any capability check, so nothing is published by accident. Capabilities are read from each post type's and taxonomy's own capability object, so a custom type declaring its own set is enforced on its own terms.
@@ -190,7 +224,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 88 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **168 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **216 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 88 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -199,14 +233,14 @@ The free plugin in this repository is a complete WordPress MCP server: connectio
 | **Page builders** | [Elementor](https://wppilot.co/integrations/elementor) `51` · [Bricks](https://wppilot.co/integrations/bricks) `49` · [Breakdance](https://wppilot.co/integrations/breakdance) `33` · [Divi](https://wppilot.co/integrations/divi) `47` · [Oxygen](https://wppilot.co/integrations/oxygen) `37` · [Beaver Builder](https://wppilot.co/integrations/beaver-builder) `21` · [WPBakery](https://wppilot.co/integrations/wpbakery) `18` · [Etch](https://wppilot.co/integrations/etch) `60` · [Mosaic](https://wppilot.co/integrations/mosaic) `41` · [Flatsome UX Builder](https://wppilot.co/integrations/flatsome) `11` |
 | **Blocks and site design** | [GenerateBlocks](https://wppilot.co/integrations/generateblocks) `3` · [Kadence Blocks](https://wppilot.co/integrations/kadenceblocks) `5` · [Spectra](https://wppilot.co/integrations/spectra) `20` · [Spectra One](https://wppilot.co/integrations/spectra-one) `22` |
 | **Themes** | [Astra](https://wppilot.co/integrations/astra) `34` · [Avada](https://wppilot.co/integrations/avada) `16` · [GeneratePress](https://wppilot.co/integrations/generatepress) `23` · [Kadence](https://wppilot.co/integrations/kadence) `5` · [OceanWP](https://wppilot.co/integrations/oceanwp) `15` · [WordPress Block Themes](https://wppilot.co/integrations/block-themes) `4` · [Blocksy](https://wppilot.co/integrations/blocksy) `4` · [Neve](https://wppilot.co/integrations/neve) `4` · [WoodMart](https://wppilot.co/integrations/woodmart) `4` |
-| **Commerce** | [WooCommerce](https://wppilot.co/integrations/woocommerce) `65` · [FunnelKit](https://wppilot.co/integrations/funnelkit) `4` |
-| **Forms** | [WPForms](https://wppilot.co/integrations/wpforms) `28` · [Gravity Forms](https://wppilot.co/integrations/gravityforms) `28` · [Fluent Forms](https://wppilot.co/integrations/fluentforms) `37` · [Formidable Forms](https://wppilot.co/integrations/formidable) `39` · [Contact Form 7](https://wppilot.co/integrations/contact-form-7) `9` · [Ninja Forms](https://wppilot.co/integrations/ninja-forms) `21` · [Forminator](https://wppilot.co/integrations/forminator) `4` · [WS Form](https://wppilot.co/integrations/ws-form) `4` |
+| **Commerce** | [WooCommerce](https://wppilot.co/integrations/woocommerce) `53` · [FunnelKit](https://wppilot.co/integrations/funnelkit) `4` |
+| **Forms** | [WPForms](https://wppilot.co/integrations/wpforms) `27` · [Gravity Forms](https://wppilot.co/integrations/gravityforms) `27` · [Fluent Forms](https://wppilot.co/integrations/fluentforms) `37` · [Formidable Forms](https://wppilot.co/integrations/formidable) `39` · [Contact Form 7](https://wppilot.co/integrations/contact-form-7) `8` · [Ninja Forms](https://wppilot.co/integrations/ninja-forms) `21` · [Forminator](https://wppilot.co/integrations/forminator) `3` · [WS Form](https://wppilot.co/integrations/ws-form) `4` |
 | **SEO suites** | [AIOSEO](https://wppilot.co/integrations/aioseo) `12` · [Rank Math](https://wppilot.co/integrations/rank-math) `8` · [SEOPress](https://wppilot.co/integrations/seopress) `16` · [Yoast SEO](https://wppilot.co/integrations/yoast) `10` · [The SEO Framework](https://wppilot.co/integrations/the-seo-framework) `3` · [Slim SEO](https://wppilot.co/integrations/slim-seo) `3` · [SmartCrawl](https://wppilot.co/integrations/smartcrawl) `3` |
 | **Custom data** | [Advanced Custom Fields](https://wppilot.co/integrations/acf) `23` · [ACPT](https://wppilot.co/integrations/acpt) `24` · [Admin and Site Enhancements](https://wppilot.co/integrations/ase) `18` · [JetEngine](https://wppilot.co/integrations/jetengine) `26` · [Meta Box](https://wppilot.co/integrations/meta-box) `32` · [Pods](https://wppilot.co/integrations/pods) `25` · [Dynamic Shortcodes](https://wppilot.co/integrations/dynamic-shortcodes) `9` |
 | **Localization** | [Weglot](https://wppilot.co/integrations/weglot) `19` · [WPML](https://wppilot.co/integrations/wpml) `8` · [Polylang](https://wppilot.co/integrations/polylang) `6` |
-| **Backups** | [UpdraftPlus](https://wppilot.co/integrations/updraftplus) `3` · [Duplicator](https://wppilot.co/integrations/duplicator) `3` · [BackWPup](https://wppilot.co/integrations/backwpup) `3` (one kit serves all three: status, history, start a backup, and an optional "require a fresh backup" hold on destructive calls) |
-| **Security** | [Wordfence](https://wppilot.co/integrations/wordfence) `8` · [Solid Security](https://wppilot.co/integrations/solid-security) `8` (status, scan findings, lockouts, a hardening plan you confirm, IP blocks, all undoable) |
-| **Site maintenance** | [Safe plugin and theme updates](https://wppilot.co/wordpress-ai-safe-updates) `3` (checks pages before and after, rolls back on its own) · [Scheduled audits](https://wppilot.co/use-cases/scheduled-site-audits) `5` · [Content fixes](https://wppilot.co/use-cases/fix-broken-links-with-ai) `2` |
+| **Backups** | [UpdraftPlus](https://wppilot.co/integrations/updraftplus) `1` · [Duplicator](https://wppilot.co/integrations/duplicator) `1` · [BackWPup](https://wppilot.co/integrations/backwpup) `1` (start a backup, and an optional "require a fresh backup" hold on destructive calls; status and history are free) |
+| **Security** | [Wordfence](https://wppilot.co/integrations/wordfence) `5` · [Solid Security](https://wppilot.co/integrations/solid-security) `5` (a hardening plan you confirm, IP blocks and scans, all undoable; status, findings and lockouts are free) |
+| **Site maintenance** | [Safe plugin and theme updates](https://wppilot.co/wordpress-ai-safe-updates) `3` (checks pages before and after, rolls back on its own) · [Content fixes](https://wppilot.co/use-cases/fix-broken-links-with-ai) `2` |
 | **Site operations** | [The Events Calendar](https://wppilot.co/integrations/the-events-calendar) `7` · [Paid Memberships Pro](https://wppilot.co/integrations/paid-memberships-pro) `5` · [Tutor LMS](https://wppilot.co/integrations/tutor-lms) `7` · [BuddyPress](https://wppilot.co/integrations/buddypress) `8` |
 | **Developer tools** | [Code Snippets](https://wppilot.co/integrations/code-snippets) `11` · [Bricksforge](https://wppilot.co/integrations/bricksforge) `21` |
 | **WordPress platform** | [WordPress extras](https://wppilot.co/integrations/wordpress) `23` · [Brand Kit](https://wppilot.co/integrations/brand-kit) `8` · [Agent Memory](https://wppilot.co/integrations/memory) `4` · [Pro skill library](https://wppilot.co/integrations/skills) `1` (skills themselves are free) |
@@ -332,7 +366,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 168 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 216 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.

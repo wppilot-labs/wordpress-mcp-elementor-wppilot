@@ -106,6 +106,9 @@ require_once dirname(__DIR__) . '/includes/oauth/middleware.php';
 // by reference, and only a real call proves the call sites still satisfy them.
 require_once dirname(__DIR__) . '/includes/change-log.php';
 require_once dirname(__DIR__) . '/includes/change-log-table.php';
+// Session undo and redo, and where a session id comes from. Both register nothing at file scope.
+require_once dirname(__DIR__) . '/includes/change-sessions.php';
+require_once dirname(__DIR__) . '/includes/agent-sessions.php';
 
 // Agent identities (a token's scope and profile ceiling) and the declarative
 // ledger map for third-party abilities. Both reach WordPress only from inside

@@ -98,6 +98,12 @@ function wppilot_connection_credential(string $method, int $user_id): ?array
         return wppilot_connection_token_credential();
     }
 
+    // `wp wppilot mcp serve`: no credential at all, only the user WP-CLI runs as.
+    // @mago-expect lint:no-insecure-comparison -- transport slug, not a secret.
+    if ($method === 'stdio') {
+        return $user_id > 0 ? ['key' => 'stdio-user-' . $user_id, 'label' => __('WP-CLI stdio', domain: 'wppilot')] : null;
+    }
+
     if ($method === 'oauth') {
         $identity = function_exists('WPPilot\\OAuth\\Middleware\\request_oauth_identity')
             ? \WPPilot\OAuth\Middleware\request_oauth_identity()

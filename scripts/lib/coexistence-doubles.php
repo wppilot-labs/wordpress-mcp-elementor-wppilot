@@ -421,3 +421,17 @@ final class WP_Site_Health
         return ['direct' => [], 'async' => []];
     }
 }
+
+if (!function_exists('get_post_types')) {
+    /**
+     * No registered post types. A kit's check-setup that lists the types an SEO plugin covers
+     * runs here once its plugin is stood in (requires.any), and has nothing to list.
+     *
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    function get_post_types(array $args = [], string $output = 'names', string $operator = 'and'): array
+    {
+        return [];
+    }
+}
