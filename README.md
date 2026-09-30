@@ -151,7 +151,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 ## What the free plugin can do
 
-216 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, so a fresh install with none of those plugins shows 173. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+216 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, and developer abilities only under Developer Full Access, so a fresh install with none of those plugins registers 156 on the default profile. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
