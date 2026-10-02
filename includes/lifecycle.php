@@ -173,6 +173,8 @@ function wppilot_deactivate_current_site(): void
     \WPPilot\Abilities\Gutenberg\unschedule_cleanup();
 
     wp_clear_scheduled_hook('wppilot_oauth_gc');
+    // Re-created on the next admin request after reactivation while the site is still paired.
+    wp_clear_scheduled_hook(WPPILOT_CLOUD_HEARTBEAT_HOOK);
     wp_clear_scheduled_hook(WPPILOT_CHANGES_PRUNE_HOOK);
 
     // Report the deactivation before dropping the schedule, then drop it.

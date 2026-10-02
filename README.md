@@ -11,6 +11,8 @@
 
 [![Download wppilot.zip](https://img.shields.io/badge/Download-wppilot.zip-D9FF63?style=for-the-badge&labelColor=142017)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases/latest/download/wppilot.zip)
 
+> **New in 1.17: [WPPilot Cloud](https://app.wppilot.co).** Connect every WordPress site you run to ChatGPT, Claude, Cursor or any MCP client through **one link** - `https://app.wppilot.co/mcp`. Free for 3 sites; a WPPilot Pro licence adds more sites and bulk actions. Optional: the direct, self-hosted connection works exactly as before.
+
 Installs straight into **Plugins - Add New - Upload Plugin**. That link always resolves to the newest release, so it does not go stale. Older versions are on the [releases page](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases). GitHub's own *Source code (zip)* is **not** installable: it has no `vendor/` and uses a versioned folder name.
 
 WPPilot turns your WordPress site into an **MCP server**, built on the WordPress Abilities API and the official WordPress MCP Adapter. AI clients discover, inspect and execute *typed* WordPress abilities through a compact three-tool interface instead of loading hundreds of one-off endpoints into context.
@@ -19,7 +21,7 @@ The free plugin is the **WordPress MCP server**, and since 1.10.0 it is also a w
 
 ### How WPPilot compares to other WordPress MCP servers
 
-WordPress MCP servers differ most in what happens *after* an agent writes: who confirms a destructive call, whether a change can be undone, and whether the server runs on your own site or through someone else's relay. WPPilot is self-hosted with no call caps. It can require a person, not the model, to confirm destructive calls. It records every write in a change ledger, and its undo checks the restored state against the before-image instead of assuming it worked. The free plugin covers Elementor editing, accessibility and content audits, and search and replace with undo.
+WordPress MCP servers differ most in what happens *after* an agent writes: who confirms a destructive call, whether a change can be undone, and whether the server runs on your own site or through someone else's relay. WPPilot is self-hosted with no call caps, and [WPPilot Cloud](#wppilot-cloud-every-site-in-chatgpt-and-claude-optional) is an optional hosted gateway when you want one link for many sites. It can require a person, not the model, to confirm destructive calls. It records every write in a change ledger, and its undo checks the restored state against the before-image instead of assuming it worked. The free plugin covers Elementor editing, accessibility and content audits, and search and replace with undo.
 
 Other servers lead elsewhere, and the comparisons say so. Every competitor fact is sourced and dated:
 
@@ -79,6 +81,7 @@ WPPilot Pro adds plugin-aware modules, page builders, WooCommerce, forms, custom
 2. Activate WPPilot.
 3. Open **WPPilot → Configuration** and leave **Production Safe** selected.
 4. Open **WPPilot → Connect**, choose your AI client, and follow the OAuth or Application Password route.
+   *Or choose **WPPilot Cloud** on the same screen to reach this and all your other sites through one link - see [WPPilot Cloud](#wppilot-cloud-every-site-in-chatgpt-and-claude-optional).*
 
 Canonical MCP endpoint:
 
@@ -87,6 +90,25 @@ https://example.com/wp-json/mcp/wppilot
 ```
 
 OAuth-authenticated clients use `/wp-json/mcp/wppilot-oauth`. Application passwords and access tokens both authenticate on the canonical route. The older `/wp-json/mcp/mcp-adapter-default-server` route still resolves as a legacy alias, but new configurations should use the canonical path above.
+
+## WPPilot Cloud: every site in ChatGPT and Claude (optional)
+
+The free plugin connects one site directly. **WPPilot Cloud** is an optional hosted account at [app.wppilot.co](https://app.wppilot.co) that puts **all** your sites behind one MCP link, so ChatGPT, Claude, Cursor, VS Code, Codex, Gemini CLI or any MCP client can work across them without a connector per site.
+
+1. Install WPPilot **1.17 or newer** on each site.
+2. In wp-admin: **WPPilot → Connect → WPPilot Cloud**, sign in (or create a free account) and choose what Cloud may do on that site: **Read only** or **Production safe**. The site creates its own access token and sends it to Cloud server to server - it never passes through a browser.
+3. Add `https://app.wppilot.co/mcp` to your AI app once. It signs in to Cloud and you pick which sites it may reach. Cursor, VS Code, LM Studio and Goose install with one click from **Connect AI** in the Cloud panel.
+
+The AI then lists your sites, discovers each site's tools (including WPPilot Pro tools where Pro is installed), runs them, reviews changes and undoes them. **Each site stays the final authority:** its safety profile, human confirmations, change ledger and undo apply exactly as with a direct connection, and Cloud can never exceed the access the site granted. Disconnect from either side and the token is revoked.
+
+| | Free | With a WPPilot Pro licence |
+|---|---|---|
+| Connected sites | 3 | Crew 10 · Fleet 100 · Command unlimited |
+| Every single-site tool, review and undo | ✓ | ✓ |
+| Bulk actions across sites (with dry run) | - | ✓ |
+| Priority support | - | ✓ |
+
+Cloud is included with every Pro licence, linked automatically by your Freemius email. Personal access tokens are available for tools that can't sign in (scripts, CI, Cline). A WPPilot plugin for the ChatGPT directory is coming. Sign up: [app.wppilot.co](https://app.wppilot.co/register).
 
 ## Supported AI clients: connect Claude, ChatGPT, Cursor and more to WordPress
 
@@ -396,7 +418,7 @@ No. Distribution is GitHub releases for the free plugin and wppilot.co for Pro. 
 
 ## Privacy
 
-The MCP endpoint is self-hosted; there is no WPPilot relay. When WPPilot Chat is used, WordPress sends conversation history, selected attachments, site instructions, tool definitions and relevant tool results to the AI provider you configured. Suggested policy text is available in **Settings → Privacy → Policy Guide**.
+The MCP endpoint is self-hosted; a direct connection has no WPPilot relay. **WPPilot Cloud is optional:** only if you connect a site to it, the site shares its URL, versions and status with app.wppilot.co and Cloud stores that site's access token encrypted, and the AI calls you make through Cloud pass through it (Cloud logs the tool name, site, outcome and time, not page content). See the plugin's *External services* section in `readme.txt`. When WPPilot Chat is used, WordPress sends conversation history, selected attachments, site instructions, tool definitions and relevant tool results to the AI provider you configured. Suggested policy text is available in **Settings → Privacy → Policy Guide**.
 
 ## Documentation
 

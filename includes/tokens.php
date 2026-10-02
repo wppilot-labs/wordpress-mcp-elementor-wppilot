@@ -596,6 +596,31 @@ function wppilot_token_name(int $token_id): string
 }
 
 /**
+ * The user a token belongs to, or 0 when there is no such token.
+ *
+ * For the one caller that revokes a token on the site's behalf rather than the
+ * owner's: WPPilot Cloud's Disconnect may be pressed by a different
+ * administrator from the one who paired, and wppilot_token_revoke() is scoped
+ * to the owner.
+ */
+function wppilot_token_owner(int $token_id): int
+{
+    // @mago-expect lint:no-global -- $wpdb is WordPress' database handle.
+    global $wpdb;
+    /** @var wpdb $wpdb */
+
+    if ($token_id <= 0) {
+        return 0;
+    }
+
+    $table = wppilot_tokens_table();
+    // @mago-expect analysis:mixed-assignment
+    $owner = $wpdb->get_var((string) $wpdb->prepare("SELECT user_id FROM {$table} WHERE id = %d", $token_id));
+
+    return is_numeric($owner) ? (int) $owner : 0;
+}
+
+/**
  * Revoke one token.
  *
  * Scoped to the owner: an administrator managing their own tokens must not be

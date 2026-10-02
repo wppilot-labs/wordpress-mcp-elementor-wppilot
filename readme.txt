@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.16.0
+Stable tag: 1.17.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -83,6 +83,8 @@ The MCP endpoint runs on your own site, and your AI client connects to it direct
 WPPilot Chat is different: when you use Chat, WordPress sends the conversation history, selected attachments, site instructions, tool definitions and relevant tool results to the AI provider and model you selected through the WordPress AI Client. That provider is an external service and its own terms and privacy policy apply. WPPilot adds suggested text to WordPress's Privacy Policy Guide and integrates with the personal-data export and erase tools.
 
 The stock-image search ability queries Openverse (api.openverse.org), WordPress.org's openly-licensed media search, and only when an agent calls it. The search terms and filters are sent to Openverse; nothing about your site, your users, or your content goes with them, and no account or API key is involved. Openverse is operated by the WordPress.org project and its own terms apply. Importing a chosen image then downloads that file from wherever its source hosts it, exactly as pasting the URL into the media importer would.
+
+WPPilot Cloud (app.wppilot.co) is optional and contacted only if an administrator connects the site under **WPPilot > Connect > WPPilot Cloud**. Nothing is sent before that. Connecting sends app.wppilot.co this site's address and name, the WPPilot, WordPress, PHP and WPPilot Pro versions, a one-time pairing code, the site's public signing key, and an access token that WPPilot creates for the Cloud with the access level you confirm. While connected, the site sends a signed heartbeat once an hour and after a plugin update (site ID, versions, safety profile and site address), and a signed notice when you disconnect. The Cloud then calls this site's MCP endpoint with that token on behalf of the AI clients in your workspace; those calls go through the same safety profile, confirmations and change log as any other client. Disconnecting revokes the token. No usernames, email addresses, posts or other content are sent by the plugin; what AI clients read through the Cloud is whatever they ask for within the access you granted. Terms: https://wppilot.co/terms. Privacy policy: https://wppilot.co/privacy.
 
 When you use OAuth, the client you are connecting registers itself with your site. That traffic is between your site and your own AI client, and no WPPilot server is involved.
 
@@ -166,6 +168,10 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.17.0 =
+* New: WPPilot Cloud. A WPPilot Cloud card on the Connect screen pairs this site with an app.wppilot.co workspace: sign in there, choose Read Only or Production Safe access and which abilities, then confirm on this site. The site creates an access token for the Cloud (listed as "Managed by WPPilot Cloud") and hands it over server to server, so it never passes through a browser. The Cloud can read the site's status and unlink itself through two new routes that accept only that token; the site sends a signed hourly heartbeat. Disconnect revokes the token. See External services for what is sent.
+* The wppilot_tool_call_rate_limit filter now receives the credential being budgeted as a second argument. The WPPilot Cloud credential is allowed at least 600 write calls a minute, unless the limit is switched off.
 
 = 1.16.0 =
 * New, formerly WPPilot Pro: WooCommerce basics. wppilot/woocommerce-check-setup, list and read products and variations, product categories and tags, store settings, and read orders and customers (orders and customers also need manage_woocommerce), with the input and output Pro gives them. wppilot/woocommerce-edit-product edits one product's name, description, prices and stock, saves through WooCommerce so its lookup tables and caches follow, keeps backslashes, and can be undone from the Changes screen: the undo writes the old values back through WooCommerce and says which fields did not come back. Bulk prices and stock, order and customer writes, refunds, coupons, reports, shipping, tax, gateways and full product editing (SKU, categories, images, attributes) stay in Pro, whose richer edit-product takes over when Pro is active.
@@ -458,6 +464,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.17.0 =
+New: WPPilot Cloud (optional). Connect this site to an app.wppilot.co account and reach every connected site from ChatGPT, Claude or any MCP client through one link. Nothing changes until you connect; direct connections work as before. No ability permissions changed.
 
 = 1.16.0 =
 WooCommerce reads and a basic product editor, one post's SEO title, description and robots for seven SEO plugins, read-only forms with contact details redacted, backup and security status, and scheduled audits, all formerly WPPilot Pro. Each stands aside while WPPilot Pro 1.10.0 still provides it. Also new: undo or redo everything one agent session did, and a local connection over WP-CLI (wp wppilot mcp serve). 48 new abilities. Reading server files (wppilot/read-file, wppilot/list-directory) now needs Developer Full Access.

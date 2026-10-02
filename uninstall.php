@@ -122,6 +122,12 @@ function wppilot_uninstall_options(): array
         // Written only by the first-run notice that 1.6.0 shipped and 1.6.1
         // removed. Listed so an install that saw it does not keep the row.
         'wppilot_telemetry_notice_acknowledged',
+        // includes/cloud/. The Cloud's access token goes with the tokens table
+        // above, so a Cloud still holding it is refused from then on. Pairings
+        // in flight are transients, removed by the prefix sweep below.
+        'wppilot_cloud_link',
+        'wppilot_cloud_keys',
+        'wppilot_cloud_seen_version',
     ];
 }
 
@@ -205,6 +211,8 @@ function wppilot_uninstall_cron_hooks(): array
         'wppilot_telemetry_ping',
         // includes/kits/scheduled-audits: the hourly repair of the routines' schedule.
         'wppilot_kit_routines_reconcile',
+        // includes/cloud/heartbeat.php
+        'wppilot_cloud_heartbeat',
     ];
 }
 

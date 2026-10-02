@@ -181,7 +181,15 @@ function wppilot_handle_revoke_token(): void
 
     check_admin_referer('wppilot_revoke_token_' . $token_id);
 
-    wppilot_token_revoke($token_id, get_current_user_id());
+    // The WPPilot Cloud token is revoked by disconnecting, which also drops the
+    // link and tells the Cloud. Revoking the row alone would leave the site
+    // reporting itself connected with a token that no longer exists.
+    $cloud_link = function_exists('wppilot_cloud_link') ? wppilot_cloud_link() : null;
+    if ($cloud_link !== null && $cloud_link['token_id'] === $token_id) {
+        wppilot_cloud_disconnect();
+    } else {
+        wppilot_token_revoke($token_id, get_current_user_id());
+    }
 
     wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=token_revoked'));
     exit();
@@ -205,6 +213,14 @@ function wppilot_handle_update_token(): void
     }
 
     check_admin_referer('wppilot_update_token_' . $token_id);
+
+    // The WPPilot Cloud token's limits were chosen when the site was connected
+    // and the Cloud relies on them; change them by reconnecting.
+    $cloud_link = function_exists('wppilot_cloud_link') ? wppilot_cloud_link() : null;
+    if ($cloud_link !== null && $cloud_link['token_id'] === $token_id) {
+        wp_safe_redirect(admin_url('admin.php?page=' . WPPILOT_SETUP_PAGE . '&wppilot_result=token_cloud_managed'));
+        exit();
+    }
 
     $raw_name = $_POST['wppilot_edit_token_name'] ?? '';
     $name = is_string($raw_name) ? trim(wp_unslash($raw_name)) : '';
@@ -773,9 +789,16 @@ function wppilot_render_token_row(array $token, string $dt_format): void
     };
     $expires = $token['expires'];
     $has_expired = $expires !== '' && (int) strtotime($expires . ' UTC') < time();
+    $cloud_link = function_exists('wppilot_cloud_link') ? wppilot_cloud_link() : null;
+    $cloud_managed = $cloud_link !== null && $cloud_link['token_id'] === $token['id'];
     ?>
     <tr>
-        <td><strong><?php echo esc_html($token['name']); ?></strong></td>
+        <td>
+            <strong><?php echo esc_html($token['name']); ?></strong>
+            <?php if ($cloud_managed): ?>
+                <br /><span class="wppilot-recommended-badge"><?php esc_html_e('Managed by WPPilot Cloud', domain: 'wppilot'); ?></span>
+            <?php endif; ?>
+        </td>
         <td class="wppilot-mono">…<?php echo esc_html($token['last_four']); ?></td>
         <td><?php echo esc_html($format($token['created'], __('Unknown', domain: 'wppilot'))); ?></td>
         <td><?php echo esc_html($format($token['last_used'], __('Never', domain: 'wppilot'))); ?></td>
@@ -786,6 +809,17 @@ function wppilot_render_token_row(array $token, string $dt_format): void
             <?php endif; ?>
         </td>
         <td><?php echo esc_html(wppilot_token_policy_summary($token)); ?></td>
+        <?php if ($cloud_managed): ?>
+        <td>
+            <?php /* Its scope and ceiling were agreed with the Cloud at pairing; changing
+             * them here would leave the Cloud describing access it does not have. */ ?>
+            <a href="#wppilot-cloud-method" onclick="var c = document.querySelector('.wppilot-method-card[data-method=&quot;cloud&quot;]'); if (c) { c.click(); c.scrollIntoView({ block: 'center' }); } return false;"><?php esc_html_e(
+                'Disconnect under WPPilot Cloud',
+                domain: 'wppilot',
+            ); ?></a>
+        </td>
+    </tr>
+        <?php return; endif; ?>
         <td>
             <button type="button" class="button button-small" aria-expanded="false" onclick="var r = document.getElementById('<?php echo
                 esc_js('wppilot-token-edit-' . $token['id'])

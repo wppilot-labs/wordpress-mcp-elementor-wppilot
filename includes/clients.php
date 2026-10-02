@@ -456,6 +456,19 @@ function wppilot_client_proxy_shapes(): array
             'note' => __('An AI client connecting through the OAuth wrapper.', domain: 'wppilot'),
             'hidden' => true,
         ],
+        // Not a client anyone configures: the Cloud pairs itself from the
+        // Connect screen's WPPilot Cloud card. It introduces itself as
+        // `wppilot-cloud` on initialize and in its User-Agent
+        // (`WPPilot-Cloud/1`), and the AI client behind it only in a display
+        // header, so its connections are labelled as the Cloud.
+        'wppilot-cloud' => [
+            'label' => 'WPPilot Cloud',
+            'match' => ['wppilot-cloud'],
+            'oauth' => 'native',
+            'methods' => ['token'],
+            'note' => __('Connected through WPPilot Cloud with the access token it was given when the site was paired.', domain: 'wppilot'),
+            'hidden' => true,
+        ],
         'wordpress-remote' => [
             'label' => __('WordPress MCP proxy', domain: 'wppilot'),
             'match' => ['mcp-wordpress-remote', 'wordpress-remote'],

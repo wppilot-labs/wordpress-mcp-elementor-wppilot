@@ -460,6 +460,13 @@ function oauth_identity_may_use_route(string $route, string $method): bool
     if (request_identity_via() === 'token' && is_any_mcp_route($route)) {
         return true;
     }
+    // WPPilot Cloud's status and unlink routes. Any token identity gets past
+    // this boundary; the routes' own permission callback then admits only the
+    // token that was paired with the Cloud. See includes/cloud/rest.php.
+    // @mago-expect lint:no-insecure-comparison -- credential kind, not a secret.
+    if (request_identity_via() === 'token' && str_starts_with($route, '/wppilot/v1/cloud/')) {
+        return true;
+    }
     if ($route === '/wp-abilities/v1/abilities') {
         return $method === 'GET' || $method === 'HEAD';
     }
