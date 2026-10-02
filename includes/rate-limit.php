@@ -33,16 +33,22 @@ const WPPILOT_RATE_DEFAULT_LIMIT = 120;
  *
  * Zero or a negative value disables the limit entirely, which is the documented
  * escape hatch for a site doing a large scripted migration.
+ *
+ * @param string $credential The credential being budgeted, as wppilot_rate_credential_id() names it.
  */
-function wppilot_rate_limit(): int
+function wppilot_rate_limit(string $credential = ''): int
 {
     /**
      * Filter the per-credential ability execution budget, per minute.
      *
-     * @param int $limit Calls per minute. 0 or less disables the limit.
+     * The second argument arrived in 1.17.0; a callback registered with one
+     * accepted argument keeps receiving only the limit.
+     *
+     * @param int    $limit      Calls per minute. 0 or less disables the limit.
+     * @param string $credential The credential being budgeted: `ap:<uuid>`, `oauth:<sha256>` or `user:<id>`.
      */
     /** @var mixed $limit */
-    $limit = apply_filters('wppilot_tool_call_rate_limit', WPPILOT_RATE_DEFAULT_LIMIT);
+    $limit = apply_filters('wppilot_tool_call_rate_limit', WPPILOT_RATE_DEFAULT_LIMIT, $credential);
 
     return is_int($limit) ? $limit : WPPILOT_RATE_DEFAULT_LIMIT;
 }
@@ -67,7 +73,7 @@ function wppilot_rate_bucket_key(string $credential): string
  */
 function wppilot_rate_consume(string $credential): array
 {
-    $limit = wppilot_rate_limit();
+    $limit = wppilot_rate_limit($credential);
     if ($limit <= 0) {
         return ['allowed' => true, 'used' => 0, 'limit' => 0, 'retry_after' => 0];
     }

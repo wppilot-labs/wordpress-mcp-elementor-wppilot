@@ -20,6 +20,7 @@ declare(strict_types=1);
  *   client-configs.php    generated config for each supported client
  *   token-configs.php     generated config for the Access token method
  *   stdio-panel.php       the local WP-CLI stdio connection (wp wppilot mcp serve)
+ *   cloud-panel.php       the WPPilot Cloud connection method (pairing lives in includes/cloud/)
  *   page.php              the top-level render and shared sections
  */
 
@@ -38,4 +39,5 @@ require_once __DIR__ . '/web-apps.php';
 require_once __DIR__ . '/client-configs.php';
 require_once __DIR__ . '/token-configs.php';
 require_once __DIR__ . '/stdio-panel.php';
+require_once __DIR__ . '/cloud-panel.php';
 require_once __DIR__ . '/page.php';

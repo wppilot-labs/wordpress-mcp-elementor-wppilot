@@ -139,6 +139,53 @@ final class WPPilot_Test_Sqlite_Wpdb
         );
     }
 
+    /**
+     * wpdb::insert(). Values are quoted; null is written as NULL.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function insert(string $table, array $data, mixed $format = null): int|false
+    {
+        $values = array_map(
+            fn(mixed $value): string => $value === null ? 'NULL' : (string) $this->pdo->quote((string) $value),
+            array_values($data),
+        );
+        $result = $this->query(sprintf(
+            'INSERT INTO %s (%s) VALUES (%s)',
+            $table,
+            implode(', ', array_keys($data)),
+            implode(', ', $values),
+        ));
+
+        return $result === false ? false : 1;
+    }
+
+    /**
+     * wpdb::delete(), with every condition an equality.
+     *
+     * @param array<string, mixed> $where
+     */
+    public function delete(string $table, array $where, mixed $where_format = null): int|false
+    {
+        $conditions = [];
+        foreach ($where as $column => $value) {
+            $conditions[] = $column . ' = ' . (string) $this->pdo->quote((string) $value);
+        }
+        $result = $this->query(sprintf('DELETE FROM %s WHERE %s', $table, implode(' AND ', $conditions)));
+
+        return is_int($result) ? $result : false;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function get_row(string $query, string $output = 'OBJECT'): ?array
+    {
+        if ($this->query($query) === false || $this->last_result === []) {
+            return null;
+        }
+
+        return $this->last_result[0];
+    }
+
     /** @return list<array<string, mixed>>|null */
     public function get_results(string $query, string $output = 'OBJECT'): ?array
     {

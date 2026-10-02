@@ -51,6 +51,7 @@ function wppilot_render_connect_page(): void
         'revoked' => __('Application password revoked.', domain: 'wppilot'),
         'token_revoked' => __('Access token revoked.', domain: 'wppilot'),
         'token_updated' => __('Access token limits saved.', domain: 'wppilot'),
+        'token_cloud_managed' => __('That token is managed by WPPilot Cloud. To change what Cloud may do, disconnect and connect the site again.', domain: 'wppilot'),
         'token_update_failed' => __('The access token limits were not saved. A restricted token needs at least one ability or category.', domain: 'wppilot'),
         default => null,
     };
@@ -248,6 +249,8 @@ function wppilot_render_connect_page(): void
  * it is offered as the answer to a specific problem (a caller that cannot run a browser sign-in)
  * rather than presented as the easy default.
  */
+// Inherent: which of five cards opens first depends on what this request did; each branch is one card.
+// @mago-expect lint:cyclomatic-complexity
 function wppilot_render_method_chooser(
     ?string $new_password,
     ?string $existing_password = null,
@@ -272,12 +275,17 @@ function wppilot_render_method_chooser(
     $password_active =
         !$token_active && wppilot_password_method_preselected($new_password, $existing_password, $existing_error);
     $has_password = $new_password !== null || $existing_password !== null;
+    // A WPPilot Cloud pairing step that just redirected back here opens its own card.
+    $cloud_available = wppilot_cloud_available();
+    $cloud_active = $cloud_available && !$token_active && !$password_active && wppilot_cloud_method_preselected();
     // What the page opens on: whatever happened this request, else the
     // recommended method. The script downgrades a password default to something
     // renderable when no password exists yet.
     $default_method = 'oauth';
     if ($token_active) {
         $default_method = 'token';
+    } elseif ($cloud_active) {
+        $default_method = 'cloud';
     } elseif ($password_active || !$oauth_available) {
         $default_method = 'password';
     }
@@ -293,6 +301,8 @@ function wppilot_render_method_chooser(
         $password_recommended,
         $password_active,
         $token_active,
+        $cloud_available,
+        $cloud_active,
     ); ?>
 
     <div class="wppilot-method-panel" data-panel="oauth" hidden>
@@ -309,6 +319,11 @@ function wppilot_render_method_chooser(
     <div class="wppilot-method-panel" data-panel="webapps" hidden>
         <?php wppilot_render_web_apps_step(); ?>
     </div>
+    <?php if ($cloud_available): ?>
+    <div class="wppilot-method-panel" data-panel="cloud"<?php echo $cloud_active ? '' : ' hidden'; ?>>
+        <?php wppilot_render_cloud_panel(); ?>
+    </div>
+    <?php endif; ?>
 
     <noscript>
         <style>.wppilot-method-panel[hidden], #wppilot-step3[hidden] { display: block; }</style>
@@ -363,7 +378,7 @@ function wppilot_render_method_chooser(
             // the link lands on whichever panel the server picked, which for a
             // visitor who clicked "Create an access token" is the wrong one.
             var requested = (window.location.hash || '').replace('#wppilot-', '').replace('-method', '');
-                if (['oauth', 'password', 'token', 'webapps'].indexOf(requested) !== -1) {
+                if (['oauth', 'password', 'token', 'webapps', 'cloud'].indexOf(requested) !== -1) {
                 var card = document.querySelector('.wppilot-method-card[data-method="' + requested + '"]');
                 if (card && !card.disabled) {
                     apply(requested);
@@ -401,19 +416,23 @@ function wppilot_render_method_chooser(
 }
 
 /**
- * The three method cards.
+ * The method cards.
  *
  * Split from the chooser because it holds all the branching — an availability
  * test, two recommendation badges, and three active states — while the chooser
  * itself is about which panel is open. Together they were one function deciding
  * two unrelated things.
  */
+// One flag per card state, computed once by the chooser and only rendered here.
+// @mago-expect lint:excessive-parameter-list
 function wppilot_render_method_cards(
     bool $oauth_available,
     bool $oauth_recommended,
     bool $password_recommended,
     bool $password_active,
     bool $token_active,
+    bool $cloud_available = false,
+    bool $cloud_active = false,
 ): void {
     $badge_label = $oauth_recommended
         ? esc_html__('Recommended for your setup', domain: 'wppilot')
@@ -509,6 +528,25 @@ function wppilot_render_method_cards(
                 domain: 'wppilot',
             ); ?></span>
         </button>
+        <?php /*
+         * Offered only where an access token can authenticate at all (HTTPS or a
+         * local site), since what the Cloud is given is an access token.
+         */ ?>
+        <?php if ($cloud_available): ?>
+        <button
+            type="button"
+            class="wppilot-method-card<?php echo $cloud_active ? ' is-active' : ''; ?>"
+            data-method="cloud"
+        >
+            <span class="wppilot-method-title">
+                <?php esc_html_e('WPPilot Cloud', domain: 'wppilot'); ?>
+            </span>
+            <span class="description"><?php esc_html_e(
+                'Pair this site with your WPPilot Cloud workspace once; its AI clients connect through it.',
+                domain: 'wppilot',
+            ); ?></span>
+        </button>
+        <?php endif; ?>
     </div>
     <?php
 }

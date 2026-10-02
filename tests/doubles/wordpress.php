@@ -1005,6 +1005,7 @@ if (!function_exists('add_option')) {
         }
 
         WPPilot_Test_State::$options[$option] = $value;
+        $GLOBALS['wppilot_test_option_autoload'][$option] = $autoload;
 
         return true;
     }
@@ -1035,6 +1036,9 @@ if (!function_exists('update_option')) {
         }
 
         WPPilot_Test_State::$options[$option] = $value;
+        if ($autoload !== null) {
+            $GLOBALS['wppilot_test_option_autoload'][$option] = $autoload;
+        }
 
         return true;
     }
@@ -1160,9 +1164,14 @@ if (!function_exists('wp_clear_scheduled_hook')) {
 
 if (!function_exists('wp_remote_post')) {
     /** @param array<string, mixed> $args */
-    function wp_remote_post(string $url, array $args = []): array
+    function wp_remote_post(string $url, array $args = []): array|WP_Error
     {
-        WPPilot_Test_State::$http_posts[] = ['url' => $url, 'body' => $args['body'] ?? null];
+        WPPilot_Test_State::$http_posts[] = ['url' => $url, 'body' => $args['body'] ?? null, 'args' => $args];
+
+        // A test that needs a particular answer queues it; everything else gets a 204.
+        if (($GLOBALS['wppilot_test_http_responses'] ?? []) !== []) {
+            return array_shift($GLOBALS['wppilot_test_http_responses']);
+        }
 
         return ['response' => ['code' => 204], 'body' => ''];
     }
