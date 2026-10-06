@@ -31,10 +31,37 @@ per-request `_meta`. Everything else falls through to the adapter untouched, so
 an existing client does not need to be reconnected when the plugin is updated.
 
 `server/discover` is implemented and advertises both revisions plus the
-capabilities actually registered on this site. Subscriptions, the tasks
-extension and logging are deliberately not advertised: WPPilot has no
+capabilities actually registered on this site, including MCP Tasks when enabled
+and tools are served. Subscriptions and logging are not advertised: WPPilot has no
 change-notification producer, so `subscriptions/listen` is not implemented
 rather than being advertised and then failing.
+
+## MCP Tasks
+
+MCP Tasks shipped in Free 1.15.0 on the modern transport (`2026-07-28`). The
+legacy adapter does not provide this extension. Tasks is enabled by default;
+the `wppilot_mcp_tasks_enabled` filter can disable advertisement and dispatch.
+Discovery declares `tasks` and the `io.modelcontextprotocol/tasks` extension
+when Tasks is enabled and tools are served.
+
+An authenticated client adds `task: {}` (or a requested `ttl`) to the
+`tools/call` parameters and receives a task object. It can then use:
+
+- `tasks/get`: poll the task state.
+- `tasks/result`: retrieve the completed result or failure.
+- `tasks/list`: list tasks belonging to the connected user.
+- `tasks/cancel`: request cancellation of a non-terminal task.
+
+Only abilities declaring task support and backed by the job runner can execute
+in the background. Their progress depends on the runner and WordPress cron.
+Other abilities execute synchronously and return an already completed or failed
+task; requesting a task does not automatically make every long call asynchronous.
+Tasks do not support an `input_required` pause.
+
+Each call retains the usual permission, safety-profile, confirmation, rate-limit
+and ledger checks. Tasks are owned by the authenticated user. Cancelling a job
+stops further runner steps; it does not undo writes that have already completed.
+Clients without Tasks support can continue using ordinary `tools/call` results.
 
 ## The three-tool interface
 

@@ -1,5 +1,9 @@
 # WPPilot - WordPress MCP Server, Elementor MCP and WooCommerce MCP
 
+<!-- current-releases:start -->
+Current releases: **WPPilot Free 1.17.2 / Pro 1.11.1**. Pro requires Free 1.16.0 or newer; that minimum is not the latest Free release.
+<!-- current-releases:end -->
+
 **Connect Claude, ChatGPT, Claude Code, Codex, Cursor or Antigravity to your WordPress site and let an AI agent build pages, Elementor layouts, block content, menus, taxonomies, media and SEO metadata through typed abilities your permissions still govern.**
 
 [![Version](https://img.shields.io/github/v/release/wppilot-labs/wordpress-mcp-elementor-wppilot?color=142017&label=version)](https://github.com/wppilot-labs/wordpress-mcp-elementor-wppilot/releases)
@@ -46,7 +50,9 @@ WPPilot serves both protocol revisions during the migration window:
 
 A request is served under the modern revision **only** when it carries modern per-request `_meta`; everything else reaches the adapter untouched. **Existing users do not need to reconnect** unless their client requires the newer revision.
 
-`server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. Subscriptions, the tasks extension and logging are deliberately not advertised, WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented.
+`server/discover` is implemented and advertises both versions plus the capabilities actually registered on the site. **MCP Tasks shipped in Free 1.15.0 on the modern transport**. Tasks is enabled by default and advertised when tools are served; the `wppilot_mcp_tasks_enabled` filter can disable it. Clients can request a task with `tools/call`, then use `tasks/get`, `tasks/result`, `tasks/list` and `tasks/cancel`. Job-backed abilities can run in the background; other abilities return an already completed or failed task. Tasks remain scoped to the authenticated user and enforce the same permissions, safety profile and confirmation checks. Cancellation does not undo completed writes. The legacy adapter does not provide this Tasks extension.
+
+Subscriptions and logging are not advertised by the modern transport. WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented. See [MCP Tasks](docs/wordpress-mcp.md#mcp-tasks) for the request and execution contract.
 
 For OAuth, **Client ID Metadata Documents are the preferred registration mechanism**; RFC 7591 Dynamic Client Registration remains available as a compatibility fallback. Application Passwords and access tokens stay independent fallbacks for clients that run no OAuth flow.
 

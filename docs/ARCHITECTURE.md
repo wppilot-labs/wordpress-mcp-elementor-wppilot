@@ -15,7 +15,9 @@ Abilities are protocol-independent. Authentication, safety profiles, capability 
 
 An ability that wants the model to see an image returns it under the result key `_mcp_content` as `[{type: "image", data: <base64>, mimeType}]` (PNG, JPEG, GIF or WebP) beside its ordinary fields. The modern transport sends each valid item as an MCP `image` content block after the JSON text and drops the key from the text and `structuredContent`; the legacy path converts it into the adapter's image result, which carries the image alone; REST and Chat return the whole array as JSON. See `tool_result()` and `legacy_image_result()` in `includes/mcp/transport.php`.
 
-`server/discover` advertises only what is actually registered. Subscriptions, logging, and the tasks extension are never advertised - WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented. Cacheable results carry `cacheScope: "private"`, because the ability list is filtered per user, per safety profile, and per site.
+`server/discover` advertises only what is actually registered. MCP Tasks shipped in Free 1.15.0 on the modern transport and is advertised when enabled and tools are served. `includes/mcp/tasks.php` implements user-owned polling, results, listing and cancellation. Job-backed abilities execute in the background; other abilities return a completed or failed synchronous task. Tasks use the ordinary execution safety checks, and cancellation does not undo completed writes. The legacy adapter does not provide this extension. See [the Tasks contract](wordpress-mcp.md#mcp-tasks).
+
+Subscriptions and logging are not advertised by the modern transport - WPPilot has no change-notification producer, so `subscriptions/listen` is not implemented. Cacheable results carry `cacheScope: "private"`, because the ability list is filtered per user, per safety profile, and per site.
 
 ## Request path
 
