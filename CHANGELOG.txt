@@ -1,3 +1,6 @@
+v1.17.2 - 2026/10/07
+* Changed: WPPilot's admin screens (Connect, Abilities, Skills and the masthead Upgrade link) use the wppilot.co brand purple, #675CF4, instead of #3D2BFF, so the plugin, the website and the WPPilot Cloud dashboard look like one product. The README names the Pro plans by site count (Single Site, 10 Sites, 100 Sites, Unlimited Sites), as wppilot.co does. No behaviour, ability or permission changed.
+
 v1.17.1 - 2026/10/06
 * Fixed: when WPPilot Cloud could not finish connecting because its test request to this site failed, the Connect screen showed only "verification_failed". It now names the reason (for example verification_failed-unauthorized_403 when a firewall or security plugin refuses the request, or protocol_200 when a challenge page or redirect answers instead) and says what to change. Connection Doctor does not test the token WPPilot Cloud uses, so it can pass while this check fails.
 

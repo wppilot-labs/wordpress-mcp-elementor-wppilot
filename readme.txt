@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.17.1
+Stable tag: 1.17.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.17.2 =
+* Changed: WPPilot's admin screens (Connect, Abilities, Skills and the masthead Upgrade link) use the wppilot.co brand purple, #675CF4, instead of #3D2BFF, so the plugin, the website and the WPPilot Cloud dashboard look like one product. The README names the Pro plans by site count (Single Site, 10 Sites, 100 Sites, Unlimited Sites), as wppilot.co does. No behaviour, ability or permission changed.
 
 = 1.17.1 =
 * Fixed: when WPPilot Cloud could not finish connecting because its test request to this site failed, the Connect screen showed only "verification_failed". It now names the reason (for example verification_failed-unauthorized_403 when a firewall or security plugin refuses the request, or protocol_200 when a challenge page or redirect answers instead) and says what to change. Connection Doctor does not test the token WPPilot Cloud uses, so it can pass while this check fails.
@@ -467,6 +470,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.17.2 =
+Visual only: the admin screens use the wppilot.co brand purple. No ability permissions changed.
 
 = 1.17.1 =
 When connecting WPPilot Cloud fails its connection check, the Connect screen now says why and what to change. No ability permissions changed.
