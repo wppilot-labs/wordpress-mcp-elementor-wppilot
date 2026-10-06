@@ -103,7 +103,7 @@ The AI then lists your sites, discovers each site's tools (including WPPilot Pro
 
 | | Free | With a WPPilot Pro licence |
 |---|---|---|
-| Connected sites | 3 | Crew 10 · Fleet 100 · Command unlimited |
+| Connected sites | 3 | 10 Sites plan: 10 · 100 Sites plan: 100 · Unlimited Sites: no limit |
 | Every single-site tool, review and undo | ✓ | ✓ |
 | Bulk actions across sites (with dry run) | - | ✓ |
 | Priority support | - | ✓ |

@@ -40,9 +40,9 @@ body[class*='wppilot'] {
 	--wpp-line-soft: #eef0f3;
 
 	/* Identity. Position, selection, focus, the primary action. */
-	--wpp-accent: #3d2bff;
-	--wpp-accent-hover: #2f1fe0;
-	--wpp-accent-soft: #efedff;
+	--wpp-accent: #675cf4;
+	--wpp-accent-hover: #4a3fd1;
+	--wpp-accent-soft: #f4f3fe;
 
 	/* State, never decoration. */
 	--wpp-live: #067647;
@@ -153,7 +153,7 @@ body[class*='wppilot'] .wrap .wrap-title h1 {
 
 .wppilot-masthead__brand:focus {
 	box-shadow: none;
-	outline: 2px solid var(--wpp-accent, #3d2bff);
+	outline: 2px solid var(--wpp-accent, #675cf4);
 	outline-offset: 4px;
 	border-radius: 4px;
 }
@@ -214,7 +214,7 @@ body[class*='wppilot'] .wrap .wrap-title h1 {
 .wppilot-masthead__link--upgrade:hover,
 .wppilot-masthead__link--upgrade:focus {
 	color: #fff;
-	background: var(--wpp-accent, #3d2bff);
+	background: var(--wpp-accent, #675cf4);
 	margin-left: 4px;
 }
 
@@ -359,7 +359,7 @@ a.wppilot-masthead__status--armed:focus {
 .wppilot-tabs__section.is-current {
 	color: var(--wpp-ink, #101828);
 	font-weight: 600;
-	border-bottom-color: var(--wpp-accent, #3d2bff);
+	border-bottom-color: var(--wpp-accent, #675cf4);
 }
 
 .wppilot-tabs__badge {
@@ -425,7 +425,7 @@ body[class*='wppilot'] .wppilot-subtabs a.wppilot-subtabs__tab.is-current {
 
 .wppilot-tabs__section:focus-visible,
 .wppilot-subtabs__tab:focus-visible {
-	outline: 2px solid var(--wpp-accent, #3d2bff);
+	outline: 2px solid var(--wpp-accent, #675cf4);
 	outline-offset: -2px;
 	border-radius: 6px;
 }

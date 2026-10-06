@@ -41,8 +41,8 @@
     --wpp-hub-pill-protected-text: #92400e;
     /* Source: which plugin registered the ability. Uses the WPPilot accent so it
        reads as identity rather than as another status. */
-    --wpp-hub-pill-source-bg: #ecebff;
-    --wpp-hub-pill-source-text: #3d2bff;
+    --wpp-hub-pill-source-bg: #f4f3fe;
+    --wpp-hub-pill-source-text: #4a3fd1;
 
     /* Focus, radius, shadow */
     --wpp-hub-focus: #2271b1;
