@@ -50,6 +50,26 @@ function wppilot_cloud_error_message(string $code): string
 }
 
 /**
+ * What to do about a failed connection check, from the detail WPPilot Cloud
+ * returned (`verification_failed-{kind}[_{status}]`). Empty when there is no advice.
+ */
+function wppilot_cloud_detail_hint(string $detail): string
+{
+    if (!str_starts_with($detail, 'verification_failed-')) {
+        return '';
+    }
+    $reason = substr($detail, strlen('verification_failed-'));
+
+    return match (true) {
+        str_starts_with($reason, 'unauthorized') => __('This site, or a firewall or security plugin in front of it, refused WPPilot Cloud\'s test request. Allow POST requests to /wp-json/mcp/ that carry an "Authorization: Bearer" header and the user agent WPPilot-Cloud/1. Connection Doctor does not test this kind of token.', domain: 'wppilot'),
+        str_starts_with($reason, 'protocol') => __('This site answered WPPilot Cloud\'s test request with something other than an MCP response, usually a firewall or bot-protection challenge page, a redirect, or a cached page. Exclude /wp-json/mcp/ from those, and check the Site Address in Settings > General matches the address the site is served on.', domain: 'wppilot'),
+        str_starts_with($reason, 'unreachable') => __('WPPilot Cloud could not reach this site, or the site returned a server error. Check the site is reachable from the internet and look in the server error log.', domain: 'wppilot'),
+        str_starts_with($reason, 'remote') => __('The MCP server on this site returned an error when listing its tools. Check AI Abilities are on and look in the PHP error log.', domain: 'wppilot'),
+        default => '',
+    };
+}
+
+/**
  * Render the panel under the WPPilot Cloud card.
  */
 // Inherent: a template reading four request values and choosing one of three states.
@@ -81,6 +101,10 @@ function wppilot_render_cloud_panel(): void
                         __('WPPilot Cloud said: %s', domain: 'wppilot'),
                         $detail,
                     )); ?></span>
+                    <?php $hint = wppilot_cloud_detail_hint($detail); ?>
+                    <?php if ($hint !== ''): ?>
+                        <br /><?php echo esc_html($hint); ?>
+                    <?php endif; ?>
                 <?php endif; ?>
             </p></div>
         <?php endif; ?>

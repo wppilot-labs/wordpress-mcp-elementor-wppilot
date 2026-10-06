@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.17.0
+Stable tag: 1.17.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.17.1 =
+* Fixed: when WPPilot Cloud could not finish connecting because its test request to this site failed, the Connect screen showed only "verification_failed". It now names the reason (for example verification_failed-unauthorized_403 when a firewall or security plugin refuses the request, or protocol_200 when a challenge page or redirect answers instead) and says what to change. Connection Doctor does not test the token WPPilot Cloud uses, so it can pass while this check fails.
 
 = 1.17.0 =
 * New: WPPilot Cloud. A WPPilot Cloud card on the Connect screen pairs this site with an app.wppilot.co workspace: sign in there, choose Read Only or Production Safe access and which abilities, then confirm on this site. The site creates an access token for the Cloud (listed as "Managed by WPPilot Cloud") and hands it over server to server, so it never passes through a browser. The Cloud can read the site's status and unlink itself through two new routes that accept only that token; the site sends a signed hourly heartbeat. Disconnect revokes the token. See External services for what is sent.
@@ -464,6 +467,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.17.1 =
+When connecting WPPilot Cloud fails its connection check, the Connect screen now says why and what to change. No ability permissions changed.
 
 = 1.17.0 =
 New: WPPilot Cloud (optional). Connect this site to an app.wppilot.co account and reach every connected site from ChatGPT, Claude or any MCP client through one link. Nothing changes until you connect; direct connections work as before. No ability permissions changed.

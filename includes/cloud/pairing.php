@@ -204,8 +204,14 @@ function wppilot_cloud_json(array $data): string
 function wppilot_cloud_error_detail(array $body): string
 {
     $error = $body['error'] ?? '';
+    if (!is_string($error)) {
+        return '';
+    }
+    // A failed connection check also names why (e.g. unauthorized_403), which is what the site owner can act on.
+    $reason = $body['reason'] ?? '';
+    $detail = is_string($reason) && $reason !== '' ? $error . '-' . $reason : $error;
 
-    return is_string($error) ? substr(sanitize_key($error), offset: 0, length: 64) : '';
+    return substr(sanitize_key($detail), offset: 0, length: 64);
 }
 
 /**

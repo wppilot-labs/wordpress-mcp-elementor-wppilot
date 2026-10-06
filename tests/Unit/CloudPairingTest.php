@@ -27,6 +27,7 @@ require_once dirname(__DIR__, 2) . '/includes/capabilities.php';
 require_once dirname(__DIR__, 2) . '/includes/clients.php';
 require_once dirname(__DIR__, 2) . '/includes/rate-limit.php';
 require_once dirname(__DIR__, 2) . '/includes/cloud/bootstrap.php';
+require_once dirname(__DIR__, 2) . '/includes/admin/connect/cloud-panel.php';
 
 if (!defined('WPPILOT_SETUP_PAGE')) {
     define('WPPILOT_SETUP_PAGE', 'wppilot-setup');
@@ -422,6 +423,20 @@ final class CloudPairingTest extends TestCase
         self::assertFalse($this->tokenExists((int) $sent['token_id']));
         self::assertArrayNotHasKey(WPPILOT_CLOUD_LINK_OPTION, WPPilot_Test_State::$options);
         self::assertArrayNotHasKey(WPPILOT_CLOUD_HEARTBEAT_HOOK, WPPilot_Test_State::$cron);
+    }
+
+    public function test_a_failed_connection_check_carries_the_cloud_reason_and_a_hint(): void
+    {
+        $state = $this->pendingPairing();
+        self::queue(self::answer(422, ['error' => 'verification_failed', 'reason' => 'unauthorized_403', 'message' => 'the site rejected the Cloud credential']));
+
+        $result = wppilot_cloud_complete($state, 1);
+
+        self::assertInstanceOf(WP_Error::class, $result);
+        self::assertSame(['detail' => 'verification_failed-unauthorized_403'], $result->get_error_data());
+        self::assertStringContainsString('WPPilot-Cloud/1', wppilot_cloud_detail_hint('verification_failed-unauthorized_403'));
+        self::assertStringContainsString('challenge page', wppilot_cloud_detail_hint('verification_failed-protocol_200'));
+        self::assertSame('', wppilot_cloud_detail_hint('invalid_or_expired_code'));
     }
 
     public function test_a_network_failure_during_completion_revokes_the_token(): void
