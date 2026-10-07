@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   signing.php     §5     the site's Ed25519 key and signed calls to the Cloud
  *   rest.php        §4     the two routes the Cloud calls with its access token
  *   heartbeat.php   §5     the hourly heartbeat and the schedule that drives it
+ *   updates.php     §4     pending core, plugin and theme updates for the status answer
  *   rate-limit.php  §6     the Cloud credential's write budget
  *
  * What the Cloud holds is an ordinary WPPilot access token, minted on this
@@ -58,6 +59,7 @@ require_once __DIR__ . '/pairing.php';
 require_once __DIR__ . '/signing.php';
 require_once __DIR__ . '/rest.php';
 require_once __DIR__ . '/heartbeat.php';
+require_once __DIR__ . '/updates.php';
 require_once __DIR__ . '/rate-limit.php';
 
 add_action('admin_post_wppilot_cloud_begin', callback: 'wppilot_cloud_handle_begin');

@@ -664,7 +664,68 @@ final class CloudPairingTest extends TestCase
             'safety_profile' => 'production',
             'abilities_enabled' => true,
             'home_url' => 'https://example.test',
+            'updates' => ['checked_at' => null, 'core' => null, 'plugins' => [], 'themes' => [], 'translations' => 0],
         ], $response->data);
+    }
+
+    public function test_status_lists_pending_updates_from_the_transients_only(): void
+    {
+        $this->pairedLink();
+        WPPilot_Test_State::$plugins = [
+            'akismet/akismet.php' => ['Name' => 'Akismet', 'Version' => '5.3'],
+            'hello.php' => ['Name' => 'Hello Dolly', 'Version' => '1.7.2'],
+        ];
+        WPPilot_Test_State::$options['auto_update_plugins'] = ['akismet/akismet.php'];
+        $GLOBALS['wppilot_test_themes'] = ['twentytwentyfive' => ['Name' => 'Twenty Twenty-Five', 'Version' => '1.2']];
+        $GLOBALS['wppilot_test_site_transients'] = [
+            'update_plugins' => (object) [
+                'last_checked' => 1_700_000_500,
+                'response' => [
+                    'akismet/akismet.php' => (object) ['new_version' => '5.4'],
+                    'gone/gone.php' => (object) ['new_version' => '2.0'],
+                ],
+                'translations' => [['language' => 'de_DE']],
+            ],
+            'update_themes' => (object) [
+                'last_checked' => 1_700_000_000,
+                'response' => ['twentytwentyfive' => ['theme' => 'twentytwentyfive', 'new_version' => '1.3']],
+            ],
+            'update_core' => (object) [
+                'last_checked' => 1_700_000_900,
+                'updates' => [(object) ['response' => 'upgrade', 'current' => '7.1'], (object) ['response' => 'latest', 'current' => '7.0']],
+            ],
+        ];
+
+        try {
+            $updates = wppilot_cloud_rest_status()->data['updates'];
+        } finally {
+            unset($GLOBALS['wppilot_test_site_transients'], $GLOBALS['wppilot_test_themes']);
+        }
+
+        self::assertSame(1_700_000_000, $updates['checked_at'], 'the oldest check, so every list is at least that fresh');
+        self::assertSame(['current' => '7.0', 'new_version' => '7.1'], $updates['core']);
+        self::assertSame([
+            ['file' => 'akismet/akismet.php', 'name' => 'Akismet', 'version' => '5.3', 'new_version' => '5.4', 'auto_update' => true],
+        ], $updates['plugins'], 'an offer for a plugin no longer installed is dropped');
+        self::assertSame([
+            ['stylesheet' => 'twentytwentyfive', 'name' => 'Twenty Twenty-Five', 'version' => '1.2', 'new_version' => '1.3', 'auto_update' => false],
+        ], $updates['themes']);
+        self::assertSame(1, $updates['translations']);
+        self::assertSame([], WPPilot_Test_State::$http_posts, 'a status call never contacts an update source');
+    }
+
+    public function test_core_already_current_is_not_an_update(): void
+    {
+        $this->pairedLink();
+        $GLOBALS['wppilot_test_site_transients'] = [
+            'update_core' => (object) ['updates' => [(object) ['response' => 'upgrade', 'current' => '7.0']]],
+        ];
+
+        try {
+            self::assertNull(wppilot_cloud_rest_status()->data['updates']['core']);
+        } finally {
+            unset($GLOBALS['wppilot_test_site_transients']);
+        }
     }
 
     public function test_rest_unlink_revokes_the_token_without_calling_back(): void

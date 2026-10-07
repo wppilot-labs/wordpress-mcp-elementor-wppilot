@@ -84,3 +84,40 @@ if (!function_exists('register_rest_route')) {
         return true;
     }
 }
+
+if (!function_exists('get_site_transient')) {
+    function get_site_transient(string $transient): mixed
+    {
+        return $GLOBALS['wppilot_test_site_transients'][$transient] ?? false;
+    }
+}
+
+if (!function_exists('get_site_option')) {
+    function get_site_option(string $option, mixed $default_value = false): mixed
+    {
+        return WPPilot_Test_State::$options[$option] ?? $default_value;
+    }
+}
+
+if (!function_exists('wp_get_theme')) {
+    /** Installed themes are $GLOBALS['wppilot_test_themes']: stylesheet => [Name, Version]. */
+    function wp_get_theme(string $stylesheet = ''): object
+    {
+        $headers = $GLOBALS['wppilot_test_themes'][$stylesheet] ?? null;
+
+        return new class($headers) {
+            /** @param array<string, string>|null $headers */
+            public function __construct(private ?array $headers) {}
+
+            public function exists(): bool
+            {
+                return $this->headers !== null;
+            }
+
+            public function get(string $header): string
+            {
+                return $this->headers[$header] ?? '';
+            }
+        };
+    }
+}

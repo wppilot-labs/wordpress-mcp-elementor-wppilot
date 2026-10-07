@@ -102,6 +102,7 @@ function wppilot_cloud_rest_status(): WP_REST_Response|WP_Error
         'safety_profile' => wppilot_cloud_safety_profile(),
         'abilities_enabled' => (bool) wppilot_is_enabled(),
         'home_url' => home_url(),
+        'updates' => wppilot_cloud_pending_updates(),
     ], 200);
 }
 
