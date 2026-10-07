@@ -10,7 +10,7 @@ Scores how editable an Elementor page is, from its saved element tree, and says 
 
 | Finding | Each | At most | Why it matters |
 |---|---|---|---|
-| `html_widget` | −10 | −40 | Layout pasted into an HTML widget cannot be edited in the panel. |
+| `html_widget` | −20 | −40 | Layout pasted into an HTML widget cannot be edited in the panel. |
 | `script` | −15 | −30 | Scripts in content break with caching and are invisible to editors. |
 | `shortcode_widget` | −5 | −20 | Shortcodes show nothing in the editor. |
 | `unknown_widget` | −5 | −20 | The widget's plugin is inactive; it renders nothing. |

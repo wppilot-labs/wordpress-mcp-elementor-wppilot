@@ -28,7 +28,7 @@ const DEEP_NESTING = 6;
 
 /** What each finding costs, and the most one kind of finding may cost in total. */
 const PENALTIES = [
-    'html_widget' => [10, 40],
+    'html_widget' => [20, 40],
     'script' => [15, 30],
     'shortcode_widget' => [5, 20],
     'unknown_widget' => [5, 20],

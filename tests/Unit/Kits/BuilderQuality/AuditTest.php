@@ -61,8 +61,8 @@ final class AuditTest extends TestCase
         self::assertEqualsCanonicalizing(['html_widget' => 1, 'script' => 1, 'inline_style' => 1, 'shortcode_widget' => 1, 'unknown_widget' => 1, 'custom_css' => 1, 'hardcoded_color' => 1, 'empty_container' => 1], $audit['counts']);
         self::assertSame('unknown_widget', $issues['w3']);
         self::assertSame('empty_container', $issues['e1']);
-        self::assertSame(100 - 10 - 15 - 3 - 5 - 5 - 3 - 1 - 1, $audit['score']);
-        self::assertSame('poor', $audit['grade'], '57 is below 60');
+        self::assertSame(100 - 20 - 15 - 3 - 5 - 5 - 3 - 1 - 1, $audit['score']);
+        self::assertSame('poor', $audit['grade'], '47 is below 60');
         self::assertArrayHasKey('html_widget', $audit['fixes']);
     }
 
