@@ -160,6 +160,27 @@ final class LedgerMapTest extends TestCase
         self::assertStringContainsString('email the customer', (string) $row['rollback']['reason']);
     }
 
+    public function testATranslatePressLanguageChangeIsUndoneOnItsSettings(): void
+    {
+        WPPilot_Test_State::$options['trp_settings'] = ['default-language' => 'en_US', 'translation-languages' => ['en_US']];
+
+        $row = $this->run_write('translatepress/add-language', ['language_code' => 'es_ES'], static function (): void {
+            update_option('trp_settings', ['default-language' => 'en_US', 'translation-languages' => ['en_US', 'es_ES']]);
+        });
+        self::assertTrue($row['rollback']['reversible']);
+
+        wppilot_rollback_change((string) $row['id']);
+        self::assertSame(['en_US'], get_option('trp_settings')['translation-languages']);
+    }
+
+    public function testATranslatePressLicenceKeyIsNeverCopiedIntoTheLedger(): void
+    {
+        $row = $this->run_write('translatepress/set-license-key', ['license_key' => 'secret-key'], static function (): void {});
+
+        self::assertFalse($row['rollback']['reversible']);
+        self::assertStringContainsString('secret', (string) $row['rollback']['reason']);
+    }
+
     public function testATargetMissingFromTheInputRecordsNoBeforeImage(): void
     {
         $row = $this->run_write('seopress/update-post-title-description', ['title' => 'x'], static function (): void {});

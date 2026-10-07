@@ -123,6 +123,13 @@ function wppilot_default_ability_ledger_map(): array
     $map['woocommerce/order-update-status'] = ['strategy' => 'irreversible', 'reason' => 'An order status change can email the customer and move stock; set the status back by hand if needed.'];
     $map['woocommerce/order-add-note'] = ['strategy' => 'irreversible', 'reason' => 'An order note may already have been emailed to the customer.'];
 
+    // TranslatePress 3.3's own abilities (includes/class-abilities.php) rewrite its settings arrays.
+    foreach (['translatepress/add-language', 'translatepress/remove-language', 'translatepress/update-language', 'translatepress/set-default-language'] as $ability) {
+        $map[$ability] = ['strategy' => 'option', 'option' => 'trp_settings'];
+    }
+    $map['translatepress/enable-automatic-translation'] = ['strategy' => 'option', 'option' => 'trp_machine_translation_settings'];
+    $map['translatepress/set-license-key'] = ['strategy' => 'irreversible', 'reason' => 'A licence key is a secret, so it is never copied into the change log. Re-enter the old key by hand.'];
+
     return $map;
 }
 
