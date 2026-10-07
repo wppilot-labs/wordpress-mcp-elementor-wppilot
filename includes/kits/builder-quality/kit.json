@@ -1,0 +1,25 @@
+{
+    "slug": "builder-quality",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\BuilderQuality",
+    "tier": "free",
+    "runtime": "^1.0",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "any": {
+            "constants": ["ELEMENTOR_VERSION"]
+        }
+    },
+    "categories": {
+        "elementor": {
+            "label": "Elementor",
+            "description": "Elementor page building and editing."
+        }
+    },
+    "abilities": [
+        {"name": "wppilot/elementor-audit-output", "readonly": true, "destructive": false, "ledger": "self"}
+    ],
+    "skills": ["builder-quality"],
+    "tests": ["tests/Unit/Kits/BuilderQuality"]
+}
