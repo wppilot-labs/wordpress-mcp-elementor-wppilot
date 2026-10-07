@@ -218,6 +218,8 @@ function undo_created(array $payload): array|WP_Error
  */
 function undo_reverted(array $payload): array|WP_Error
 {
+    // The host keeps a capture under `snapshot` when no build step reshapes it, as for post-partial.
+    $payload = is_array($payload['snapshot'] ?? null) ? $payload['snapshot'] : $payload;
     $type = template_type($payload['template_type'] ?? '');
     $id = (string) ($payload['template_id'] ?? '');
     $content = (string) ($payload['content'] ?? '');
