@@ -23,21 +23,23 @@ if (!defined('ABSPATH')) {
  */
 function wppilot_get_active_languages()
 {
+    // Polylang. Checked before WPML because Polylang's WPML compatibility
+    // layer defines icl_get_languages(), which made a Polylang site report
+    // itself as WPML.
+    if (function_exists('pll_languages_list')) {
+        /** @var string[]|false $languages */
+        $languages = pll_languages_list();
+        if (is_array($languages)) {
+            return ['plugin' => 'Polylang', 'languages' => $languages];
+        }
+    }
+
     // WPML.
     if (function_exists('icl_get_languages')) {
         /** @var array<string, array{language_code: string}>|false $wpml_languages */
         $wpml_languages = icl_get_languages('skip_missing=0');
         if (is_array($wpml_languages)) {
             return ['plugin' => 'WPML', 'languages' => array_column($wpml_languages, 'language_code')];
-        }
-    }
-
-    // Polylang.
-    if (function_exists('pll_languages_list')) {
-        /** @var string[]|false $languages */
-        $languages = pll_languages_list();
-        if (is_array($languages)) {
-            return ['plugin' => 'Polylang', 'languages' => $languages];
         }
     }
 
@@ -150,4 +152,36 @@ function wppilot_build_server_instructions()
     $lines = array_merge($lines, wppilot_build_building_context_lines());
 
     return implode("\n", $lines);
+}
+
+/**
+ * A one-line input signature for an ability: each top-level parameter with its
+ * type, optional ones marked with a trailing `?`, required ones first.
+ *
+ * The list used to carry names and descriptions only, so an agent guessed at
+ * parameter names — `post_type` for `post_types`, `widget_type` for
+ * `widget_types` — and spent a failed call learning each one.
+ *
+ * @param array<string, mixed> $schema
+ */
+function wppilot_ability_param_signature(array $schema): string
+{
+    $properties = $schema['properties'] ?? null;
+    if (!is_array($properties) || $properties === []) {
+        return '';
+    }
+    $required = is_array($schema['required'] ?? null) ? $schema['required'] : [];
+
+    $parts = ['required' => [], 'optional' => []];
+    foreach (array_keys($properties) as $name) {
+        $property = $properties[$name];
+        $type = is_array($property) && (is_string($property['type'] ?? null) || is_array($property['type'] ?? null))
+            ? $property['type']
+            : 'mixed';
+        $type = is_array($type) ? implode('|', array_map('strval', $type)) : $type;
+        $is_required = in_array($name, $required, strict: true);
+        $parts[$is_required ? 'required' : 'optional'][] = sprintf('%s%s: %s', $name, $is_required ? '' : '?', $type);
+    }
+
+    return implode(', ', [...$parts['required'], ...$parts['optional']]);
 }

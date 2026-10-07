@@ -197,6 +197,9 @@ function el_is_v3_passthrough_key(string $key): bool
         '_title',
         '_z_index',
         '_flex_align_self',
+        // A classic column's width: written by the editor into every column and
+        // read by the column's render, but never registered as a control.
+        '_column_size',
     ];
     foreach ($prefixes as $prefix) {
         if ($key === $prefix || str_starts_with($key, $prefix . '_')) {

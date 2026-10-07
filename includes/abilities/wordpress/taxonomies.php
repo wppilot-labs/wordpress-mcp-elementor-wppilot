@@ -243,12 +243,40 @@ function wordpress_taxonomy_is_agent_facing(string $taxonomy): ?WP_Error
     if ($object->public !== true && $object->show_in_rest !== true) {
         return new WP_Error(
             'taxonomy_not_public',
-            sprintf('Taxonomy "%s" is registered as private, so it is not exposed to agents.', $taxonomy),
+            sprintf(
+                'Taxonomy "%s" is registered as private, so it is not exposed to agents.%s',
+                $taxonomy,
+                wordpress_private_taxonomy_remedy($taxonomy),
+            ),
             ['status' => 403],
         );
     }
 
     return null;
+}
+
+/**
+ * Where to go instead when the private taxonomy belongs to Polylang.
+ *
+ * Polylang keeps a post's language and its translation group in private
+ * taxonomies, so an agent asked to put a page in another language reaches for
+ * them and is refused with no way forward.
+ */
+function wordpress_private_taxonomy_remedy(string $taxonomy): string
+{
+    if (!in_array($taxonomy, ['language', 'post_translations', 'term_language', 'term_translations'], strict: true)) {
+        return '';
+    }
+
+    $ability = 'wppilot/polylang-set-content-language';
+    if (function_exists('wp_has_ability') && wp_has_ability($ability)) {
+        return sprintf(
+            ' It belongs to Polylang: use %s to set a post\'s language and wppilot/polylang-link-content-translations to link it to its translations.',
+            $ability,
+        );
+    }
+
+    return ' It belongs to Polylang: set the language and translations in the Polylang editor — WPPilot Pro adds Polylang abilities that set a post\'s language and link its translations.';
 }
 
 /**
