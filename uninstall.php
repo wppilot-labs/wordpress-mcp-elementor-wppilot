@@ -128,6 +128,8 @@ function wppilot_uninstall_options(): array
         'wppilot_cloud_link',
         'wppilot_cloud_keys',
         'wppilot_cloud_seen_version',
+        'wppilot_cloud_manage',
+        'wppilot_cloud_policy',
     ];
 }
 

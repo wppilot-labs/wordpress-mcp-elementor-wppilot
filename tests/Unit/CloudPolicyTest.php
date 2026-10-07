@@ -128,6 +128,37 @@ final class CloudPolicyTest extends TestCase
         self::assertTrue($rules['wppilot/delete-post']['disabled'], "the owner's block stays");
     }
 
+    public function test_a_block_the_owner_touched_is_the_owners_and_is_never_lifted(): void
+    {
+        wppilot_cloud_save_manage_settings(tighten: true, loosen: true);
+        wppilot_cloud_apply_policy(self::policy(['disabled' => ['wppilot/execute-php']]));
+
+        // The owner switches the Cloud's block off and on again in wp-admin: from now on it is theirs.
+        wppilot_update_ability_rules([]);
+        wppilot_update_ability_rules(['wppilot/execute-php' => ['disabled' => true]]);
+        $result = wppilot_cloud_apply_policy(self::policy(['disabled' => []]));
+
+        self::assertIsArray($result);
+        self::assertSame([], $result['changes']);
+        self::assertTrue(wppilot_get_ability_rules()['wppilot/execute-php']['disabled']);
+    }
+
+    public function test_a_block_the_owner_lifted_is_dropped_from_the_clouds_list_on_the_next_apply(): void
+    {
+        wppilot_cloud_save_manage_settings(tighten: true, loosen: true);
+        wppilot_cloud_apply_policy(self::policy(['disabled' => ['wppilot/execute-php']]));
+        // Lifted some other way than the Hub (here: the option itself), then the next policy omits it.
+        WPPilot_Test_State::$options['wppilot_ability_rules'] = [];
+        wppilot_cloud_apply_policy(self::policy(['disabled' => []]));
+        self::assertSame([], wppilot_cloud_applied_policy()['disabled']);
+
+        // The owner blocks it later, as their own: a policy without it leaves it alone.
+        wppilot_update_ability_rules(['wppilot/execute-php' => ['disabled' => true]]);
+        $result = wppilot_cloud_apply_policy(self::policy(['disabled' => []]));
+        self::assertSame([], $result['changes']);
+        self::assertTrue(wppilot_get_ability_rules()['wppilot/execute-php']['disabled']);
+    }
+
     public function test_lifting_its_own_block_counts_as_loosening(): void
     {
         wppilot_cloud_save_manage_settings(tighten: true, loosen: false);
@@ -164,6 +195,8 @@ final class CloudPolicyTest extends TestCase
             self::policy(['disabled' => ['k' => 'wppilot/execute-php']]),
             self::policy(['disabled' => ['not an ability']]),
             self::policy(['disabled' => array_fill(0, WPPILOT_CLOUD_POLICY_MAX_ABILITIES + 1, 'wppilot/a')]),
+            self::policy(['disabled' => ["wppilot/a\n"]]),
+            self::policy(['disabled' => ['wppilot/' . str_repeat('a', 130)]]),
         ] as $body) {
             $result = wppilot_cloud_apply_policy($body);
             self::assertInstanceOf(WP_Error::class, $result, (string) wp_json_encode($body));
@@ -171,10 +204,11 @@ final class CloudPolicyTest extends TestCase
         }
     }
 
-    public function test_loosen_implies_tighten_and_disconnect_clears_the_opt_in(): void
+    public function test_unticking_tighten_opts_out_and_disconnect_clears_the_opt_in(): void
     {
         wppilot_cloud_save_manage_settings(tighten: false, loosen: true);
-        self::assertSame(['tighten' => true, 'loosen' => true], wppilot_cloud_manage_settings());
+        self::assertSame(['tighten' => false, 'loosen' => false], wppilot_cloud_manage_settings(), 'unticking "may tighten" opts out, whatever the loosen box says');
+        wppilot_cloud_save_manage_settings(tighten: true, loosen: true);
 
         wppilot_cloud_apply_policy(self::policy(['safety_profile' => 'readonly']));
         wppilot_cloud_clear_link();

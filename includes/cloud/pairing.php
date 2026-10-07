@@ -561,6 +561,9 @@ function wppilot_cloud_complete(string $state, int $user_id): array|WP_Error
     ];
     update_option(WPPILOT_CLOUD_LINK_OPTION, $link, autoload: false);
     update_option(WPPILOT_CLOUD_SEEN_VERSION_OPTION, WPPILOT_VERSION, autoload: false);
+    // Every pairing starts unmanaged, whatever an earlier one was allowed: the owner opts in to this account.
+    delete_option(WPPILOT_CLOUD_MANAGE_OPTION);
+    delete_option(WPPILOT_CLOUD_POLICY_OPTION);
     wppilot_cloud_schedule_heartbeat();
 
     return $link;

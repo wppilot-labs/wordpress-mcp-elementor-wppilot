@@ -37,6 +37,9 @@ const WPPILOT_CLOUD_POLICY_OPTION = 'wppilot_cloud_policy';
 /** Profiles a policy may set. Developer Full Access is wp-admin only. */
 const WPPILOT_CLOUD_POLICY_PROFILES = ['readonly', 'production'];
 
+/** Longest ability name a policy may carry. */
+const WPPILOT_CLOUD_POLICY_MAX_NAME = 128;
+
 /** Most abilities one list may name. */
 const WPPILOT_CLOUD_POLICY_MAX_ABILITIES = 500;
 
@@ -54,10 +57,10 @@ function wppilot_cloud_manage_settings(): array
     return ['tighten' => $tighten, 'loosen' => $loosen];
 }
 
-/** Loosening implies tightening: "may also loosen" without "may tighten" is not a state. */
+/** "May tighten" is the switch: unticking it opts out entirely, whatever "may also loosen" says. */
 function wppilot_cloud_save_manage_settings(bool $tighten, bool $loosen): void
 {
-    update_option(WPPILOT_CLOUD_MANAGE_OPTION, ['tighten' => $tighten || $loosen, 'loosen' => $loosen], autoload: false);
+    update_option(WPPILOT_CLOUD_MANAGE_OPTION, ['tighten' => $tighten, 'loosen' => $tighten && $loosen], autoload: false);
 }
 
 /**
@@ -111,6 +114,38 @@ function wppilot_cloud_applied_policy(): ?array
 }
 
 /**
+ * Forget the Cloud's claim on every ability whose block or confirmation the owner just changed.
+ *
+ * Called from wppilot_update_ability_rules() for every write that is not the Cloud's own. Without
+ * this, an owner who switched a Cloud-set block off and on again would have it lifted by a later
+ * policy, although it is now the owner's block.
+ *
+ * @param array<string, array{disabled: bool, require_confirmation: bool, min_profile: string}> $before
+ * @param array<string, array<string, mixed>> $after Rules about to be stored.
+ */
+function wppilot_cloud_release_changed_rules(array $before, array $after): void
+{
+    $applied = wppilot_cloud_applied_policy();
+    if ($applied === null) {
+        return;
+    }
+    $changed = static function (string $ability, string $flag) use ($before, $after): bool {
+        return ($before[$ability][$flag] ?? false) !== (($after[$ability][$flag] ?? false) === true);
+    };
+    $disabled = array_values(array_filter($applied['disabled'], static fn(string $a): bool => !$changed($a, 'disabled')));
+    $confirm = array_values(array_filter($applied['confirm'], static fn(string $a): bool => !$changed($a, 'require_confirmation')));
+    if ($disabled === $applied['disabled'] && $confirm === $applied['confirm']) {
+        return;
+    }
+    $stored = get_option(WPPILOT_CLOUD_POLICY_OPTION, []);
+    if (is_array($stored)) {
+        $stored['disabled'] = $disabled;
+        $stored['confirm'] = $confirm;
+        update_option(WPPILOT_CLOUD_POLICY_OPTION, $stored, autoload: false);
+    }
+}
+
+/**
  * Validate a policy as the Cloud sent it.
  *
  * @param array<mixed> $body
@@ -125,7 +160,7 @@ function wppilot_cloud_policy_parse(array $body): array|WP_Error
         return $bad('id must be 1-64 letters, digits or dashes.');
     }
     $name = $body['name'] ?? '';
-    if (!is_string($name) || strlen($name) > 120) {
+    if (!is_string($name) || mb_strlen($name) > 120) {
         return $bad('name must be a string of at most 120 characters.');
     }
 
@@ -145,7 +180,7 @@ function wppilot_cloud_policy_parse(array $body): array|WP_Error
             return $bad(sprintf('%s must be a list of at most %d ability names.', $key, WPPILOT_CLOUD_POLICY_MAX_ABILITIES));
         }
         foreach ($value as $ability) {
-            if (!is_string($ability) || !wppilot_is_valid_ability_name($ability)) {
+            if (!is_string($ability) || strlen($ability) > WPPILOT_CLOUD_POLICY_MAX_NAME || preg_match('#^[a-z0-9-]+/[a-z0-9/-]+\z#', $ability) !== 1) {
                 return $bad(sprintf('%s holds something that is not an ability name.', $key));
             }
         }
@@ -264,7 +299,11 @@ function wppilot_cloud_apply_policy(array $body, bool $dry_run = false): array|W
     }
 
     $rules = wppilot_get_ability_rules();
-    $set_by_cloud = ['disabled' => $applied['disabled'] ?? [], 'require_confirmation' => $applied['confirm'] ?? []];
+    // Only blocks still on can still be the Cloud's: one the owner lifted in the meantime is gone from its list.
+    $set_by_cloud = [
+        'disabled' => array_values(array_intersect($applied['disabled'] ?? [], $current['disabled'])),
+        'require_confirmation' => array_values(array_intersect($applied['confirm'] ?? [], $current['require_confirmation'])),
+    ];
     foreach ($changes as $change) {
         if (!isset($change['ability'])) {
             continue;
@@ -278,7 +317,12 @@ function wppilot_cloud_apply_policy(array $body, bool $dry_run = false): array|W
             : array_values(array_diff($mine, [$change['ability']]));
         unset($mine);
     }
-    wppilot_update_ability_rules($rules);
+    $GLOBALS['wppilot_cloud_policy_applying'] = true;
+    try {
+        wppilot_update_ability_rules($rules);
+    } finally {
+        unset($GLOBALS['wppilot_cloud_policy_applying']);
+    }
 
     $now = gmdate('Y-m-d\TH:i:s\Z');
     $history = $applied['history'] ?? [];

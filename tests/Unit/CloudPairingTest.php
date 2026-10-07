@@ -352,8 +352,11 @@ final class CloudPairingTest extends TestCase
     {
         $state = $this->pendingPairing(['ceiling' => 'readonly', 'scope' => ['abilities' => ['wppilot/*']]]);
         self::queue(self::answer(200, ['site_id' => 'site_abc', 'cloud_pubkey' => 'ignored']));
+        // Left over from an earlier pairing that was never disconnected properly.
+        WPPilot_Test_State::$options[WPPILOT_CLOUD_MANAGE_OPTION] = ['tighten' => true, 'loosen' => true];
 
         $link = wppilot_cloud_complete($state, 1);
+        self::assertSame(['tighten' => false, 'loosen' => false], wppilot_cloud_manage_settings(), 'a new pairing starts unmanaged');
 
         self::assertIsArray($link);
         self::assertSame('https://app.wppilot.co/api/pair/complete', WPPilot_Test_State::$http_posts[0]['url']);

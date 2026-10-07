@@ -93,6 +93,12 @@ function wppilot_update_ability_rules(array $rules): void
         $clean[$ability_name] = array_filter($rule, static fn(mixed $value): bool => $value !== false && $value !== '');
     }
 
+    // A rule the owner changes is the owner's from then on: WPPilot Cloud may only lift blocks it set
+    // and nobody has touched since. The Cloud's own apply skips this, see includes/cloud/policy.php.
+    if (function_exists('wppilot_cloud_release_changed_rules') && empty($GLOBALS['wppilot_cloud_policy_applying'])) {
+        wppilot_cloud_release_changed_rules(wppilot_get_ability_rules(), $clean);
+    }
+
     update_option('wppilot_ability_rules', $clean, autoload: false);
 }
 
