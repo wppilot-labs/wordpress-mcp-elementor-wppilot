@@ -28,6 +28,12 @@ function wppilot_cloud_register_routes(): void
         'permission_callback' => 'wppilot_cloud_rest_permission',
     ]);
 
+    register_rest_route('wppilot/v1', '/cloud/policy', [
+        'methods' => 'POST',
+        'callback' => 'wppilot_cloud_rest_policy',
+        'permission_callback' => 'wppilot_cloud_rest_permission',
+    ]);
+
     register_rest_route('wppilot/v1', '/cloud/unlink', [
         'methods' => 'POST',
         'callback' => 'wppilot_cloud_rest_unlink',
@@ -104,6 +110,7 @@ function wppilot_cloud_rest_status(): WP_REST_Response|WP_Error
         'home_url' => home_url(),
         'updates' => wppilot_cloud_pending_updates(),
         'backup' => wppilot_cloud_backup_summary(),
+        'policy' => wppilot_cloud_policy_status(),
     ], 200);
 }
 

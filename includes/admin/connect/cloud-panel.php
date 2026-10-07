@@ -84,6 +84,7 @@ function wppilot_render_cloud_panel(): void
     $result_message = match ($result) {
         'connected' => __('This site is connected to WPPilot Cloud.', domain: 'wppilot'),
         'disconnected' => __('Disconnected from WPPilot Cloud. Its access token was revoked.', domain: 'wppilot'),
+        'manage_saved' => __('Saved.', domain: 'wppilot'),
         'cancelled' => __('Connection cancelled. Nothing was changed on this site.', domain: 'wppilot'),
         default => '',
     };
@@ -223,6 +224,7 @@ function wppilot_render_cloud_connected(array $link): void
             <td><?php echo esc_html(is_string($paired_label) ? $paired_label : __('Unknown', domain: 'wppilot')); ?></td>
         </tr>
     </table>
+    <?php wppilot_render_cloud_manage(); ?>
     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo
         esc_js(__('Disconnect from WPPilot Cloud? Its access token is revoked and AI clients using this site through the Cloud lose access.', domain: 'wppilot'))
     ; ?>');">
@@ -230,5 +232,43 @@ function wppilot_render_cloud_connected(array $link): void
         <?php wp_nonce_field('wppilot_cloud_disconnect'); ?>
         <button type="submit" class="button wppilot-revoke-btn"><?php esc_html_e('Disconnect', domain: 'wppilot'); ?></button>
     </form>
+    <?php
+}
+
+/**
+ * The owner's opt-in to safety settings pushed from the Cloud, and what it last applied.
+ */
+function wppilot_render_cloud_manage(): void
+{
+    $manage = wppilot_cloud_manage_settings();
+    $applied = wppilot_cloud_applied_policy();
+    ?>
+    <h3><?php esc_html_e('Safety settings from WPPilot Cloud', domain: 'wppilot'); ?></h3>
+    <p class="description" style="max-width:640px;">
+        <?php esc_html_e('Let your WPPilot Cloud workspace apply one safety policy to all its sites: the safety profile, the approval mode, and which abilities are switched off or need a confirmation. Developer Full Access can never be set from the Cloud, and blocks you set here are never lifted by it.', domain: 'wppilot'); ?>
+    </p>
+    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+        <input type="hidden" name="action" value="wppilot_cloud_manage" />
+        <?php wp_nonce_field('wppilot_cloud_manage'); ?>
+        <p>
+            <label><input type="checkbox" name="wppilot_cloud_manage_tighten" value="1" <?php checked($manage['tighten']); ?> />
+                <?php esc_html_e('WPPilot Cloud may make these settings stricter', domain: 'wppilot'); ?></label><br />
+            <label><input type="checkbox" name="wppilot_cloud_manage_loosen" value="1" <?php checked($manage['loosen']); ?> />
+                <?php esc_html_e('…and may also loosen them (never above Production Safe)', domain: 'wppilot'); ?></label>
+        </p>
+        <p><button type="submit" class="button"><?php esc_html_e('Save', domain: 'wppilot'); ?></button></p>
+    </form>
+    <?php if ($applied !== null) : ?>
+        <p>
+            <?php
+            printf(
+                /* translators: 1: policy name, 2: date and time */
+                esc_html__('Managed by WPPilot Cloud: policy "%1$s", last applied %2$s. Changes made here may be replaced the next time the policy is pushed.', domain: 'wppilot'),
+                esc_html($applied['name'] !== '' ? $applied['name'] : $applied['id']),
+                esc_html(($t = strtotime($applied['applied_at'])) !== false ? wp_date(wppilot_get_datetime_format('Y-m-d H:i'), $t) : $applied['applied_at']),
+            );
+            ?>
+        </p>
+    <?php endif; ?>
     <?php
 }

@@ -584,6 +584,10 @@ function wppilot_cloud_clear_link(): void
 {
     delete_option(WPPILOT_CLOUD_LINK_OPTION);
     wp_clear_scheduled_hook(WPPILOT_CLOUD_HEARTBEAT_HOOK);
+    // A new pairing, perhaps to another account, starts unmanaged: the owner opts in again.
+    // The settings the Cloud applied stay as they are; only its right to change them goes.
+    delete_option(WPPILOT_CLOUD_MANAGE_OPTION);
+    delete_option(WPPILOT_CLOUD_POLICY_OPTION);
 }
 
 /**

@@ -666,6 +666,11 @@ final class CloudPairingTest extends TestCase
             'home_url' => 'https://example.test',
             'updates' => ['checked_at' => null, 'core' => null, 'plugins' => [], 'themes' => [], 'translations' => 0],
             'backup' => null,
+            'policy' => [
+                'manage' => ['tighten' => false, 'loosen' => false],
+                'applied' => null,
+                'current' => ['safety_profile' => 'production', 'confirmation_mode' => 'argument', 'disabled' => [], 'require_confirmation' => []],
+            ],
         ], $response->data);
     }
 

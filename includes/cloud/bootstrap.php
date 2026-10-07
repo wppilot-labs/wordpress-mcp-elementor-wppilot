@@ -18,6 +18,7 @@ declare(strict_types=1);
  *   heartbeat.php   §5     the hourly heartbeat and the schedule that drives it
  *   updates.php     §4     pending core, plugin and theme updates for the status answer
  *   backups.php     §4     the newest backup and running state for the status answer
+ *   policy.php      §7     safety settings pushed from the Cloud, only as far as the owner allows
  *   rate-limit.php  §6     the Cloud credential's write budget
  *
  * What the Cloud holds is an ordinary WPPilot access token, minted on this
@@ -62,6 +63,7 @@ require_once __DIR__ . '/rest.php';
 require_once __DIR__ . '/heartbeat.php';
 require_once __DIR__ . '/updates.php';
 require_once __DIR__ . '/backups.php';
+require_once __DIR__ . '/policy.php';
 require_once __DIR__ . '/rate-limit.php';
 
 add_action('admin_post_wppilot_cloud_begin', callback: 'wppilot_cloud_handle_begin');
@@ -69,6 +71,7 @@ add_action('admin_post_wppilot_cloud_return', callback: 'wppilot_cloud_handle_re
 add_action('admin_post_wppilot_cloud_confirm', callback: 'wppilot_cloud_handle_confirm');
 add_action('admin_post_wppilot_cloud_cancel', callback: 'wppilot_cloud_handle_cancel');
 add_action('admin_post_wppilot_cloud_disconnect', callback: 'wppilot_cloud_handle_disconnect');
+add_action('admin_post_wppilot_cloud_manage', callback: 'wppilot_cloud_handle_manage');
 
 add_action('rest_api_init', callback: 'wppilot_cloud_register_routes');
 
