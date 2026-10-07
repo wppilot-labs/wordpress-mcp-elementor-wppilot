@@ -181,6 +181,23 @@ final class LedgerMapTest extends TestCase
         self::assertStringContainsString('secret', (string) $row['rollback']['reason']);
     }
 
+    public function testAnEddProductUpdateIsUndoneAndItsOrderWritesSayWhyNot(): void
+    {
+        $download = Kit_Test_Site::insert(['post_title' => 'E-book', 'post_type' => 'download']);
+        Kit_Test_Site::set_meta($download, 'edd_price', '9.00');
+
+        $row = $this->run_write('edd/product-update', ['product_id' => $download, 'price' => '12.00'], static function () use ($download): void {
+            update_post_meta($download, 'edd_price', '12.00');
+        });
+        self::assertTrue($row['rollback']['reversible']);
+        wppilot_rollback_change((string) $row['id']);
+        self::assertSame('9.00', get_post_meta($download, 'edd_price', single: true));
+
+        $order = $this->run_write('edd/order-update-status', ['order_id' => 3, 'status' => 'refunded'], static function (): void {});
+        self::assertFalse($order['rollback']['reversible']);
+        self::assertStringContainsString('own tables', (string) $order['rollback']['reason']);
+    }
+
     public function testATargetMissingFromTheInputRecordsNoBeforeImage(): void
     {
         $row = $this->run_write('seopress/update-post-title-description', ['title' => 'x'], static function (): void {});

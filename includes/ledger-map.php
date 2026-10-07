@@ -130,6 +130,18 @@ function wppilot_default_ability_ledger_map(): array
     $map['translatepress/enable-automatic-translation'] = ['strategy' => 'option', 'option' => 'trp_machine_translation_settings'];
     $map['translatepress/set-license-key'] = ['strategy' => 'irreversible', 'reason' => 'A licence key is a secret, so it is never copied into the change log. Re-enter the old key by hand.'];
 
+    // Easy Digital Downloads 3.7's own abilities. A download is a post; orders, customers, notes
+    // and discounts live in EDD's own tables, and receipts are emailed.
+    $map['edd/product-update'] = ['strategy' => 'post', 'target' => 'input.product_id'];
+    $map['edd/product-create'] = ['strategy' => 'irreversible', 'reason' => 'EDD created a new download. Undo by trashing it.'];
+    $edd_tables = 'EDD keeps this in its own tables, which WPPilot does not snapshot. Change it back in Downloads.';
+    foreach (['edd/order-create', 'edd/order-update-status', 'edd/customer-create', 'edd/customer-update', 'edd/discount-create', 'edd/discount-update', 'edd/discount-delete'] as $ability) {
+        $map[$ability] = ['strategy' => 'irreversible', 'reason' => $edd_tables];
+    }
+    foreach (['edd/order-resend-receipt', 'edd/order-note-add', 'edd/customer-note-add'] as $ability) {
+        $map[$ability] = ['strategy' => 'irreversible', 'reason' => 'An email or a note was sent or recorded; it cannot be taken back.'];
+    }
+
     return $map;
 }
 
