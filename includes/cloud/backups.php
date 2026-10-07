@@ -52,7 +52,8 @@ function wppilot_cloud_backup_summary(): ?array
             'label' => is_string($provider['label'] ?? null) ? $provider['label'] : $provider['provider'],
             'readable' => ($provider['readable'] ?? false) === true,
         ];
-        if (!empty($provider['running'])) {
+        // Each adapter answers running as {running: bool, jobs: [...]}.
+        if (is_array($provider['running'] ?? null) && ($provider['running']['running'] ?? false) === true) {
             $running = true;
         }
     }

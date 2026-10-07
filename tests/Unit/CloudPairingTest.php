@@ -727,7 +727,7 @@ final class CloudPairingTest extends TestCase
         $GLOBALS['cloud_test_backup_status'] = [
             'active_providers' => ['updraftplus', 'backwpup'],
             'providers' => [
-                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'running' => ['files' => true]],
+                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'running' => ['running' => true, 'jobs' => [['state' => 'queued']]]],
                 ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false, 'error' => 'unreadable'],
                 'junk',
             ],
@@ -743,6 +743,10 @@ final class CloudPairingTest extends TestCase
             'newest' => ['provider' => 'updraftplus', 'timestamp' => 1_700_000_000],
             'running' => true,
         ], wppilot_cloud_rest_status()->data['backup']);
+
+        // An idle adapter still answers with its running array: only the flag counts.
+        $GLOBALS['cloud_test_backup_status']['providers'][0]['running'] = ['running' => false, 'jobs' => []];
+        self::assertFalse(wppilot_cloud_backup_summary()['running']);
 
         $GLOBALS['cloud_test_backup_status'] = new WP_Error('kit_down', 'no');
         self::assertNull(wppilot_cloud_backup_summary(), 'a failing ability reads as no summary, never an error in the status answer');
