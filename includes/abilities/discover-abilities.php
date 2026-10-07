@@ -33,7 +33,7 @@ if (wp_has_ability('mcp-adapter/discover-abilities')) {
 wp_register_ability('mcp-adapter/discover-abilities', [
     'label' => __('Discover Abilities', domain: 'wppilot'),
     'description' => __(
-        'Discover all available WordPress abilities in the system. Returns a list of all registered abilities with their basic information, plus WPPilot environment instructions.',
+        'Discover all available WordPress abilities in the system. Returns a list of all registered abilities with their basic information and input signature (parameter names and types), plus WPPilot environment instructions.',
         domain: 'wppilot',
     ),
     'category' => 'mcp-adapter',
@@ -52,8 +52,12 @@ wp_register_ability('mcp-adapter/discover-abilities', [
                         'name' => ['type' => 'string'],
                         'label' => ['type' => 'string'],
                         'description' => ['type' => 'string'],
+                        'params' => [
+                            'type' => 'string',
+                            'description' => 'Input signature, e.g. "post_id: integer, settings: object, replace?: boolean". A trailing ? marks an optional parameter; empty when the ability takes no input. Use get-ability-info for the full schema.',
+                        ],
                     ],
-                    'required' => ['name', 'label', 'description'],
+                    'required' => ['name', 'label', 'description', 'params'],
                 ],
             ],
         ],
@@ -85,6 +89,7 @@ wp_register_ability('mcp-adapter/discover-abilities', [
                 'name' => $ability->get_name(),
                 'label' => $ability->get_label(),
                 'description' => $ability->get_description(),
+                'params' => wppilot_ability_param_signature($ability->get_input_schema()),
             ];
         }
 

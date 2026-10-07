@@ -221,9 +221,10 @@ function inspect(string $url, int $timeout = 20, array $cookies = []): array|WP_
         ];
     } else {
         $xpath = new DOMXPath($document);
-        array_push($findings, ...headings($xpath, $summary));
+        $roots = content_roots($xpath, $summary);
+        array_push($findings, ...headings($xpath, $roots, $summary));
         array_push($findings, ...images($xpath, $summary));
-        array_push($findings, ...empty_elements($xpath, $summary));
+        array_push($findings, ...empty_elements($xpath, $roots, $summary));
         array_push($findings, ...render_errors($body));
     }
 
@@ -264,6 +265,10 @@ function inspect(string $url, int $timeout = 20, array $cookies = []): array|WP_
 
     array_push($findings, ...weight($bytes, $elapsed));
 
+    // Checks scoped to the page's own content tag themselves; everything else
+    // reads the served document as a whole.
+    $findings = array_map(static fn(array $f): array => $f + ['source' => 'document'], $findings);
+
     return [
         'url' => $url,
         'status' => $status,
@@ -302,15 +307,94 @@ function parse(string $html): ?DOMDocument
 }
 
 /**
+ * The elements that hold the page's own content, as opposed to the theme's
+ * header, sidebar and footer around it.
+ *
+ * A served page is the post wrapped in everything the theme and its widget
+ * areas print, and a check run over the whole document blamed the page for
+ * the theme: an empty `col-md-6` in the footer failed the empty-element check,
+ * and sidebar headings broke the outline. The post is found the way the markup
+ * itself names it — Elementor tags the document it renders with
+ * `data-elementor-id`, and WordPress puts the queried post's ID in the body
+ * class — then by the containers classic and block themes wrap content in. An
+ * empty list means none was found and the whole document is the scope, which
+ * the summary says rather than leaving the caller to guess.
+ *
+ * @param array<string, mixed> $summary
+ * @return list<DOMElement>
+ */
+function content_roots(DOMXPath $xpath, array &$summary): array
+{
+    $post_id = 0;
+    $body = $xpath->query('//body');
+    $body = $body === false ? null : $body->item(0);
+    if ($body instanceof DOMElement && preg_match('/\b(?:page-id|postid)-(\d+)\b/', $body->getAttribute('class'), $m) === 1) {
+        $post_id = (int) $m[1];
+    }
+
+    $queries = [];
+    if ($post_id > 0) {
+        $queries['elementor-document'] = sprintf('//*[@data-elementor-id="%d"]', $post_id);
+    }
+    $queries['entry-content'] = '//*[contains(concat(" ", normalize-space(@class), " "), " entry-content ")]';
+    $queries['main'] = '//main';
+
+    foreach ($queries as $scope => $query) {
+        $nodes = $xpath->query($query);
+        if ($nodes === false || $nodes->length === 0) {
+            continue;
+        }
+        $roots = [];
+        foreach ($nodes as $node) {
+            if ($node instanceof DOMElement) {
+                $roots[] = $node;
+            }
+        }
+        $summary['scope'] = $scope;
+        return $roots;
+    }
+
+    $summary['scope'] = 'document';
+    return [];
+}
+
+/**
+ * Whether a node sits inside one of the content roots. With no roots the whole
+ * document is content.
+ *
+ * @param list<DOMElement> $roots
+ */
+function in_content(DOMElement $node, array $roots): bool
+{
+    if ($roots === []) {
+        return true;
+    }
+    for ($cursor = $node; $cursor !== null; $cursor = $cursor->parentNode) {
+        if (in_array($cursor, $roots, strict: true)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Heading structure: exactly one h1, and no skipped levels.
  *
+ * The h1 count covers the whole document, because a theme title printed above
+ * a hero that carries its own h1 is a real defect of the page as served. The
+ * skipped-level check reads the page's own headings only: the step from the
+ * last content heading to a footer widget title is not a gap in the page.
+ * Every outline entry says where its heading came from.
+ *
+ * @param list<DOMElement>     $roots
  * @param array<string, mixed> $summary
  * @return list<array<string, mixed>>
  */
-function headings(DOMXPath $xpath, array &$summary): array
+function headings(DOMXPath $xpath, array $roots, array &$summary): array
 {
     $nodes = $xpath->query('//h1|//h2|//h3|//h4|//h5|//h6');
     $levels = [];
+    $content_levels = [];
     $outline = [];
     if ($nodes !== false) {
         foreach ($nodes as $node) {
@@ -318,16 +402,22 @@ function headings(DOMXPath $xpath, array &$summary): array
                 continue;
             }
             $level = (int) substr($node->nodeName, offset: 1);
+            $source = in_content($node, $roots) ? 'content' : 'theme';
             $levels[] = $level;
+            if ($source === 'content') {
+                $content_levels[] = $level;
+            }
             if (count($outline) < 25) {
                 $outline[] = [
                     'level' => $level,
                     'text' => trim(preg_replace('/\s+/', ' ', $node->textContent) ?? ''),
+                    'source' => $source,
                 ];
             }
         }
     }
     $summary['headings'] = count($levels);
+    $summary['content_headings'] = count($content_levels);
     $summary['outline'] = $outline;
 
     $findings = [];
@@ -338,6 +428,7 @@ function headings(DOMXPath $xpath, array &$summary): array
             'severity' => 'warn',
             'message' => __('The page has headings but no h1.', domain: 'wppilot'),
             'evidence' => '',
+            'source' => 'document',
         ];
     }
     if ($h1 > 1) {
@@ -353,16 +444,18 @@ function headings(DOMXPath $xpath, array &$summary): array
                 $h1,
             ),
             'evidence' => (string) $h1,
+            'source' => 'document',
         ];
     }
     $previous = 0;
-    foreach ($levels as $level) {
+    foreach ($content_levels as $level) {
         if ($previous !== 0 && $level > $previous + 1) {
             $findings[] = [
                 'check' => 'heading-outline',
                 'severity' => 'warn',
                 'message' => __('The heading outline skips a level, which screen readers announce as a gap.', domain: 'wppilot'),
                 'evidence' => sprintf('h%d -> h%d', $previous, $level),
+                'source' => 'content',
             ];
             break;
         }
@@ -439,10 +532,15 @@ function images(DOMXPath $xpath, array &$summary): array
  * a step that should have filled a column silently did not, and the page ships
  * with a hole in it that reads as a styling bug rather than missing content.
  *
+ * Only the page's own content is counted. Empty theme and widget-area markup
+ * is reported in the summary but is not the page's fault, and failing the
+ * page over a footer column sent the agent hunting for a defect it never made.
+ *
+ * @param list<DOMElement>     $roots
  * @param array<string, mixed> $summary
  * @return list<array<string, mixed>>
  */
-function empty_elements(DOMXPath $xpath, array &$summary): array
+function empty_elements(DOMXPath $xpath, array $roots, array &$summary): array
 {
     $nodes = $xpath->query(
         '//section|//article'
@@ -451,6 +549,7 @@ function empty_elements(DOMXPath $xpath, array &$summary): array
         . '|//div[contains(@class,"wp-block")]',
     );
     $empty = 0;
+    $outside = 0;
     $examples = [];
     if ($nodes !== false) {
         foreach ($nodes as $node) {
@@ -463,7 +562,7 @@ function empty_elements(DOMXPath $xpath, array &$summary): array
             // Text is not the only content: an image, an embed or an svg makes
             // a container legitimately textless.
             $inner = new DOMXPath($node->ownerDocument ?? new DOMDocument());
-            $media = $inner->query('.//img|.//svg|.//iframe|.//video|.//canvas|.//input|.//button|.//hr', $node);
+            $media = $inner->query('.//img|.//svg|.//iframe|.//video|.//canvas|.//input|.//textarea|.//select|.//button|.//hr', $node);
             if ($media !== false && $media->length > 0) {
                 continue;
             }
@@ -471,6 +570,10 @@ function empty_elements(DOMXPath $xpath, array &$summary): array
             // job. Counting them meant a page with four dividers earned a hard
             // failure for having drawn four lines.
             if (preg_match('/\b(divider|separator|spacer|gap|rule)\b/i', $node->getAttribute('class')) === 1) {
+                continue;
+            }
+            if (!in_content($node, $roots)) {
+                $outside++;
                 continue;
             }
             $empty++;
@@ -481,6 +584,7 @@ function empty_elements(DOMXPath $xpath, array &$summary): array
         }
     }
     $summary['empty_containers'] = $empty;
+    $summary['empty_containers_outside_content'] = $outside;
 
     if ($empty === 0) {
         return [];
@@ -498,6 +602,7 @@ function empty_elements(DOMXPath $xpath, array &$summary): array
             $empty,
         ),
         'evidence' => implode(', ', $examples),
+        'source' => 'content',
     ]];
 }
 

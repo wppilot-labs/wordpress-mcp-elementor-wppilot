@@ -146,8 +146,9 @@ function el_remove(array &$elements, string $element_id): bool
 /**
  * Resolve the validation-schema key for an element: the widget type for
  * `elType: widget`, the container pseudo-key for `elType: container`, and
- * an empty string for any other element shape (which tells the caller to
- * skip validation entirely).
+ * the element type itself for atomic elements and classic sections and
+ * columns (which have schemas of their own). An empty string means the
+ * widget type is missing and tells the caller to skip validation.
  *
  * @param array<string, mixed> $element
  */

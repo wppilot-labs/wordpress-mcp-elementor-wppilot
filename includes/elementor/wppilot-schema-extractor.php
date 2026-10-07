@@ -83,6 +83,14 @@ const WPPILOT_COMPACT_SCHEMA_CONTAINER_KEY = '__container__';
 const WPPILOT_ATOMIC_CONTAINER_TYPES = ['e-flexbox', 'e-div-block'];
 
 /**
+ * Classic layout elements that predate containers. Like the container they
+ * live under `elements_manager`, and `elementor-get-content` returns them on
+ * any page built before containers, so a tree read back from such a page has
+ * to validate against their real controls or it cannot be written back.
+ */
+const WPPILOT_LEGACY_LAYOUT_TYPES = ['section', 'column'];
+
+/**
  * Resolve the compact schema for a single widget type (or the container
  * pseudo-type), returning null when neither match.
  *
@@ -97,6 +105,10 @@ function resolve_compact_schema(string $widget_type, array $opts): ?array
 
     if (in_array($widget_type, WPPILOT_ATOMIC_CONTAINER_TYPES, strict: true)) {
         return build_atomic_element_compact_schema($widget_type);
+    }
+
+    if (in_array($widget_type, WPPILOT_LEGACY_LAYOUT_TYPES, strict: true)) {
+        return build_legacy_layout_compact_schema($widget_type, $opts);
     }
 
     return build_widget_compact_schema($widget_type, $opts);
@@ -170,6 +182,34 @@ function build_container_compact_schema(array $opts): ?array
         'widgetType' => WPPILOT_COMPACT_SCHEMA_CONTAINER_KEY,
         'label' => 'Container',
         'description' => 'Elementor container element (flex layout wrapper).',
+        'is_atomic' => false,
+        'controls' => compact_v3_controls($controls, $opts),
+    ];
+}
+
+/**
+ * Build the compact schema for a classic section or column.
+ *
+ * @param array{include_styles: bool} $opts
+ * @return array{widgetType: string, label: string, description: string, is_atomic: bool, controls: array<string, array<string, mixed>>}|null
+ */
+function build_legacy_layout_compact_schema(string $element_type, array $opts): ?array
+{
+    $element = \Elementor\Plugin::$instance->elements_manager->get_element_types($element_type);
+
+    if (!is_object($element) || !method_exists($element, 'get_controls')) {
+        return null;
+    }
+
+    /** @var array<string, array<string, mixed>> $controls */
+    $controls = $element->get_controls();
+
+    return [
+        'widgetType' => $element_type,
+        'label' => $element_type === 'section' ? 'Section' : 'Column',
+        'description' => $element_type === 'section'
+            ? 'Classic Elementor section (pre-container layout row). Its children are columns.'
+            : 'Classic Elementor column inside a section. Its children are widgets or inner sections.',
         'is_atomic' => false,
         'controls' => compact_v3_controls($controls, $opts),
     ];
@@ -304,7 +344,17 @@ function extract_control_options(array $control): array
         return [];
     }
 
-    return ['opts' => array_keys($options)];
+    $keys = array_keys($options);
+
+    // A select whose only option is the empty placeholder is filled in by the
+    // editor's JavaScript at edit time — the form widget's Reply-To lists the
+    // form's own field IDs that way. Its PHP options are not the real choices,
+    // so publishing them as an enum would reject every legitimate value.
+    if (array_filter($keys, static fn(int|string $k): bool => $k !== '') === []) {
+        return [];
+    }
+
+    return ['opts' => $keys];
 }
 
 /**
