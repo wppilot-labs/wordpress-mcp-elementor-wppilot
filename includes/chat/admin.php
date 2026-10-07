@@ -103,6 +103,7 @@ function wppilot_render_chat_page(): void
     ?>
     <div class="wrap wppilot-chat-wrap">
         <h1 class="screen-reader-text"><?php esc_html_e('WPPilot Chat', domain: 'wppilot'); ?></h1>
+        <?php wppilot_chat_render_usage_meter(get_current_user_id()); ?>
         <div id="wppilot-chat-root"></div>
         <?php wppilot_render_chat_gutenberg_finalizer_runtime(); ?>
     </div>

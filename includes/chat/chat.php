@@ -23,6 +23,7 @@ declare(strict_types=1);
  *   tool-calls.php  the tool-call record and its approval lifecycle
  *   gutenberg.php   Gutenberg-specific tool result handling
  *   ai.php          building history, generating, and parsing the response
+ *   usage.php       token counts per person, and the limits Pro can set
  *
  * bootstrap.php must load first; the rest are order-independent because every
  * symbol in them is a plain function or constant.
@@ -44,6 +45,7 @@ require_once __DIR__ . '/meta-tools.php';
 require_once __DIR__ . '/tool-calls.php';
 require_once __DIR__ . '/gutenberg.php';
 require_once __DIR__ . '/ai.php';
+require_once __DIR__ . '/usage.php';
 
 // Priority 70 places Chat directly before Visual (80) in the WPPilot submenu.
 add_action('admin_menu', callback: 'wppilot_register_chat_menu', priority: 70);

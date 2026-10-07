@@ -81,6 +81,12 @@ function wppilot_chat_generate_native_step(array $session, array $tools): array|
         return $selection;
     }
 
+    // A limit stops the call before the provider bills it.
+    $allowed = wppilot_chat_usage_allows(get_current_user_id());
+    if ($allowed instanceof WP_Error) {
+        return $allowed;
+    }
+
     $messages = wppilot_chat_build_ai_history($session);
     if ($messages === []) {
         return new WP_Error('wppilot_chat_empty_history', __('The session has no prompt history.', domain: 'wppilot'), [
@@ -155,6 +161,12 @@ function wppilot_chat_generate_native_step(array $session, array $tools): array|
             __('The model did not return a native AI Client result.', domain: 'wppilot'),
             ['status' => 500],
         );
+    }
+
+    // Counted whatever the answer turns out to be: the provider billed it either way.
+    $tokens = wppilot_chat_result_tokens($result);
+    if ($tokens !== null) {
+        wppilot_chat_record_usage(get_current_user_id(), $tokens['prompt'], $tokens['completion']);
     }
 
     return wppilot_chat_parse_native_result($result);
