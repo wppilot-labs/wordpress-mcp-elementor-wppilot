@@ -257,6 +257,7 @@ require_once __DIR__ . '/includes/safety.php';
 require_once __DIR__ . '/includes/rate-limit.php';
 require_once __DIR__ . '/includes/gate-pipeline.php';
 require_once __DIR__ . '/includes/confirmation.php';
+require_once __DIR__ . '/includes/foreign-gate.php';
 require_once __DIR__ . '/includes/change-log.php';
 require_once __DIR__ . '/includes/change-log-table.php';
 require_once __DIR__ . '/includes/change-sessions.php';

@@ -21,7 +21,8 @@ declare(strict_types=1);
  *     add_filter('wppilot_ability_ledger_map', function (array $map): array {
  *         $map['acme/update-headline'] = [
  *             'strategy'  => 'post-partial',
- *             'target'    => 'input.post_id',          // or a list of paths, first non-empty wins
+ *             'target'    => 'input.post_id',          // or a list of paths, first non-empty wins;
+ *                                                        // 'option.name' reads an ID from a site option
  *             'fields'    => ['post_title'],
  *             'meta_keys' => ['_acme_headline'],
  *         ];
@@ -98,6 +99,29 @@ function wppilot_default_ability_ledger_map(): array
         'target' => 'input.post_id',
         'meta_keys' => ['_seopress_titles_title', '_seopress_titles_desc'],
     ];
+
+    // Elementor 4.3's own MCP abilities (modules/mcp). A document's layout lives in four meta
+    // keys; global classes and variables in meta of the active kit, whose ID is an option.
+    $document = ['_elementor_data', '_elementor_page_settings', '_elementor_edit_mode', '_elementor_version'];
+    foreach (['elementor/manage-elements', 'elementor/build-composition', 'elementor/update-page-settings'] as $ability) {
+        $map[$ability] = ['strategy' => 'post-partial', 'target' => 'input.post_id', 'meta_keys' => $document];
+    }
+    $map['elementor/publish-document'] = ['strategy' => 'post-partial', 'target' => 'input.post_id', 'fields' => ['post_status', 'post_title', 'post_content'], 'meta_keys' => $document];
+    $classes = ['_elementor_global_classes', '_elementor_global_classes_order', '_elementor_global_classes_labels', '_elementor_global_classes_preview', '_elementor_global_classes_order_preview', '_elementor_global_classes_labels_preview'];
+    $map['elementor/manage-classes'] = ['strategy' => 'post-partial', 'target' => 'option.elementor_active_kit', 'meta_keys' => $classes];
+    $map['elementor/reorder-classes'] = ['strategy' => 'post-partial', 'target' => 'option.elementor_active_kit', 'meta_keys' => $classes];
+    $map['elementor/manage-global-variable'] = ['strategy' => 'post-partial', 'target' => 'option.elementor_active_kit', 'meta_keys' => ['_elementor_global_variables']];
+    $map['elementor/create-page'] = ['strategy' => 'irreversible', 'reason' => 'Elementor created a new page. Undo by trashing it.'];
+    $map['elementor/manage-component'] = ['strategy' => 'irreversible', 'reason' => 'Elementor components span several posts; WPPilot cannot put one back as it was.'];
+    $map['elementor/manage-default-styles'] = ['strategy' => 'irreversible', 'reason' => 'Elementor stores default styles where WPPilot cannot snapshot them.'];
+
+    // WooCommerce 10.3's own abilities. A product is a post with meta and terms; an order is not
+    // always a post (HPOS), and changing its status or adding a note can email the customer.
+    $map['woocommerce/product-update'] = ['strategy' => 'post', 'target' => 'input.id'];
+    $map['woocommerce/product-delete'] = ['strategy' => 'post', 'target' => 'input.id'];
+    $map['woocommerce/product-create'] = ['strategy' => 'irreversible', 'reason' => 'WooCommerce created a new product. Undo by trashing it.'];
+    $map['woocommerce/order-update-status'] = ['strategy' => 'irreversible', 'reason' => 'An order status change can email the customer and move stock; set the status back by hand if needed.'];
+    $map['woocommerce/order-add-note'] = ['strategy' => 'irreversible', 'reason' => 'An order note may already have been emailed to the customer.'];
 
     return $map;
 }
@@ -192,12 +216,18 @@ function wppilot_ledger_map_strings(mixed $value): array
 }
 
 /**
- * Read a value out of the ability input by an `input.a.b` path (the `input.` prefix is optional).
+ * Read a value out of the ability input by an `input.a.b` path (the `input.` prefix is optional),
+ * or out of a site option by `option.name`.
  *
  * @param array<string, mixed> $input
  */
 function wppilot_ledger_map_resolve(string $path, array $input): mixed
 {
+    // `option.name` reads a site option instead, for writes to something the input does not name
+    // but the site knows: Elementor's global classes live on the kit post `elementor_active_kit` names.
+    if (str_starts_with($path, 'option.')) {
+        return get_option(substr($path, offset: strlen('option.')), null);
+    }
     $path = str_starts_with($path, 'input.') ? substr($path, offset: strlen('input.')) : $path;
     /** @var mixed $value */
     $value = $input;

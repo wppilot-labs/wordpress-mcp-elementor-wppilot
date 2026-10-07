@@ -87,5 +87,34 @@ function wppilot_gate_ability_call(WP_Ability $ability, mixed $input, string $tr
      */
     // @mago-expect analysis:mixed-assignment -- Filters preserve the Ability's declared input type or return WP_Error.
     // @mago-expect lint:literal-named-argument -- WordPress filter arguments after value are variadic.
-    return apply_filters('wppilot_pre_ability_execute', $input, $ability, $transport, $context);
+    $input = apply_filters('wppilot_pre_ability_execute', $input, $ability, $transport, $context);
+    if (!$input instanceof WP_Error) {
+        // execute() runs next; the gate for other MCP servers must not hold it a second time.
+        wppilot_gate_mark_passed($ability->get_name());
+    }
+
+    return $input;
+}
+
+/**
+ * Record that WPPilot's gate passed a call to this ability, so its execute() is not gated again by
+ * the gate for other MCP servers (includes/foreign-gate.php).
+ *
+ * A count per name, not a flag: one request can run the same ability twice (a bulk replay), and
+ * each pass is used up by exactly one execute().
+ */
+function wppilot_gate_mark_passed(string $ability_name): void
+{
+    $GLOBALS['wppilot_gate_passes'][$ability_name] = ($GLOBALS['wppilot_gate_passes'][$ability_name] ?? 0) + 1;
+}
+
+function wppilot_gate_take_pass(string $ability_name): bool
+{
+    $left = (int) ($GLOBALS['wppilot_gate_passes'][$ability_name] ?? 0);
+    if ($left <= 0) {
+        return false;
+    }
+    $GLOBALS['wppilot_gate_passes'][$ability_name] = $left - 1;
+
+    return true;
 }

@@ -118,6 +118,48 @@ final class LedgerMapTest extends TestCase
         self::assertSame('edited since', get_post_meta($post_id, 'unrelated', single: true));
     }
 
+    /**
+     * Elementor keeps global classes on its active kit post, which the input does not name: the
+     * shipped entry reads the kit's ID from the `elementor_active_kit` option.
+     */
+    public function testAnElementorGlobalClassesWriteIsUndoneOnTheActiveKit(): void
+    {
+        $kit = Kit_Test_Site::insert(['post_title' => 'Default Kit', 'post_type' => 'elementor_library']);
+        WPPilot_Test_State::$options['elementor_active_kit'] = (string) $kit;
+        Kit_Test_Site::set_meta($kit, '_elementor_global_classes', '{"items":{"g-1":{"label":"hero"}}}');
+
+        $row = $this->run_write('elementor/manage-classes', ['operations' => [['op' => 'create', 'label' => 'cta']]], static function () use ($kit): void {
+            update_post_meta($kit, '_elementor_global_classes', '{"items":{"g-1":{"label":"hero"},"g-2":{"label":"cta"}}}');
+        });
+        self::assertTrue($row['rollback']['reversible']);
+
+        $result = wppilot_rollback_change((string) $row['id']);
+        self::assertIsArray($result);
+        self::assertTrue($result['rolled_back']);
+        self::assertSame('{"items":{"g-1":{"label":"hero"}}}', get_post_meta($kit, '_elementor_global_classes', single: true));
+    }
+
+    public function testAnElementorLayoutWriteSnapshotsTheDocumentMeta(): void
+    {
+        $page = Kit_Test_Site::insert(['post_title' => 'Home', 'post_type' => 'page']);
+        Kit_Test_Site::set_meta($page, '_elementor_data', '[{"id":"a"}]');
+
+        $row = $this->run_write('elementor/manage-elements', ['post_id' => $page, 'operations' => []], static function () use ($page): void {
+            update_post_meta($page, '_elementor_data', '[{"id":"a"},{"id":"b"}]');
+        });
+        self::assertTrue($row['rollback']['reversible']);
+        wppilot_rollback_change((string) $row['id']);
+        self::assertSame('[{"id":"a"}]', get_post_meta($page, '_elementor_data', single: true));
+    }
+
+    public function testWooCommerceOrderWritesSayWhyTheyCannotBeUndone(): void
+    {
+        $row = $this->run_write('woocommerce/order-update-status', ['id' => 9, 'status' => 'completed'], static function (): void {});
+
+        self::assertFalse($row['rollback']['reversible']);
+        self::assertStringContainsString('email the customer', (string) $row['rollback']['reason']);
+    }
+
     public function testATargetMissingFromTheInputRecordsNoBeforeImage(): void
     {
         $row = $this->run_write('seopress/update-post-title-description', ['title' => 'x'], static function (): void {});

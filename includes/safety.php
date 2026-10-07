@@ -474,6 +474,8 @@ function wppilot_safety_pre_mcp_tool_call(array $args, string $tool_name): array
         unset($parameters['confirm']);
         $args['parameters'] = $parameters;
     }
+    // The legacy adapter executes next; the gate for other MCP servers must not hold it again.
+    wppilot_gate_mark_passed($ability->get_name());
 
     return $args;
 }
