@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Plugin Name: WPPilot
  * Plugin URI: https://wppilot.co
  * Description: WordPress MCP server with free Elementor MCP editing. Connects Claude, Codex, Cursor and other AI clients to typed WordPress abilities over MCP, with OAuth 2.1, safety profiles, change evidence and rollback.
- * Version: 1.17.2
+ * Version: 1.17.3
  * Requires at least: 6.9
  * Requires PHP: 8.0
  * Update URI: https://wppilot.co/wppilot/
@@ -227,6 +227,7 @@ function wppilot_initialize_mcp_adapter(): bool
 // answer is available to every consumer below, including the server registration
 // that must not rename a default server another plugin owns.
 require_once __DIR__ . '/includes/mcp/adapter-origin.php';
+require_once __DIR__ . '/includes/mcp/adapter-abilities.php';
 
 $wppilot_dependency_error = wppilot_load_bundled_dependencies();
 if ($wppilot_dependency_error !== null) {
@@ -860,6 +861,11 @@ if ($is_enabled && $wppilot_abilities_supported) {
     // Initialize the optional bundled adapter after the transport-neutral Ability and REST hooks.
     // An adapter failure must not remove those hooks or make the REST Ability surface disappear.
     $wppilot_adapter_initialized = wppilot_initialize_mcp_adapter();
+
+    if ($wppilot_adapter_initialized) {
+        add_action('wp_abilities_api_categories_init', callback: 'wppilot_ensure_mcp_adapter_category', priority: 15);
+        add_action('wp_abilities_api_init', callback: 'wppilot_ensure_mcp_adapter_abilities', priority: 15);
+    }
 }
 
 /**

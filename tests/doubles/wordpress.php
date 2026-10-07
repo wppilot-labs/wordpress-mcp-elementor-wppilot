@@ -32,6 +32,9 @@ final class WPPilot_Test_State
     /** @var list<array{name: string, args: array<string, mixed>}> */
     public static array $registrations = [];
 
+    /** @var list<string> */
+    public static array $registered_categories = [];
+
     /** @var array<string, object> */
     public static array $taxonomies = [];
 
@@ -117,6 +120,7 @@ final class WPPilot_Test_State
         self::$current_user_id = 0;
         self::$registered_abilities = [];
         self::$registrations = [];
+        self::$registered_categories = [];
         self::$taxonomies = [];
         self::$logged_in = true;
         self::$wppilot_enabled = true;
@@ -618,6 +622,21 @@ if (!function_exists('wp_register_ability')) {
     {
         WPPilot_Test_State::$registered_abilities[] = $name;
         WPPilot_Test_State::$registrations[] = ['name' => $name, 'args' => $args];
+    }
+}
+
+if (!function_exists('wp_has_ability_category')) {
+    function wp_has_ability_category(string $slug): bool
+    {
+        return in_array($slug, WPPilot_Test_State::$registered_categories, true);
+    }
+}
+
+if (!function_exists('wp_register_ability_category')) {
+    /** @param array<string, mixed> $args */
+    function wp_register_ability_category(string $slug, array $args): void
+    {
+        WPPilot_Test_State::$registered_categories[] = $slug;
     }
 }
 

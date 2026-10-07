@@ -37,6 +37,7 @@ require_once __DIR__ . '/doubles/wordpress.php';
 // Which copy of the adapter won. Pure path and classmap reading; it registers
 // nothing and touches WordPress only through wp_normalize_path().
 require_once dirname(__DIR__) . '/includes/mcp/adapter-origin.php';
+require_once dirname(__DIR__) . '/includes/mcp/adapter-abilities.php';
 
 // The compatibility contract: the version constants, the probe of what the host
 // WordPress offers, and the block published to clients. It registers nothing and

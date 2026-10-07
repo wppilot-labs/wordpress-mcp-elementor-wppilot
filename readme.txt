@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.17.2
+Stable tag: 1.17.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.17.3 =
+* Fixed: an AI client could list WPPilot's abilities but never run one, because it was offered only mcp-adapter-discover-abilities. When another plugin read the WordPress Abilities registry early in the request, the bundled MCP Adapter missed the moment to register mcp-adapter/get-ability-info and mcp-adapter/execute-ability, so every WPPilot MCP endpoint (OAuth and Application Password alike) served discovery alone. WPPilot now registers both itself when the adapter did not. Clients that connected before updating should disconnect and reconnect, or start a new chat, so they read the tool list again. No ability permissions changed.
 
 = 1.17.2 =
 * Changed: WPPilot's admin screens (Connect, Abilities, Skills and the masthead Upgrade link) use the wppilot.co brand purple, #675CF4, instead of #3D2BFF, so the plugin, the website and the WPPilot Cloud dashboard look like one product. The README names the Pro plans by site count (Single Site, 10 Sites, 100 Sites, Unlimited Sites), as wppilot.co does. No behaviour, ability or permission changed.
@@ -470,6 +473,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.17.3 =
+Fixes AI clients that could discover abilities but not run them. Reconnect the client after updating. No ability permissions changed.
 
 = 1.17.2 =
 Visual only: the admin screens use the wppilot.co brand purple. No ability permissions changed.
