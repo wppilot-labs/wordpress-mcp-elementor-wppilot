@@ -69,6 +69,12 @@ function wppilot_chat_generate_native_step(array $session, array $tools): array|
         );
     }
 
+    // A limit stops the call before the provider bills it.
+    $allowed = wppilot_chat_usage_allows(get_current_user_id());
+    if ($allowed instanceof WP_Error) {
+        return $allowed;
+    }
+
     $declarations = wppilot_chat_build_function_declarations($tools);
     if (is_wp_error($declarations)) {
         return $declarations;
@@ -79,12 +85,6 @@ function wppilot_chat_generate_native_step(array $session, array $tools): array|
     $selection = wppilot_chat_normalize_model_selection($provider, $model);
     if (is_wp_error($selection)) {
         return $selection;
-    }
-
-    // A limit stops the call before the provider bills it.
-    $allowed = wppilot_chat_usage_allows(get_current_user_id());
-    if ($allowed instanceof WP_Error) {
-        return $allowed;
     }
 
     $messages = wppilot_chat_build_ai_history($session);
