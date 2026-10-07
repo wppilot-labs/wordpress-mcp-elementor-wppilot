@@ -665,6 +665,7 @@ final class CloudPairingTest extends TestCase
             'abilities_enabled' => true,
             'home_url' => 'https://example.test',
             'updates' => ['checked_at' => null, 'core' => null, 'plugins' => [], 'themes' => [], 'translations' => 0],
+            'backup' => null,
         ], $response->data);
     }
 
@@ -712,6 +713,39 @@ final class CloudPairingTest extends TestCase
         ], $updates['themes']);
         self::assertSame(1, $updates['translations']);
         self::assertSame([], WPPilot_Test_State::$http_posts, 'a status call never contacts an update source');
+    }
+
+    /**
+     * The summary reads the backup-status kit through its ability; wp_get_ability
+     * is defined here only, in its own process, so no other test sees it.
+     */
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function test_status_carries_the_newest_backup_and_whether_one_is_running(): void
+    {
+        $this->pairedLink();
+        $GLOBALS['cloud_test_backup_status'] = [
+            'active_providers' => ['updraftplus', 'backwpup'],
+            'providers' => [
+                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'running' => ['files' => true]],
+                ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false, 'error' => 'unreadable'],
+                'junk',
+            ],
+            'newest_successful_backup' => ['provider' => 'updraftplus', 'timestamp' => '1700000000', 'iso' => 'x'],
+        ];
+        eval('function wp_get_ability(string $name) { return $name === "wppilot/backup-status" ? new class { public function execute(array $input = []): mixed { return $GLOBALS["cloud_test_backup_status"]; } } : null; }');
+
+        self::assertSame([
+            'providers' => [
+                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true],
+                ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false],
+            ],
+            'newest' => ['provider' => 'updraftplus', 'timestamp' => 1_700_000_000],
+            'running' => true,
+        ], wppilot_cloud_rest_status()->data['backup']);
+
+        $GLOBALS['cloud_test_backup_status'] = new WP_Error('kit_down', 'no');
+        self::assertNull(wppilot_cloud_backup_summary(), 'a failing ability reads as no summary, never an error in the status answer');
     }
 
     public function test_core_already_current_is_not_an_update(): void
