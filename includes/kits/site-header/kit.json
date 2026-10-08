@@ -1,0 +1,26 @@
+{
+    "slug": "site-header",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\SiteHeader",
+    "tier": "free",
+    "runtime": "^1.0",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9"
+    },
+    "vendor_storage": {
+        "meta": ["_elementor_conditions", "_elementor_template_type", "_pll_menu_item"],
+        "option": ["woocommerce_coming_soon", "woocommerce_store_pages_only"]
+    },
+    "categories": {
+        "appearance": {
+            "label": "Appearance",
+            "description": "Global styles, templates, template parts, patterns and navigation of the site editor."
+        }
+    },
+    "abilities": [
+        {"name": "wppilot/build-site-header", "readonly": false, "destructive": true, "ledger": "restore:site-header/replace"}
+    ],
+    "skills": ["site-header"],
+    "tests": ["tests/Unit/Kits/SiteHeader"]
+}

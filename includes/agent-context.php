@@ -78,6 +78,8 @@ function wppilot_build_building_context_lines(): array
         '',
         'Before any visual work (building or restyling a page, template, section, or component), load the `wppilot-design` skill and follow it.',
         '',
+        'The site-wide header (logo, menu, language switcher, cart) is built with `wppilot/build-site-header`, which sizes the layout to the menu, makes one header per language and checks the served result. Do not hand-build a header template from element trees.',
+        '',
         'Before building or restructuring a page\'s content or layout, check the installed-plugins inventory above for page builders (which replace the editor) and block libraries (which extend Gutenberg), then ask the user which approach to use: a page builder, Gutenberg, classic theme templates, a child theme, or a custom theme. Ask once and follow that choice; do not mix approaches (e.g. Gutenberg blocks in a page-builder page).',
     ];
 }

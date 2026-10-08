@@ -4,7 +4,7 @@
 	"requires_wordpress": "6.9",
 	"tested_wordpress": "7.1",
 	"requires_php": "8.0",
-	"free_abilities": 228,
+	"free_abilities": 229,
 	"free_elementor_abilities": 17,
 	"elementor_minimum": "3.6",
 	"elementor_atomic_style_properties": 73,

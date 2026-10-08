@@ -179,7 +179,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 ## What the free plugin can do
 
-228 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, and developer abilities only under Developer Full Access, so a fresh install with none of those plugins registers 165 on the default profile. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+229 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, and developer abilities only under Developer Full Access, so a fresh install with none of those plugins registers 165 on the default profile. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -204,6 +204,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **Content audit** | `2` | Broken internal links, orphan pages, thin content, missing SEO descriptions and structured-data problems across the site, as a background job. |
 | **Builder quality** | `1` | Score how editable an Elementor page is, 0-100, and list per element what to fix: layout in HTML widgets, scripts, shortcodes, inactive widgets, inline styles, custom CSS, fixed colours instead of the global palette, deep nesting and empty containers. |
 | **Block themes** | `11` | Global Styles (read, and merge or replace the user layer), templates and template parts (list, read, save, revert to the theme file), the site's own synced and unsynced patterns, and block navigation menus, all through WordPress's own REST controllers and all undoable. |
+| **Site header** | `1` | Build the site-wide header from a layout sized to the menu: logo and title, the menu in one row (a menu button on tablets and phones), a styled language dropdown, an optional button and the cart, one header per Polylang language. It checks the served header before reporting success and can be undone. Elementor Pro, or the header template part of a block theme. |
 | **Block Notes** | `4` | Leave a note on a block for a person, reply, resolve, and read the notes they resolved. Every one can be undone. |
 | **Site tools** | `8` | WP-Cron list, run and delete (undoable), Site Health tests, transient flush, and - on Developer Full Access, audited - an options explorer and a read-only database SELECT with redaction. |
 | **Multisite** | `2` | List a network's sites and run an ability on one of them through that site's own safety profile and gates. Loads only on a multisite network. |
@@ -254,7 +255,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 88 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **228 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **229 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 88 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -396,7 +397,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 228 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 229 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.
