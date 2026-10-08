@@ -18,9 +18,16 @@ if (!defined('ABSPATH')) {
  * (AI1WM_BACKUPS_PATH, wp-content/ai1wm-backups unless the `ai1wm_backups_path` option moves
  * it), listed by `Ai1wm_Backups::get_files()` with its file time and size. An export is built in
  * a job folder under AI1WM_STORAGE_PATH and renamed into the backups folder only once its last
- * block is written (Ai1wm_Export_Download), so every file there is a finished export and its file
+ * block is written (Ai1wm_Export_Download), so a file there is a finished export and its file
  * time is when that export finished. Failed exports leave nothing there; the plugin records no
  * verdict for them that this reads.
+ *
+ * Anything that can write a file can also drop a `.wpress` there, and a backup that counts here
+ * lets safe updates and the fresh-backup hold through. So a file counts as a backup only when it
+ * sits in the folder itself (exports are never renamed into a subfolder), is at least
+ * AI1WM_MIN_BYTES, is not dated in the future, and ends in the archive's end-of-file block as
+ * checked by the plugin's own Ai1wm_Extractor::is_valid(), the test its import and restore run.
+ * Anything else is listed as `kind: "unverified"`, `result: "unknown"`, and never counts.
  *
  * The file name is never returned. It carries a random suffix that is the only thing guarding a
  * backup on a server that ignores the folder's .htaccess (nginx, OpenLiteSpeed), so it is as good
@@ -32,7 +39,8 @@ if (!defined('ABSPATH')) {
  *
  * The free plugin has no schedule. Since 7.106 it has a REST API whose POST /ai1wm/v1/exports
  * starts a full export on the server, continued by loopback requests; `trigger.supported` says
- * whether that route is there for WPPilot Pro's wppilot/backup-trigger to use.
+ * whether that route is there, on a release it was verified with (AI1WM_TRIGGER_FLOOR), for
+ * WPPilot Pro's wppilot/backup-trigger to use.
  */
 
 const AI1WM_BACKUPS = 'Ai1wm_Backups';
@@ -41,8 +49,17 @@ const AI1WM_REST_CONTROLLER = 'Ai1wm_Rest_Controller';
 
 const AI1WM_EXPORT_ROUTE = '/ai1wm/v1/exports';
 
-/** The first release with the REST export route (changelog, 7.106). */
-const AI1WM_TRIGGER_FLOOR = '7.106';
+/**
+ * The release starting a backup was verified against. The REST export route arrived in 7.106, and
+ * 7.107 and 7.111 changed it (multisite, find-and-replace); older releases are not trusted with it.
+ */
+const AI1WM_TRIGGER_FLOOR = '7.112';
+
+/** Smallest file counted as a backup: a finished export holds at least the database and its package.json. */
+const AI1WM_MIN_BYTES = 1048576;
+
+/** How far a file time may run ahead of the clock (a skewed NFS mount) before it is not believed. */
+const AI1WM_CLOCK_SKEW = 300;
 
 /** How recently a job folder must have changed to count as a run in progress. */
 const AI1WM_ACTIVE_SECONDS = 900;
@@ -70,6 +87,39 @@ function ai1wm_id(string $filename): string
 }
 
 /**
+ * Whether a listed file is a finished export this can vouch for (see the header).
+ *
+ * @param array<string, mixed> $file A row of Ai1wm_Backups::get_files().
+ */
+function ai1wm_verified(array $file): bool
+{
+    $name = (string) $file['filename'];
+    if (($file['path'] ?? '') !== '' || basename($name) !== $name || (int) $file['mtime'] > time() + AI1WM_CLOCK_SKEW) {
+        return false;
+    }
+    // A null size is a file too large for this PHP to measure, never a small one.
+    $size = bytes($file['size'] ?? null);
+    if ($size !== null && $size < AI1WM_MIN_BYTES) {
+        return false;
+    }
+    $folder = defined('AI1WM_BACKUPS_PATH') ? (string) constant('AI1WM_BACKUPS_PATH') : '';
+    if ($folder === '' || !class_exists('Ai1wm_Extractor') || !method_exists('Ai1wm_Extractor', 'is_valid')) {
+        return false;
+    }
+    try {
+        $archive = new \Ai1wm_Extractor($folder . DIRECTORY_SEPARATOR . $name);
+        $valid = $archive->is_valid() === true;
+        if (method_exists($archive, 'close')) {
+            $archive->close();
+        }
+
+        return $valid;
+    } catch (\Throwable $error) {
+        return false;
+    }
+}
+
+/**
  * @return list<array<string, mixed>> Newest first.
  */
 function ai1wm_records(): array
@@ -87,14 +137,15 @@ function ai1wm_records(): array
             continue;
         }
         $label = $labels[$file['filename']] ?? null;
+        $verified = ai1wm_verified($file);
         $records[] = record('ai1wm', [
             'id' => ai1wm_id($file['filename']),
             'timestamp' => (int) $file['mtime'],
-            'result' => 'success',
+            'result' => $verified ? 'success' : 'unknown',
             'size_bytes' => bytes($file['size'] ?? null),
             'storage' => ['Local (web server)'],
             'label' => is_string($label) ? mb_substr($label, 0, 255) : null,
-            'kind' => 'backup',
+            'kind' => $verified ? 'backup' : 'unverified',
         ]);
     }
 
@@ -152,7 +203,7 @@ function ai1wm_trigger_support(): array
             'reason' => $version !== null && version_compare($version, AI1WM_TRIGGER_FLOOR, '>=')
                 ? sprintf('All-in-One WP Migration %s does not have the REST export route this needs loaded; make the backup from its Export screen in wp-admin.', $version)
                 : sprintf(
-                    'All-in-One WP Migration %s has no server-side way to start an export (its REST API arrived in %s); update it, or make the backup from its Export screen in wp-admin.',
+                    'Starting an export from here needs All-in-One WP Migration %2$s or later (its REST export route); %1$s is installed. Update it, or make the backup from its Export screen in wp-admin.',
                     $version ?? '(version unknown)',
                     AI1WM_TRIGGER_FLOOR,
                 ),
@@ -172,12 +223,14 @@ function ai1wm_trigger_support(): array
 function ai1wm_status(): array
 {
     $records = ai1wm_records();
+    $verified = array_values(array_filter($records, static fn(array $record): bool => $record['kind'] === 'backup'));
 
     return [
         'version' => ai1wm_version(),
         'last_backup' => $records[0] ?? null,
-        'last_successful_backup' => $records[0] ?? null,
-        'backups' => count($records),
+        'last_successful_backup' => $verified[0] ?? null,
+        'backups' => count($verified),
+        'unverified_files' => count($records) - count($verified),
         'running' => ai1wm_running(),
         'next_scheduled' => [],
         'schedule' => null,
@@ -186,7 +239,7 @@ function ai1wm_status(): array
         'notes' => [
             'All-in-One WP Migration (free) has no backup schedule; scheduled backups are a paid extension.',
             'Only finished exports are kept: a failed export leaves no file and is not listed. A backup\'s time is when its export finished.',
-            'A .wpress file copied into the backups folder by hand is listed like an export, by its file time.',
+            'A .wpress file counts only when it is in the backups folder itself, at least 1 MB, not dated in the future and ends in a complete archive block; any other is listed as kind "unverified" and is not a backup.',
         ],
     ];
 }

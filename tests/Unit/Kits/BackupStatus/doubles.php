@@ -191,6 +191,39 @@ namespace {
         define('AI1WM_PLUGIN_NAME', 'all-in-one-wp-migration');
         define('AI1WM_VERSION', '7.112');
         define('AI1WM_STORAGE_PATH', sys_get_temp_dir() . '/kit-backup-status-ai1wm-' . getmypid());
+        define('AI1WM_BACKUPS_PATH', sys_get_temp_dir() . '/kit-backup-status-ai1wm-backups-' . getmypid());
+    }
+
+    // Reads the last block the way Ai1wm_Archiver::is_valid() does (7.112); only the v1 block of
+    // NUL bytes is produced by the tests.
+    if (!class_exists('Ai1wm_Extractor')) {
+        class Ai1wm_Extractor
+        {
+            /** @var resource */
+            private $handle;
+
+            public function __construct(string $file_name)
+            {
+                $handle = @fopen($file_name, 'rb');
+                if ($handle === false) {
+                    throw new \RuntimeException('Could not open file for reading. File: ' . $file_name);
+                }
+                $this->handle = $handle;
+            }
+
+            public function is_valid(): bool
+            {
+                if (@fseek($this->handle, -4377, SEEK_END) === -1) {
+                    return false;
+                }
+                return @fread($this->handle, 4377) === str_repeat("\0", 4377);
+            }
+
+            public function close(): void
+            {
+                fclose($this->handle);
+            }
+        }
     }
 
     // Read-only doubles: no Ai1wm_Rest_Controller, so the export route counts as missing here.

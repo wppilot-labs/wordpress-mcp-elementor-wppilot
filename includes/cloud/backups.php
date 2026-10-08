@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 
 /**
  * @return array{
- *     providers: list<array{provider: string, label: string, readable: bool}>,
+ *     providers: list<array{provider: string, label: string, readable: bool, startable: bool}>,
  *     newest: array{provider: string, timestamp: int}|null,
  *     running: bool
  * }|null Null when no supported backup plugin is active (the kit is not loaded).
@@ -51,6 +51,9 @@ function wppilot_cloud_backup_summary(): ?array
             'provider' => $provider['provider'],
             'label' => is_string($provider['label'] ?? null) ? $provider['label'] : $provider['provider'],
             'readable' => ($provider['readable'] ?? false) === true,
+            // Whether WPPilot Pro could start a backup with it here (the adapter's trigger.supported),
+            // so Cloud does not offer a start the site would refuse (an old All-in-One WP Migration).
+            'startable' => is_array($provider['trigger'] ?? null) && ($provider['trigger']['supported'] ?? false) === true,
         ];
         // Each adapter answers running as {running: bool, jobs: [...]}.
         if (is_array($provider['running'] ?? null) && ($provider['running']['running'] ?? false) === true) {

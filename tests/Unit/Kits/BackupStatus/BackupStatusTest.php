@@ -238,38 +238,101 @@ final class BackupStatusTest extends TestCase
         self::assertSame(['updraftplus'], array_column(B\status(['provider' => 'updraftplus'])['providers'], 'provider'));
 
         // An All-in-One WP Migration export that finished later is the newest across providers.
-        Vendors::$ai1wmFiles = [['path' => '', 'filename' => 'site-20260929-040000-abcdefghijkl.wpress', 'mtime' => Vendors::$now - 60, 'size' => 10]];
-        self::assertSame(['provider' => 'ai1wm', 'timestamp' => Vendors::$now - 60], array_slice(B\status([])['newest_successful_backup'], 0, 2));
+        $this->archive('site-20260929-040000-abcdefghijkl.wpress', 2 * self::MB);
+        Vendors::$ai1wmFiles = [['path' => '', 'filename' => 'site-20260929-040000-abcdefghijkl.wpress', 'mtime' => Vendors::$now - 60, 'size' => 2 * self::MB]];
+        try {
+            self::assertSame(['provider' => 'ai1wm', 'timestamp' => Vendors::$now - 60], array_slice(B\status([])['newest_successful_backup'], 0, 2));
+        } finally {
+            $this->removeTree(AI1WM_BACKUPS_PATH);
+        }
     }
 
     // All-in-One WP Migration.
 
+    private const MB = 1048576;
+
+    /**
+     * A file in the doubles' backups folder: a complete archive ends in the plugin's (v1) end-of-
+     * archive block of NUL bytes; an incomplete one does not.
+     */
+    private function archive(string $name, int $bytes, bool $complete = true): void
+    {
+        @mkdir(dirname(AI1WM_BACKUPS_PATH . '/' . $name), 0777, true);
+        $handle = fopen(AI1WM_BACKUPS_PATH . '/' . $name, 'wb');
+        ftruncate($handle, $bytes);
+        if (!$complete) {
+            fseek($handle, $bytes - 1);
+            fwrite($handle, 'X');
+        }
+        fclose($handle);
+    }
+
     public function testAi1wmBackupsAreTheFinishedArchivesInItsFolderWithoutTheirNames(): void
     {
         $now = Vendors::$now;
+        $this->archive('example-com-20260928-090000-a1b2c3d4e5f6.wpress', 2 * self::MB);
+        $this->archive('example-com-20260928-230000-zyxwvutsrqpo.wpress', 3 * self::MB);
+        $this->archive('huge.wpress', 5000);
         Vendors::$ai1wmFiles = [
-            ['path' => '', 'filename' => 'example-com-20260928-090000-a1b2c3d4e5f6.wpress', 'mtime' => $now - 86400, 'size' => 5000],
-            ['path' => '', 'filename' => 'example-com-20260928-230000-zyxwvutsrqpo.wpress', 'mtime' => $now - 3600, 'size' => 9000],
+            ['path' => '', 'filename' => 'example-com-20260928-090000-a1b2c3d4e5f6.wpress', 'mtime' => $now - 86400, 'size' => 2 * self::MB],
+            ['path' => '', 'filename' => 'example-com-20260928-230000-zyxwvutsrqpo.wpress', 'mtime' => $now - 3600, 'size' => 3 * self::MB],
             ['path' => 'old', 'filename' => 'old/unreadable.wpress', 'mtime' => null, 'size' => null],
             ['path' => '', 'filename' => 'huge.wpress', 'mtime' => $now - 7200, 'size' => null],
         ];
         Vendors::$ai1wmLabels = ['example-com-20260928-230000-zyxwvutsrqpo.wpress' => 'Before the update'];
 
-        $list = B\ai1wm_list(10);
+        try {
+            $list = B\ai1wm_list(10);
 
-        self::assertCount(3, $list, 'a file the plugin could not date is not listed');
-        self::assertSame([$now - 3600, $now - 7200, $now - 86400], array_column($list, 'timestamp'), 'newest first, by file time');
-        self::assertSame(['success', 9000, ['Local (web server)'], 'Before the update', null, 'backup'], [$list[0]['result'], $list[0]['size_bytes'], $list[0]['storage'], $list[0]['label'], $list[0]['contents'], $list[0]['kind']]);
-        self::assertNull($list[1]['size_bytes'], 'a size the plugin could not read stays null');
-        self::assertSame(16, strlen($list[0]['id']));
-        self::assertNotSame($list[0]['id'], $list[2]['id']);
-        self::assertCount(1, B\ai1wm_list(1));
+            self::assertCount(3, $list, 'a file the plugin could not date is not listed');
+            self::assertSame([$now - 3600, $now - 7200, $now - 86400], array_column($list, 'timestamp'), 'newest first, by file time');
+            self::assertSame(['success', 3 * self::MB, ['Local (web server)'], 'Before the update', null, 'backup'], [$list[0]['result'], $list[0]['size_bytes'], $list[0]['storage'], $list[0]['label'], $list[0]['contents'], $list[0]['kind']]);
+            self::assertSame([null, 'backup'], [$list[1]['size_bytes'], $list[1]['kind']], 'a size too large to measure stays null and still counts');
+            self::assertSame(16, strlen($list[0]['id']));
+            self::assertNotSame($list[0]['id'], $list[2]['id']);
+            self::assertCount(1, B\ai1wm_list(1));
 
-        $status = B\ai1wm_status();
-        self::assertSame([$now - 3600, $now - 3600, 3, '7.112'], [$status['last_backup']['timestamp'], $status['last_successful_backup']['timestamp'], $status['backups'], $status['version']]);
-        $encoded = (string) json_encode([$list, $status]);
-        foreach (['a1b2c3d4e5f6', 'zyxwvutsrqpo', 'example-com', 'huge', 'unreadable', AI1WM_STORAGE_PATH] as $secret) {
-            self::assertStringNotContainsString($secret, $encoded, 'no archive names or paths leave the kit');
+            $status = B\ai1wm_status();
+            self::assertSame([$now - 3600, $now - 3600, 3, 0, '7.112'], [$status['last_backup']['timestamp'], $status['last_successful_backup']['timestamp'], $status['backups'], $status['unverified_files'], $status['version']]);
+            $encoded = (string) json_encode([$list, $status]);
+            foreach (['a1b2c3d4e5f6', 'zyxwvutsrqpo', 'example-com', 'huge', 'unreadable', AI1WM_STORAGE_PATH, AI1WM_BACKUPS_PATH] as $secret) {
+                self::assertStringNotContainsString($secret, $encoded, 'no archive names or paths leave the kit');
+            }
+        } finally {
+            $this->removeTree(AI1WM_BACKUPS_PATH);
+        }
+    }
+
+    public function testAFileDroppedInTheBackupsFolderIsNotABackupUnlessItIsACompleteArchive(): void
+    {
+        $now = Vendors::$now;
+        $this->archive('real.wpress', 2 * self::MB);
+        $this->archive('empty.wpress', 0);
+        $this->archive('tiny.wpress', 4377);
+        $this->archive('cut-short.wpress', 2 * self::MB, false);
+        $this->archive('future.wpress', 2 * self::MB);
+        $this->archive('nested/inner.wpress', 2 * self::MB);
+        Vendors::$ai1wmFiles = [
+            ['path' => '', 'filename' => 'empty.wpress', 'mtime' => $now - 10, 'size' => 0],
+            ['path' => '', 'filename' => 'tiny.wpress', 'mtime' => $now - 20, 'size' => 4377],
+            ['path' => '', 'filename' => 'cut-short.wpress', 'mtime' => $now - 30, 'size' => 2 * self::MB],
+            ['path' => '', 'filename' => 'future.wpress', 'mtime' => $now + 3600, 'size' => 2 * self::MB],
+            ['path' => 'nested', 'filename' => 'nested/inner.wpress', 'mtime' => $now - 40, 'size' => 2 * self::MB],
+            ['path' => '', 'filename' => 'gone.wpress', 'mtime' => $now - 50, 'size' => 2 * self::MB],
+            ['path' => '', 'filename' => 'real.wpress', 'mtime' => $now - 7200, 'size' => 2 * self::MB],
+        ];
+
+        try {
+            $status = B\ai1wm_status();
+            self::assertSame($now - 7200, $status['last_successful_backup']['timestamp'], 'only the complete archive counts');
+            self::assertSame([1, 6], [$status['backups'], $status['unverified_files']]);
+            self::assertSame(['unknown', 'unverified'], [$status['last_backup']['result'], $status['last_backup']['kind']]);
+            self::assertSame(['provider' => 'ai1wm', 'timestamp' => $now - 7200], array_slice(B\status(['provider' => 'ai1wm'])['newest_successful_backup'], 0, 2));
+
+            unlink(AI1WM_BACKUPS_PATH . '/real.wpress');
+            self::assertNull(B\ai1wm_status()['last_successful_backup'], 'with no complete archive there is no backup');
+        } finally {
+            $this->removeTree(AI1WM_BACKUPS_PATH);
         }
     }
 

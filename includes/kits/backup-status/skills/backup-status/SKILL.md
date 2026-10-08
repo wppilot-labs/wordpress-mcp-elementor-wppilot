@@ -23,7 +23,9 @@ Two read-only abilities:
 - `time` is the site's timezone, `time_utc` is UTC. UpdraftPlus and BackWPup times are when the
   job started; `finished`, where present, is when it ended. All-in-One WP Migration (`ai1wm`)
   times are when the export finished; it keeps no record of failed exports, so its backups are
-  always `success` and its `contents` is `null`.
+  `success` and its `contents` is `null`. A `.wpress` file it cannot vouch for (too small, in a
+  subfolder, dated in the future, or not a complete archive) is `kind: "unverified"`, `result:
+  "unknown"`: it is not a backup.
 - `contents` lists what the backup held (`db`, `plugins`, `themes`, `uploads`, `others`, `core`,
   `wp-content`, `plugin-list`…); `null` means the plugin did not say. A BackWPup `plugin-list` is
   a text list of installed plugins, not the plugin files.

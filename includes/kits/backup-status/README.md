@@ -38,10 +38,14 @@ same name keeps it.
   `Ai1wm_Backups::get_files()` (every `.wpress` under `AI1WM_BACKUPS_PATH`, with file time and
   size) and `get_labels()`. An export is built in a job folder under `AI1WM_STORAGE_PATH` and
   renamed into the backups folder only when finished, so each file is a finished export dated by
-  its file time; failed exports leave no trace here. Running: a job folder (13 hex characters)
-  whose files changed in the last 15 minutes, export or import. No schedule in the free plugin.
-  `trigger.supported` when 7.106's REST export route (`Ai1wm_Rest_Controller::create_export`) is
-  there. Backup ids are a hash of the file name, which is never returned: its random suffix is
+  its file time; failed exports leave no trace here. A file counts as a backup only when it is in
+  the folder itself, at least 1 MB, not dated more than 5 minutes ahead, and
+  `Ai1wm_Extractor::is_valid()` finds its end-of-archive block (the check the plugin's own import
+  runs); any other `.wpress` is `kind: "unverified"` and never the last successful backup, so a
+  file dropped there by hand cannot open the fresh-backup hold. Running: a job folder (13 hex
+  characters) whose files changed in the last 15 minutes, export or import. No schedule in the
+  free plugin. `trigger.supported` from 7.112 when the REST export route
+  (`Ai1wm_Rest_Controller::create_export`, added in 7.106) is there. Backup ids are a hash of the file name, which is never returned: its random suffix is
   all that guards the archive where the folder's .htaccess is ignored.
 
 ## Host needs

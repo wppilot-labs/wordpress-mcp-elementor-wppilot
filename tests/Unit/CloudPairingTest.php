@@ -735,7 +735,7 @@ final class CloudPairingTest extends TestCase
         $GLOBALS['cloud_test_backup_status'] = [
             'active_providers' => ['updraftplus', 'backwpup'],
             'providers' => [
-                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'running' => ['running' => true, 'jobs' => [['state' => 'queued']]]],
+                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'running' => ['running' => true, 'jobs' => [['state' => 'queued']]], 'trigger' => ['supported' => true]],
                 ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false, 'error' => 'unreadable'],
                 'junk',
             ],
@@ -745,8 +745,8 @@ final class CloudPairingTest extends TestCase
 
         self::assertSame([
             'providers' => [
-                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true],
-                ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false],
+                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'startable' => true],
+                ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false, 'startable' => false],
             ],
             'newest' => ['provider' => 'updraftplus', 'timestamp' => 1_700_000_000],
             'running' => true,

@@ -170,7 +170,7 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 == Changelog ==
 
 = 1.18.1 =
-* New: All-in-One WP Migration backups are read alongside UpdraftPlus, BackWPup and Duplicator. backup-status and backup-list report its newest finished backup (time and size), how many there are and whether an export or import is running; WPPilot Cloud's Backups page shows it, and WPPilot Pro 1.12.1 counts it as the recent backup a safe update needs. Backup file names, folders and links are never returned, because on hosts that ignore .htaccess a .wpress file name is enough to download the whole site.
+* New: All-in-One WP Migration backups are read alongside UpdraftPlus, BackWPup and Duplicator. backup-status and backup-list report its newest finished backup (time and size), how many there are and whether an export or import is running (only a complete archive of at least 1 MB in its backups folder counts, so a file dropped there cannot pass for a backup); WPPilot Cloud's Backups page shows it, and WPPilot Pro 1.12.1 counts it as the recent backup a safe update needs. Backup file names, folders and links are never returned, because on hosts that ignore .htaccess a .wpress file name is enough to download the whole site.
 
 = 1.18.0 =
 * New: WPPilot Cloud reporting. A site connected to WPPilot Cloud now reports its pending core, plugin and theme updates and its newest backup (UpdraftPlus, BackWPup or Duplicator), so Cloud's Updates and Backups screens can show every site at once. Cloud never receives backup files, links or storage credentials.
