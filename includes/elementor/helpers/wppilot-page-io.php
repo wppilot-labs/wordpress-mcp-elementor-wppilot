@@ -154,6 +154,8 @@ function el_write_page(int $post_id, array $elements, ?string $template_type = n
  */
 function el_write_page_raw(int $post_id, array $elements, string $template_type): bool|WP_Error
 {
+    $elements = el_kses_elements_for_current_user($elements);
+
     // Elementor's `elementor/document/save/data` filter runs the interactions
     // Parser to convert `temp-...` ids (the marker for client-side unsaved
     // interactions) into stable, post/element-scoped ids. The raw write path
@@ -178,6 +180,39 @@ function el_write_page_raw(int $post_id, array $elements, string $template_type)
     el_clear_css_cache($post_id);
 
     return true;
+}
+
+/**
+ * Filter every string in an element tree through kses when the current user
+ * may not post unfiltered HTML.
+ *
+ * Elementor holds such a user to this in its own editor: Document::save()
+ * runs Utils::kses_post_deep() over the data, and its REST meta sanitizer does
+ * the same to `_elementor_data`. The raw write bypasses Document::save(), and
+ * Elementor registers that sanitizer only on rest_api_init, so without this an
+ * HTML widget, a <script> in a title, or markup in custom CSS written from a
+ * cron job, WP-CLI or an Elementor version without the sanitizer would be
+ * stored as given. Keys are left alone and non-strings pass through, as in
+ * Elementor's version.
+ *
+ * @param list<array<string, mixed>> $elements
+ * @param (callable(string): string)|null $kses Defaults to wp_kses_post.
+ * @return list<array<string, mixed>>
+ */
+function el_kses_elements_for_current_user(array $elements, ?callable $kses = null): array
+{
+    if (current_user_can('unfiltered_html')) {
+        return $elements;
+    }
+
+    $kses ??= 'wp_kses_post';
+    array_walk_recursive($elements, static function (mixed &$value) use ($kses): void {
+        if (is_string($value)) {
+            $value = (string) $kses($value);
+        }
+    });
+
+    return $elements;
 }
 
 /**
