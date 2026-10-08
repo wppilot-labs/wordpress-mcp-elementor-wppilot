@@ -1,32 +1,51 @@
 # site-header kit
 
-Builds the site-wide header from a layout decided by the site's own menu, then checks the header
-the site actually serves.
+Saves the site-wide header the caller designs, does the plumbing around it, and checks the
+result. There is no built-in layout: the caller (an AI client, usually) designs the header for
+the brand, as it designs the rest of the site.
 
 | Ability | Kind | What it does |
 |---|---|---|
-| `wppilot/build-site-header` | write, destructive (confirm) | Elementor Pro Theme Builder header, one per language under Polylang, replacing the headers that had display conditions; or, on a block theme, the `header` template part (one translated part per language). `dry_run` returns the plan. |
+| `wppilot/build-site-header` | write, destructive (confirm) | Elementor Pro: the caller's Elementor tree as Theme Builder headers, one per language under Polylang, on every page, replacing the headers that had display conditions. Block themes: the caller's block markup as the `header` template part, one translated part per language. `dry_run` returns the site facts or checks a design without saving; `check_only` checks the served header. |
 
-## Layout
+## Plumbing
 
-One boxed flex row, no wrapping: brand (logo + title) | menu (grows) | language switcher, call to
-action, cart. `plan()` estimates widths from the menu labels: a menu that does not fit one row at
-1200px becomes a menu button at every width, and on a 375px phone the title gives way to the logo
-when both do not fit. The menu button is ordered last on tablets and phones.
+- **Facts** (`dry_run` without a design): title, tagline, logo (or likely logos), colours and
+  fonts from the Elementor kit / theme.json / the logo, the colours and fonts the home page is
+  painted with, whether it opens with a hero, each language's menu, whether there is a shop,
+  and `building_blocks` (menu, language switcher, cart, logo, row settings that render well).
+- **Tokens** fill one design in per language: `{{menu}}`, `{{language_switcher}}` (a menu made
+  once holding Polylang's switcher item as a styled dropdown), `{{navigation_ref}}` (block
+  themes: a navigation post per language with the switcher last), `{{home_url}}`,
+  `{{site_title}}`, `{{label:key}}`. `elements_by_language` / `block_markup_by_language` give a
+  language its own design.
+- **Saving** goes through the host's `elementor-content-writer` extension when it has one (its
+  normalisation and validation), else Elementor's document save. On a translated page the
+  default-language header is swapped for its translation through Elementor Pro's
+  `elementor/theme/get_location_templates/template_id` filter, from a map on the default header.
 
-The language switcher is Polylang's own menu item (`#pll_switcher`, dropdown) in a small menu,
-rendered by a second nav-menu widget, so it is styled like the menu instead of a bare list. On a
-translated page the default-language header is swapped for its translation through Elementor
-Pro's `elementor/theme/get_location_templates/template_id` filter, from a map kept on the
-default header.
+## Checks
 
-## Check
+Reported as findings (`severity`, `check`, `element_id` or the element's path, `detail`, `fix`);
+the design is never rewritten.
 
-After saving, each language's home page is fetched as a visitor and `check_served_header()`
-confirms: the new template is the one served, menu items and a menu button are rendered, the
-switcher items sit inside a styled menu (no bare `li.lang-item` list), the cart button has its
-icon, and the phone-row estimate fits. Any failure undoes the build and returns the checks. The
-check reads HTML only; it does not measure pixels.
+- Before saving (`precheck_elementor`, `precheck_blocks`): no menu button, a raw Polylang list,
+  a cart without WooCommerce, a picture-less image, links to nowhere, WCAG AA contrast of the
+  colours the design sets (kit globals resolved, measured on the container behind), unnamed
+  menus, rows that wrap on phones, zero-width widgets in a row, unknown tokens. Errors block the
+  save.
+- On the served page of every language (`check_served`): the right header, raw language list,
+  switcher present, a menu button for every row menu, the cart icon, accessible names, broken
+  images and same-site links. An error restores the previous header unless `keep_on_fail`.
+- In a browser (`probe.php`): a page opened with a probe URL (`?wppilot-kit-header-probe=<token>`,
+  signed for the user who ran the ability, valid 15 minutes; a signed-in user who can
+  edit_theme_options may use `=1`) measures its own
+  header at the width it is opened at - menu rows, labels that wrap, text spilling out of
+  squeezed elements, overlaps, sideways scroll, header height, a menu that cannot be reached or
+  does not open, computed contrast (gradients by each stop), broken images - and publishes
+  `window.siteHeaderProbe`. The server has no layout engine, so these are the caller's to
+  run (1440, 768, 390). Anyone else gets the page exactly as every visitor does; a page that
+  prints the probe is sent with no-cache headers and DONOTCACHEPAGE.
 
 ## Undo
 
@@ -38,5 +57,6 @@ the theme file).
 <!-- kit-export:omit -->
 ## Tests
 
-`tests/Unit/Kits/SiteHeader` drives `plan()`, `elementor_tree()` and `check_served_header()`.
+`tests/Unit/Kits/SiteHeader` drives the tokens, `precheck_elementor()`, `precheck_blocks()`,
+`check_served()` and the colour arithmetic.
 <!-- /kit-export:omit -->

@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace WPPilot\Kits\SiteHeader;
 
 use WP_Error;
+use WPPilot\Kits\Runtime;
 use WPPilot\Kits\Runtime\Page;
 use WPPilot\Kits\Runtime\Ledger;
 
@@ -15,7 +16,9 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/checks.php';
+require_once __DIR__ . '/site.php';
+require_once __DIR__ . '/probe.php';
 require_once __DIR__ . '/block-theme.php';
 
 /** Undo: delete the headers (and switcher menu) this call made, give the old headers their conditions back. */
@@ -259,7 +262,130 @@ function save_conditions(int $post_id, array $conditions): bool
 }
 
 /**
- * Build the header.
+ * The menu each language uses: given, else found by name, else the longest other language's.
+ *
+ * @param array<string, mixed> $input
+ * @param list<string> $language_list
+ * @return array{menus: array<string, ?\WP_Term>, notes: list<string>}
+ */
+function language_menus(array $input, array $language_list): array
+{
+    $menus = [];
+    foreach ($language_list as $language) {
+        $menus[$language] = pick_menu($input, $language);
+    }
+    // A language without a menu of its own gets the longest one found for another, so its pages
+    // still have navigation (in that menu's language, which the notes say).
+    $fallback = null;
+    foreach ($menus as $menu) {
+        if ($menu instanceof \WP_Term && (!$fallback instanceof \WP_Term || $menu->count > $fallback->count)) {
+            $fallback = $menu;
+        }
+    }
+    $notes = [];
+    foreach ($language_list as $language) {
+        if (!$menus[$language] instanceof \WP_Term && $language !== '' && $fallback instanceof \WP_Term) {
+            $menus[$language] = $fallback;
+            $notes[] = sprintf('No menu for language "%s" was found (one named like "Main menu (%s)"), so its header uses "%s". Pass menus.%s to choose another.', $language, strtoupper($language), $fallback->name, $language);
+        } elseif (!$menus[$language] instanceof \WP_Term) {
+            $notes[] = 'No menu was found. Create one under Appearance > Menus, or pass menu.';
+        }
+    }
+
+    return ['menus' => $menus, 'notes' => $notes];
+}
+
+/**
+ * What the caller needs to design the header: the site's colours, fonts, logo, hero, menus per
+ * language, what is already there, and the building blocks it can use.
+ *
+ * @param list<string> $language_list
+ * @param array<string, ?\WP_Term> $menus
+ * @return array<string, mixed>
+ */
+function site_facts(string $builder, array $language_list, array $menus, int $logo_id): array
+{
+    $look = site_look($builder, $logo_id);
+    $hero = front_hero();
+    $menu_facts = [];
+    foreach ($language_list as $language) {
+        $menu = $menus[$language];
+        $menu_facts[$language !== '' ? $language : 'site'] = $menu instanceof \WP_Term ? [
+            'id' => (int) $menu->term_id,
+            'name' => (string) $menu->name,
+            'top_level' => array_column(menu_top_level($menu), 'title'),
+        ] : null;
+    }
+    $logo_url = $logo_id > 0 ? (string) wp_get_attachment_image_url($logo_id, 'full') : '';
+
+    return [
+        'title' => site_name(),
+        'tagline' => html_entity_decode((string) get_bloginfo('description'), ENT_QUOTES, 'UTF-8'),
+        'logo' => $logo_id > 0 ? ['id' => $logo_id, 'url' => $logo_url] : null,
+        'logo_candidates' => $logo_id > 0 ? [] : logo_candidates(),
+        'colors' => $look['colors'],
+        'home_page_paint' => home_palette(),
+        'fonts' => $look['fonts'],
+        'colors_from' => $look['sources'] !== [] ? $look['sources'] : ['no global colours or fonts are set: home_page_paint has the colours and fonts the home page is painted with'],
+        'home_page' => ['url' => home_url('/'), 'hero' => $hero['detail'], 'has_hero' => $hero['has_hero']],
+        'languages' => array_values(array_filter($language_list)),
+        'menus' => $menu_facts,
+        'shop' => class_exists('WooCommerce'),
+        'current_headers' => $builder === 'elementor' ? array_keys(active_headers()) : [],
+        'tokens' => TOKENS,
+        'building_blocks' => building_blocks($builder),
+    ];
+}
+
+/**
+ * The pieces the caller places in its own design, as settings that are known to render well.
+ *
+ * @return array<string, mixed>
+ */
+function building_blocks(string $builder): array
+{
+    if ($builder === 'block-theme') {
+        return [
+            'navigation' => '<!-- wp:navigation {"ref":"{{navigation_ref}}","overlayMenu":"mobile","layout":{"type":"flex","justifyContent":"right","flexWrap":"nowrap"}} /-->  (each language\'s menu, with the language switcher as its last item when Polylang is active)',
+            'cart' => '<!-- wp:woocommerce/mini-cart /-->',
+            'logo' => '<!-- wp:site-logo {"width":44} /--> (the Customizer logo) or an image block with the logo id',
+            'title' => '<!-- wp:site-title {"level":0} /-->',
+        ];
+    }
+
+    return [
+        'menu' => ['widgetType' => 'nav-menu', 'settings' => ['menu' => '{{menu}}', 'menu_name' => 'Main menu', 'layout' => 'horizontal', 'dropdown' => 'tablet', 'toggle' => 'burger', 'full_width' => 'stretch', '_element_width' => 'auto', '_flex_size' => 'grow', 'align_items' => 'end']],
+        'language_switcher' => ['widgetType' => 'nav-menu', 'settings' => ['menu' => '{{language_switcher}}', 'menu_name' => 'Language', 'layout' => 'horizontal', 'dropdown' => 'none', 'pointer' => 'none', 'submenu_icon' => ['value' => 'fas fa-chevron-down', 'library' => 'fa-solid'], '_element_width' => 'auto', '_flex_size' => 'none'], 'note' => 'One item, the current language, with the others in its dropdown. Style it like the menu (menu_typography_*, color_menu_item, color_dropdown_item, background_color_dropdown_item).'],
+        'cart' => ['widgetType' => 'woocommerce-menu-cart', 'settings' => ['icon' => 'bag-medium', 'items_indicator' => 'bubble', 'hide_empty_indicator' => 'hide', 'show_subtotal' => '', 'cart_type' => 'side-cart', 'toggle_button_border_width' => ['unit' => 'px', 'size' => 0], 'toggle_button_background_color' => 'rgba(0,0,0,0)', '_element_width' => 'auto', '_flex_size' => 'none'], 'note' => 'Only when WooCommerce is active (site.shop).'],
+        'logo' => ['widgetType' => 'image', 'settings' => ['image' => ['id' => '<logo id>', 'url' => '<logo url>'], 'link_to' => 'custom', 'link' => ['url' => '{{home_url}}'], 'width' => ['unit' => 'px', 'size' => 44], '_element_width' => 'auto', '_flex_size' => 'none']],
+        'row' => ['elType' => 'container', 'settings' => ['html_tag' => 'header', 'content_width' => 'boxed', 'flex_direction' => 'row', 'flex_direction_tablet' => 'row', 'flex_direction_mobile' => 'row', 'flex_wrap' => 'nowrap', 'flex_wrap_tablet' => 'nowrap', 'flex_wrap_mobile' => 'nowrap', 'flex_align_items' => 'center'], 'note' => 'Sticky: "sticky": "top", "sticky_on": ["desktop","tablet","mobile"], "sticky_effects_offset": 40, then style the scrolled state in custom_css under selector.elementor-sticky--effects.'],
+    ];
+}
+
+/**
+ * The labels for one language: {key: text} or {key: {language: text}}, the default language's
+ * text standing in for a language without one.
+ *
+ * @param array<string, mixed> $labels
+ * @return array<string, string>
+ */
+function labels_for(array $labels, string $language, string $default): array
+{
+    $out = [];
+    foreach ($labels as $key => $value) {
+        if (is_array($value)) {
+            $text = $value[$language] ?? $value[$default] ?? reset($value);
+            $out[(string) $key] = is_scalar($text) ? (string) $text : '';
+        } elseif (is_scalar($value)) {
+            $out[(string) $key] = (string) $value;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Build the header from the caller's design.
  *
  * @param array<string, mixed> $input
  * @return array<string, mixed>|WP_Error
@@ -276,116 +402,91 @@ function build(array $input): array|WP_Error
 
     $langs = languages();
     $language_list = $langs['languages'] !== [] ? $langs['languages'] : [''];
-    $switch = (string) ($input['show_language_switcher'] ?? 'auto');
-    $want_switcher = $langs['plugin'] === 'polylang' && $switch !== 'no';
-    if ($switch === 'yes' && $langs['plugin'] === '') {
-        return new WP_Error('kit_site_header_no_languages', 'A language switcher needs Polylang with two or more languages; this site has none.', ['status' => 400]);
-    }
-    $cart_choice = (string) ($input['show_cart'] ?? 'auto');
-    $woo = class_exists('WooCommerce');
-    if ($cart_choice === 'yes' && !$woo) {
-        return new WP_Error('kit_site_header_no_shop', 'A cart needs WooCommerce, which is not active.', ['status' => 400]);
-    }
-    $want_cart = $woo && $cart_choice !== 'no';
-
+    $default = $language_list[0];
     $logo_id = (int) ($input['logo_id'] ?? 0);
     if ($logo_id === 0) {
         $logo_id = (int) get_theme_mod('custom_logo', 0);
     }
-    $logo_url = $logo_id > 0 ? (string) wp_get_attachment_image_url($logo_id, 'full') : '';
-    if ($logo_id > 0 && $logo_url === '') {
-        return new WP_Error('kit_site_header_bad_logo', 'logo_id is not an image in the media library.', ['status' => 400]);
-    }
-    $title = array_key_exists('site_title', $input) ? trim((string) $input['site_title']) : (string) get_bloginfo('name');
-    $cta = is_array($input['cta'] ?? null) ? $input['cta'] : [];
-    $cta_label = trim((string) ($cta['label'] ?? ''));
-    $cta_url = esc_url_raw((string) ($cta['url'] ?? ''));
-    if ($cta_label !== '' && $cta_url === '') {
-        return new WP_Error('kit_site_header_bad_cta', 'cta needs both label and url.', ['status' => 400]);
-    }
-    $colors = [];
-    foreach (['background', 'text', 'accent'] as $key) {
-        $value = is_array($input['colors'] ?? null) ? (string) ($input['colors'][$key] ?? '') : '';
-        if ($value !== '') {
-            $hex = sanitize_hex_color($value);
-            if (!is_string($hex) || $hex === '') {
-                return new WP_Error('kit_site_header_bad_color', sprintf('colors.%s must be a hex colour such as #1f2937.', $key), ['status' => 400]);
-            }
-            $colors[$key] = $hex;
-        }
-    }
-    $colors += kit_palette();
-    $fonts = [];
-    foreach (['title', 'menu'] as $key) {
-        $family = is_array($input['fonts'] ?? null) ? trim((string) ($input['fonts'][$key] ?? '')) : '';
-        if ($family !== '') {
-            if (preg_match('/^[\p{L}\p{N} _-]{1,60}$/u', $family) !== 1) {
-                return new WP_Error('kit_site_header_bad_font', sprintf('fonts.%s must be a font family name such as "Source Serif 4".', $key), ['status' => 400]);
-            }
-            $fonts[$key] = $family;
-        }
+    $found = language_menus($input, $language_list);
+    $menus = $found['menus'];
+    $facts = site_facts('elementor', $language_list, $menus, $logo_id);
+    $woo = class_exists('WooCommerce');
+
+    if (!empty($input['check_only'])) {
+        return check_current_elementor($language_list, $langs['plugin'] !== '' ? count($language_list) : 1, $woo) + ['site' => $facts];
     }
 
-    // One plan per language: menus differ in length, so does the layout.
-    $per_language = [];
-    $menus = [];
-    foreach ($language_list as $language) {
-        $menus[$language] = pick_menu($input, $language);
-    }
-    // A language without a menu of its own gets the longest one found for another, so its pages
-    // still have navigation (in that menu's language, which the notes say).
-    $fallback = null;
-    foreach ($menus as $menu) {
-        if ($menu instanceof \WP_Term && (!$fallback instanceof \WP_Term || $menu->count > $fallback->count)) {
-            $fallback = $menu;
+    $elementor = is_array($input['elementor'] ?? null) ? $input['elementor'] : [];
+    $shared = is_array($elementor['elements'] ?? null) ? array_values($elementor['elements']) : [];
+    $own = is_array($elementor['elements_by_language'] ?? null) ? $elementor['elements_by_language'] : [];
+    if ($shared === [] && $own === []) {
+        if (!empty($input['dry_run'])) {
+            return ['dry_run' => true, 'builder' => 'elementor', 'site' => $facts, 'notes' => $found['notes'], 'next' => 'Design the header for this brand from site (colours, fonts, logo, tone), then call again with elementor.elements and dry_run: true to have it checked before it is saved.'];
         }
+
+        return new WP_Error('kit_site_header_no_design', 'Pass the header design as elementor.elements (Elementor elements, a container at the top). Call with dry_run: true first for the site\'s colours, fonts, logo, menus and the building blocks to use.', ['status' => 400]);
     }
-    $notes = [];
+
+    $switcher_slug = '';
+    $existing_switcher = wp_get_nav_menu_object(SWITCHER_MENU_NAME);
+    $uses_switcher = uses_token($elementor, 'language_switcher');
+    if ($uses_switcher && $langs['plugin'] === '') {
+        return new WP_Error('kit_site_header_no_languages', 'The design uses {{language_switcher}}, which needs Polylang with two or more languages; this site has none.', ['status' => 400]);
+    }
+    $switcher_slug = $existing_switcher instanceof \WP_Term ? (string) $existing_switcher->slug : sanitize_title(SWITCHER_MENU_NAME);
+    $labels = is_array($input['labels'] ?? null) ? $input['labels'] : [];
+    $globals = kit_palette_ids();
+    $page_background = kit_background() !== '' ? kit_background() : '#ffffff';
+
+    $unfiltered_html = current_user_can('unfiltered_html');
+    $trees = [];
+    $findings = [];
     foreach ($language_list as $language) {
+        $source = is_array($own[$language] ?? null) ? array_values($own[$language]) : $shared;
+        if ($source === []) {
+            return new WP_Error('kit_site_header_no_design', sprintf('No design for language "%s": pass elementor.elements (for every language) or elementor.elements_by_language.%s.', $language, $language), ['status' => 400]);
+        }
         $menu = $menus[$language];
-        if (!$menu instanceof \WP_Term && $language !== '' && $fallback instanceof \WP_Term) {
-            $menu = $fallback;
-            $notes[] = sprintf('No menu for language "%s" was found (one named like "Main menu (%s)"), so its header uses "%s". Pass menus.%s to choose another.', $language, strtoupper($language), $fallback->name, $language);
+        $unknown = [];
+        $tree = substitute($source, [
+            'menu' => $menu instanceof \WP_Term ? (string) $menu->slug : '',
+            'language_switcher' => $switcher_slug,
+            'home_url' => $language !== '' && function_exists('pll_home_url') ? (string) pll_home_url($language) : home_url('/'),
+            'site_title' => site_name(),
+            'labels' => labels_for($labels, $language, $default),
+        ], $unknown);
+        foreach (array_unique($unknown) as $token) {
+            $findings[] = ['language' => $language] + finding('error', 'unknown_token', '', sprintf('%s has no value here.', $token), $token === '{{menu}}' ? 'Create the menu, or pass menu / menus.' : 'Use one of the tokens listed in site.tokens, or add the label to labels.');
         }
-        $nav = $menu instanceof \WP_Term ? menu_top_level($menu) : [];
-        $per_language[$language] = [
-            'menu' => $menu,
-            'nav' => $nav,
-            'plan' => plan([
-                'title' => $title,
-                'has_logo' => $logo_id > 0,
-                'nav' => $nav,
-                'language' => $want_switcher,
-                'cart' => $want_cart,
-                'cta' => $cta_label,
-            ]),
-        ];
-    }
-    foreach ($per_language as $language => $row) {
-        if (!$row['menu'] instanceof \WP_Term) {
-            $notes[] = $language === ''
-                ? 'No menu was found, so the header has no navigation. Create one under Appearance > Menus, or pass menu.'
-                : sprintf('No menu for language "%s" was found (a menu named like "Main menu (%s)"), so that header has no navigation. Pass menus.%s.', $language, strtoupper($language), $language);
-        } elseif ($row['plan']['nav_layout'] === 'dropdown') {
-            $notes[] = sprintf('The %s menu has %d top-level items, too many for one row beside the logo and the right-hand group, so it opens from a menu button at every width. Shorten it (move items into sub-menus) for a full-width menu.', $language !== '' ? strtoupper($language) : 'main', count($row['nav']));
+        foreach (precheck_elementor($source, ['woo' => $woo, 'languages' => $langs['plugin'] !== '' ? count($language_list) : 1, 'globals' => $globals, 'page_background' => $page_background, 'switcher_slug' => $switcher_slug, 'unfiltered_html' => $unfiltered_html]) as $f) {
+            $findings[] = ['language' => $language] + $f;
         }
+        if (!$unfiltered_html) {
+            // Labels are substituted after the precheck above: check what they put in, too.
+            foreach (precheck_elementor($tree, ['woo' => $woo, 'languages' => 1, 'globals' => [], 'page_background' => $page_background, 'unfiltered_html' => false]) as $f) {
+                if ($f['check'] === 'html_not_allowed') {
+                    $findings[] = ['language' => $language] + $f;
+                }
+            }
+            $tree = kses_design($tree, 'wp_kses_post');
+        }
+        $trees[$language] = $tree;
     }
-
+    $findings = dedupe_findings($findings);
+    $blocking = has_errors($findings);
     $summary = [
         'builder' => 'elementor',
+        'site' => $facts,
         'languages' => $langs['languages'],
-        'language_switcher' => $want_switcher,
-        'cart' => $want_cart,
-        'logo_id' => $logo_id,
-        'site_title' => $title,
-        'plans' => array_map(static fn(array $row): array => [
-            'menu' => $row['menu'] instanceof \WP_Term ? ['id' => (int) $row['menu']->term_id, 'name' => (string) $row['menu']->name, 'top_level_items' => count($row['nav'])] : null,
-        ] + $row['plan'], $per_language),
         'replaces' => array_keys(active_headers()),
-        'notes' => $notes,
+        'findings' => $findings,
+        'notes' => $found['notes'],
     ];
     if (!empty($input['dry_run'])) {
-        return $summary + ['dry_run' => true];
+        return $summary + ['dry_run' => true, 'ready' => !$blocking, 'next' => $blocking ? 'Fix the error findings in the design, then dry-run again.' : 'Ready: call again without dry_run and with confirm: true.'];
+    }
+    if ($blocking) {
+        return new WP_Error('kit_site_header_design_problems', 'The design was not saved: ' . findings_line($findings), ['status' => 422, 'findings' => $findings]);
     }
 
     $created = [];
@@ -407,11 +508,7 @@ function build(array $input): array|WP_Error
     };
 
     try {
-        return write($input, $summary, $per_language, [
-            'title' => $title, 'logo_id' => $logo_id, 'logo_url' => $logo_url, 'want_switcher' => $want_switcher,
-            'want_cart' => $want_cart, 'cta_label' => $cta_label, 'cta_url' => $cta_url, 'colors' => $colors,
-            'fonts' => $fonts,
-        ], $created, $created_menu, $demoted, $undo_partial);
+        return write($input, $summary, $trees, $uses_switcher, $woo, $language_list, $created, $created_menu, $demoted, $undo_partial);
     } catch (\Throwable $e) {
         $undo_partial();
 
@@ -420,31 +517,20 @@ function build(array $input): array|WP_Error
 }
 
 /**
- * The writing half of build(). Anything that throws is undone by the caller's catch through
- * the same $undo the failed-check path uses.
+ * Save each language's header, put it on every page, and check what visitors get.
  *
  * @param array<string, mixed> $input
  * @param array<string, mixed> $summary
- * @param array<string, array{menu: ?\WP_Term, nav: list<array{title: string, children: bool}>, plan: array<string, mixed>}> $per_language
- * @param array<string, mixed> $c
+ * @param array<string, list<array<string, mixed>>> $trees
+ * @param list<string> $language_list
  * @param list<int> $created
  * @param array<int, list<string>> $demoted
  * @return array<string, mixed>|WP_Error
  */
-function write(array $input, array $summary, array $per_language, array $c, array &$created, int &$created_menu, array &$demoted, callable $undo_partial): array|WP_Error
+function write(array $input, array $summary, array $trees, bool $uses_switcher, bool $woo, array $language_list, array &$created, int &$created_menu, array &$demoted, callable $undo_partial): array|WP_Error
 {
-    $title = (string) $c['title'];
-    $logo_id = (int) $c['logo_id'];
-    $logo_url = (string) $c['logo_url'];
-    $want_switcher = (bool) $c['want_switcher'];
-    $want_cart = (bool) $c['want_cart'];
-    $cta_label = (string) $c['cta_label'];
-    $cta_url = (string) $c['cta_url'];
-    $colors = (array) $c['colors'];
-    $fonts = (array) $c['fonts'];
-
     $switcher = ['slug' => '', 'id' => 0, 'created' => false];
-    if ($want_switcher) {
+    if ($uses_switcher) {
         $switcher = ensure_switcher_menu();
         if ($switcher instanceof WP_Error) {
             return $switcher;
@@ -453,30 +539,10 @@ function write(array $input, array $summary, array $per_language, array $c, arra
     }
 
     $templates = [];
-    $counter = 0;
-    $id = static function () use (&$counter): string {
-        $counter++;
-
-        return substr(md5(uniqid('', true) . $counter), 0, 7);
-    };
-    foreach ($per_language as $language => $row) {
-        $home = $language !== '' && function_exists('pll_home_url') ? (string) pll_home_url($language) : home_url('/');
-        $tree = elementor_tree($row['plan'], [
-            'title' => $title,
-            'home_url' => $home,
-            'logo_id' => $logo_id,
-            'logo_url' => $logo_url,
-            'menu' => $row['menu'] instanceof \WP_Term ? (string) $row['menu']->slug : '',
-            'switcher_menu' => $switcher['slug'],
-            'cart' => $want_cart,
-            'cta_label' => $cta_label,
-            'cta_url' => $cta_url,
-            'sticky' => !empty($input['sticky']),
-            'colors' => $colors,
-            'fonts' => $fonts,
-        ], $id);
+    $dropped = [];
+    foreach ($trees as $language => $tree) {
         $document = \Elementor\Plugin::$instance->documents->create('header', [
-            'post_title' => $language !== '' ? sprintf('Site header (%s)', strtoupper($language)) : 'Site header',
+            'post_title' => $language !== '' ? sprintf('Site header (%s)', strtoupper((string) $language)) : 'Site header',
             'post_status' => 'publish',
         ]);
         if ($document instanceof WP_Error || !is_object($document)) {
@@ -486,8 +552,16 @@ function write(array $input, array $summary, array $per_language, array $c, arra
         }
         $post_id = (int) $document->get_main_id();
         $created[] = $post_id;
-        $document->save(['elements' => $tree, 'settings' => ['post_status' => 'publish']]);
-        $templates[] = ['id' => $post_id, 'language' => $language, 'edit_url' => (string) $document->get_edit_url()];
+        $saved = save_elementor_tree($post_id, $tree, $document);
+        if ($saved instanceof WP_Error) {
+            $undo_partial();
+
+            return $saved;
+        }
+        if ($saved !== []) {
+            $dropped[$language !== '' ? $language : 'site'] = $saved;
+        }
+        $templates[] = ['id' => $post_id, 'language' => (string) $language, 'edit_url' => (string) $document->get_edit_url()];
     }
 
     // The new header takes over every page: the old ones keep their content, lose their conditions.
@@ -507,33 +581,21 @@ function write(array $input, array $summary, array $per_language, array $c, arra
         update_post_meta($primary, TRANSLATIONS_META, wp_slash($map));
     }
 
-    // Read every language's home page as a visitor gets it and check the header that came back.
     $checks = [];
-    $passed = true;
+    $failed = false;
     foreach ($templates as $template) {
         $language = $template['language'];
         $url = $language !== '' && function_exists('pll_home_url') ? (string) pll_home_url($language) : home_url('/');
-        $page = Page::fetch(add_query_arg('wppilot-kit-header-check', (string) time(), $url));
-        $html = is_array($page) ? $page['html'] : '';
-        $check = check_served_header($html, [
-            'template_id' => $template['id'],
-            'nav_items' => count($per_language[$language]['nav']),
-            'language' => $want_switcher,
-            'cart' => $want_cart,
-            'plan' => $per_language[$language]['plan'],
-        ]);
-        if (!is_array($page)) {
-            $check['checks'][] = ['check' => 'served', 'passed' => false, 'detail' => $page->get_error_message()];
-            $check['passed'] = false;
-        }
-        $checks[$language !== '' ? $language : 'site'] = ['url' => $url] + $check;
-        $passed = $passed && $check['passed'];
+        $result = check_page($url, ['kind' => 'elementor', 'template_id' => $template['id'], 'languages' => count($language_list) > 1 ? count($language_list) : 1, 'cart' => $woo]);
+        $checks[$language !== '' ? $language : 'site'] = $result;
+        $failed = $failed || !$result['passed'];
     }
-    if (!$passed) {
-        // Never leave a header that did not check out: put everything back and say why.
+    $keep = !empty($input['keep_on_fail']);
+    if ($failed && !$keep) {
+        // The default: a header that did not check out is not left on the site.
         $undo_partial();
 
-        return new WP_Error('kit_site_header_check_failed', 'The header was built but did not pass its own check on the served page, so it was removed again and the previous header restored. Failed: ' . failed_checks($checks), [
+        return new WP_Error('kit_site_header_check_failed', 'The header was saved but did not pass its checks on the served page, so it was removed and the previous header restored. Fix the design and build again (or pass keep_on_fail: true to keep it while you fix it). ' . findings_line(array_merge(...array_values(array_map(static fn(array $c): array => $c['findings'], $checks)))), [
             'status' => 422,
             'checks' => $checks,
         ]);
@@ -546,23 +608,158 @@ function write(array $input, array $summary, array $per_language, array $c, arra
         'switcher_menu_id' => $switcher['id'],
         'demoted' => $demoted,
         'checks' => $checks,
-        'look' => 'Structural checks passed. Screenshot each language at 1440, 768 and 390 px wide to see it; this check does not run a browser.',
+        'passed' => !$failed,
+        'dropped' => $dropped,
+        'probe' => probe_instructions($checks),
     ];
 }
 
 /**
- * The failed checks as one line: MCP clients see an error's message, not its data.
+ * Save an Elementor tree into a header template: through the host's Elementor content writer
+ * when it has one (its normalisation and validation), else Elementor's own document save.
  *
- * @param array<string, array{checks: list<array{check: string, passed: bool, detail: string}>}> $checks
+ * @param list<array<string, mixed>> $tree
+ * @return list<mixed>|WP_Error  What the validator dropped, when anything.
  */
-function failed_checks(array $checks): string
+function save_elementor_tree(int $post_id, array $tree, object $document): array|WP_Error
+{
+    $writer = Runtime\host()->extension('elementor-content-writer');
+    $result = is_callable($writer) ? $writer($post_id, $tree, 'header') : null;
+    if ($result instanceof WP_Error) {
+        return $result;
+    }
+    if ($result !== null) {
+        if (!is_array($result) || ($result['success'] ?? false) !== true) {
+            $error = is_array($result) ? (string) ($result['error'] ?? 'invalid design') : 'invalid design';
+
+            return new WP_Error('kit_site_header_invalid_design', 'Elementor refused the design: ' . $error, ['status' => 422, 'validation' => $result]);
+        }
+
+        return array_values((array) ($result['dropped'] ?? []));
+    }
+    $counter = 0;
+    $normalize = static function (array $elements) use (&$normalize, &$counter): array {
+        $out = [];
+        foreach ($elements as $element) {
+            if (!is_array($element)) {
+                continue;
+            }
+            $counter++;
+            $node = [
+                'id' => preg_match('/^[0-9a-f]{7,8}$/', (string) ($element['id'] ?? '')) === 1 ? (string) $element['id'] : substr(md5(uniqid('', true) . $counter), 0, 7),
+                'elType' => el_type($element),
+                'settings' => is_array($element['settings'] ?? null) ? $element['settings'] : [],
+                'elements' => $normalize(is_array($element['elements'] ?? null) ? $element['elements'] : []),
+            ];
+            if ($node['elType'] === 'widget') {
+                $node['widgetType'] = widget_type($element);
+            }
+            if (isset($element['isInner'])) {
+                $node['isInner'] = (bool) $element['isInner'];
+            }
+            $out[] = $node;
+        }
+
+        return $out;
+    };
+    $document->save(['elements' => $normalize($tree), 'settings' => ['post_status' => 'publish']]);
+
+    return [];
+}
+
+/**
+ * Fetch a page as a visitor and check its header, its images and its same-site links.
+ *
+ * @param array{kind: string, template_id?: int, languages: int, cart: bool} $expect
+ * @return array{url: string, probe_url: string, passed: bool, findings: list<array<string, string>>}
+ */
+function check_page(string $url, array $expect): array
+{
+    $page = Page::fetch(add_query_arg('wppilot-kit-header-check', (string) time(), $url));
+    if (!is_array($page)) {
+        return ['url' => $url, 'probe_url' => probe_url($url), 'passed' => false, 'findings' => [finding('error', 'served', '', $page->get_error_message(), 'Check that the home page loads for a visitor.')]];
+    }
+    $result = check_served($page['html'], $expect);
+    $findings = $result['findings'];
+    $budget = 12;
+    foreach (['image' => $result['images'], 'link' => $result['links']] as $kind => $targets) {
+        foreach ($targets as $target => $element) {
+            $target = (string) $target;
+            $absolute = str_starts_with($target, '/') && !str_starts_with($target, '//') ? home_url($target) : $target;
+            if (!Page::is_same_site($absolute) || $budget-- <= 0) {
+                continue;
+            }
+            $got = Page::fetch($absolute, 10);
+            $status = is_array($got) ? $got['status'] : 0;
+            if ($status >= 400 || $status === 0) {
+                $findings[] = finding('error', 'broken_' . $kind, (string) $element, sprintf('The %s %s returns %s.', $kind, $target, $status === 0 ? 'no response' : 'HTTP ' . $status), $kind === 'image' ? 'Pick an image that exists in the media library.' : 'Point the link at a page that exists.');
+            }
+        }
+    }
+
+    return ['url' => $url, 'probe_url' => probe_url($url), 'passed' => !has_errors($findings), 'findings' => $findings];
+}
+
+/**
+ * Check the header the site serves now, without writing: the same checks as after a build.
+ *
+ * @param list<string> $language_list
+ * @return array<string, mixed>
+ */
+function check_current_elementor(array $language_list, int $languages, bool $woo): array
+{
+    $checks = [];
+    foreach ($language_list as $language) {
+        $url = $language !== '' && function_exists('pll_home_url') ? (string) pll_home_url($language) : home_url('/');
+        $page = Page::fetch(add_query_arg('wppilot-kit-header-check', (string) time(), $url));
+        $html = is_array($page) ? $page['html'] : '';
+        $template = preg_match('/data-elementor-type="header"\s+data-elementor-id="(\d+)"|data-elementor-id="(\d+)"[^>]*data-elementor-type="header"/', $html, $m) === 1 ? (int) ($m[1] !== '' ? $m[1] : $m[2]) : 0;
+        $checks[$language !== '' ? $language : 'site'] = ['template_id' => $template] + check_page($url, ['kind' => 'elementor', 'template_id' => $template, 'languages' => $languages, 'cart' => $woo]);
+    }
+
+    return ['check_only' => true, 'checks' => $checks, 'probe' => probe_instructions($checks)];
+}
+
+/**
+ * How to run the in-browser half of the check.
+ *
+ * @param array<string, array{probe_url: string}> $checks
+ * @return array<string, mixed>
+ */
+function probe_instructions(array $checks): array
+{
+    return [
+        'urls' => array_map(static fn(array $c): string => $c['probe_url'], $checks),
+        'widths' => [1440, 768, 390],
+        'how' => 'The server cannot lay the page out, so overlap, menu rows, wrapping labels, horizontal scroll, header height, the menu button opening and computed contrast are checked in a browser: open each URL at 1440, 768 and 390 px wide and, once loaded, read window.siteHeaderProbe (or the data-wppilot-kit-header-probe attribute on <html>). Each finding names the element (Elementor id) and what to change. Fix your design and build again until every width passes, then look at the screenshots yourself. Without a browser tool, ask the person to look at those widths.',
+    ];
+}
+
+/** Findings that repeat across languages, once. */
+function dedupe_findings(array $findings): array
+{
+    $seen = [];
+    $out = [];
+    foreach ($findings as $f) {
+        $key = $f['check'] . '|' . $f['element_id'] . '|' . $f['detail'];
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $out[] = $f;
+    }
+
+    return $out;
+}
+
+/** The error findings as one line: MCP clients see an error's message, not its data. */
+function findings_line(array $findings): string
 {
     $lines = [];
-    foreach ($checks as $language => $result) {
-        foreach ($result['checks'] as $check) {
-            if (!$check['passed']) {
-                $lines[] = sprintf('[%s] %s: %s', $language, $check['check'], $check['detail']);
-            }
+    foreach ($findings as $f) {
+        if (($f['severity'] ?? '') === 'error') {
+            // The same problem in every language is said once.
+            $lines[$f['check'] . $f['element_id'] . $f['detail']] = sprintf('[%s%s] %s Fix: %s', $f['check'], ($f['element_id'] ?? '') !== '' ? ' ' . $f['element_id'] : '', $f['detail'], $f['fix']);
         }
     }
 

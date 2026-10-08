@@ -10,7 +10,7 @@
     },
     "vendor_storage": {
         "meta": ["_elementor_conditions", "_elementor_template_type", "_pll_menu_item"],
-        "option": ["woocommerce_coming_soon", "woocommerce_store_pages_only"]
+        "option": ["woocommerce_coming_soon", "woocommerce_store_pages_only", "elementor_active_kit"]
     },
     "categories": {
         "appearance": {

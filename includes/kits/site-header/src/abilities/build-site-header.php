@@ -14,12 +14,17 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-$tri = ['type' => 'string', 'enum' => ['auto', 'yes', 'no'], 'default' => 'auto'];
+$by_language = static fn(array $item, string $what): array => [
+    'type' => 'object',
+    'additionalProperties' => $item,
+    'description' => 'Per language, when a language needs its own ' . $what . ': {"ru": ...}. Languages not listed use the shared one.',
+];
+$tree = ['type' => 'array', 'items' => ['type' => 'object'], 'description' => 'Elementor elements, in the format Elementor stores them: a container at the top (elType "container"), widgets with widgetType and settings, children in "elements". Any widgets, containers and styles.'];
 
 wp_register_ability('wppilot/build-site-header', [
     'label' => __('Build Site Header', domain: 'wppilot'),
     'description' => __(
-        'Builds the site-wide header from a proven layout instead of a hand-made element tree: logo and site title on the left, the menu in one row (a menu button on tablets and phones), and on the right the language switcher as a styled dropdown, an optional call-to-action button and the cart icon. Use this for any request to create, fix, redesign or "make professional" a site header - do not hand-build a header template. Elementor Pro: a Theme Builder header shown on every page, one per language when Polylang is active (each with that language\'s menu, swapped in automatically), replacing the headers that had display conditions (they are kept, only their conditions are removed). The layout is sized from the menu: a menu too long for one row becomes a menu button at every width, and the site title gives way to the logo on phones when both do not fit. After saving, it reads each language\'s home page as a visitor and checks the header that came back (the right template, the menu, a menu button for small screens, the switcher styled rather than a bare list, the cart icon, the phone row\'s width); if a check fails it removes what it built, restores the previous header and returns the failed checks. Block themes (builder block-theme, or auto without Elementor Pro): the header template part of the theme as one row - site logo and title, a navigation block made from the menu of each language with the Polylang switcher as its last item and an overlay menu on phones, and the WooCommerce mini-cart - with one translated template part per Polylang language. Undo restores the previous header. dry_run returns the plan without writing. A classic theme without Elementor Pro is refused with what the theme supports instead.',
+        'Saves the site-wide header YOU design and checks it. You are the designer, as for the rest of the website: there is no template. 1) Call with dry_run: true and no design: it returns the site\'s facts (title, tagline, logo, colours and fonts from the Elementor kit or theme.json and the logo, the home page hero, each language\'s menu, whether there is a shop) and building_blocks: settings for the menu, the language switcher and the cart that are known to render well. 2) Design a header that fits this brand - its colours, type and tone - and pass it as elementor.elements (Elementor Pro: Elementor elements, in the format Elementor stores them) or block_markup (block themes: the header template part\'s blocks), with dry_run: true: it is checked before anything is saved. Use the tokens {{menu}} (each language\'s menu), {{language_switcher}} (a styled language dropdown, never a bare list), {{navigation_ref}} (block themes), {{home_url}}, {{site_title}} and {{label:key}} (per-language text from labels); one design then serves every language, or pass elements_by_language for a language that needs its own. 3) Build with confirm: true. Elementor Pro: one Theme Builder header per language on every page (swapped in by language), the headers that had display conditions kept with their conditions removed. Block themes: the header template part, with one translated part per Polylang language and a navigation per language. It then reads each language\'s home page as a visitor and reports objective problems - raw language list, a menu with no menu button for phones, cart without its icon, text below WCAG AA, missing accessible names, broken images and links - each with the element id and what to change; on an error it restores the previous header unless keep_on_fail is true. It returns probe URLs: open them in a browser at 1440, 768 and 390 px and read window.siteHeaderProbe for what only a layout shows (menu rows, wrapping labels, overlaps, horizontal scroll, header height, the menu button opening, computed contrast). Fix your design from the findings and build again; check_only: true re-checks the served header without writing. Undo restores the previous header.',
         domain: 'wppilot',
     ),
     'category' => 'appearance',
@@ -28,49 +33,38 @@ wp_register_ability('wppilot/build-site-header', [
         'default' => [],
         'properties' => [
             'builder' => ['type' => 'string', 'enum' => ['auto', 'elementor', 'block-theme'], 'default' => 'auto', 'description' => 'auto picks Elementor Pro when it is active, else the block theme.'],
-            'logo_id' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Media library image for the logo; 0 or omitted uses the site logo (Customizer), if any.'],
-            'site_title' => ['type' => 'string', 'maxLength' => 120, 'description' => 'Text beside the logo; defaults to the site title. Empty string for logo only.'],
-            'menu' => ['type' => ['integer', 'string'], 'description' => 'Menu ID or slug for a single-language site. Defaults to the main (or longest) menu.'],
+            'elementor' => [
+                'type' => 'object',
+                'properties' => [
+                    'elements' => $tree,
+                    'elements_by_language' => $by_language($tree, 'design'),
+                ],
+                'additionalProperties' => false,
+                'description' => 'The header design for Elementor Pro.',
+            ],
+            'block_markup' => ['type' => 'string', 'maxLength' => 200000, 'description' => 'The header design for a block theme: the header template part\'s block markup. Put the navigation in as <!-- wp:navigation {"ref":"{{navigation_ref}}","overlayMenu":"mobile"} /-->.'],
+            'block_markup_by_language' => $by_language(['type' => 'string', 'maxLength' => 200000], 'markup'),
+            'labels' => [
+                'type' => 'object',
+                'additionalProperties' => ['type' => ['string', 'object']],
+                'description' => 'Texts for {{label:key}}, the same everywhere or per language: {"cta": {"en": "Order online", "ru": "Заказать"}}. A language without its own uses the default language\'s.',
+            ],
+            'logo_id' => ['type' => 'integer', 'minimum' => 0, 'description' => 'The logo the facts report; 0 or omitted is the site logo (Customizer).'],
+            'menu' => ['type' => ['integer', 'string'], 'description' => 'Menu ID or slug for {{menu}} on a single-language site. Defaults to the main (or longest) menu.'],
             'menus' => ['type' => 'object', 'additionalProperties' => ['type' => ['integer', 'string']], 'description' => 'Per language: {"en": 63, "ru": 64}. Defaults to the menu whose name ends in the language code, such as "Main menu (EN)".'],
-            'show_language_switcher' => $tri + ['description' => 'auto: when Polylang has two or more languages.'],
-            'show_cart' => $tri + ['description' => 'auto: when WooCommerce is active.'],
-            'cta' => [
-                'type' => 'object',
-                'properties' => ['label' => ['type' => 'string', 'maxLength' => 40], 'url' => ['type' => 'string', 'maxLength' => 2000]],
-                'required' => ['label', 'url'],
-                'additionalProperties' => false,
-                'description' => 'Optional button on the right at desktop width, such as {"label": "Order online", "url": "/shop/"}.',
-            ],
-            'sticky' => ['type' => 'boolean', 'default' => false, 'description' => 'Keep the header at the top while scrolling.'],
-            'colors' => [
-                'type' => 'object',
-                'properties' => [
-                    'background' => ['type' => 'string', 'maxLength' => 7],
-                    'text' => ['type' => 'string', 'maxLength' => 7],
-                    'accent' => ['type' => 'string', 'maxLength' => 7],
-                ],
-                'additionalProperties' => false,
-                'description' => 'Hex colours. Text and accent default to the Elementor kit\'s global colours when the site has set them (otherwise near-black); background defaults to white.',
-            ],
-            'fonts' => [
-                'type' => 'object',
-                'properties' => [
-                    'title' => ['type' => 'string', 'maxLength' => 60],
-                    'menu' => ['type' => 'string', 'maxLength' => 60],
-                ],
-                'additionalProperties' => false,
-                'description' => 'Font family names for the site title and the menu, such as the site heading and body fonts. Omitted, they follow the global typography of the Elementor kit.',
-            ],
-            'dry_run' => ['type' => 'boolean', 'default' => false, 'description' => 'Return the layout plan (menus found, width estimates, what would be replaced) without writing.'],
-            'confirm' => ['type' => 'boolean', 'description' => 'Must be true to write: the person approved replacing the site header. Not needed with dry_run.'],
+            'show_language_switcher' => ['type' => 'string', 'enum' => ['auto', 'no'], 'default' => 'auto', 'description' => 'Block themes: auto puts Polylang\'s switcher last in each navigation when the site has two or more languages.'],
+            'keep_on_fail' => ['type' => 'boolean', 'default' => false, 'description' => 'Keep the new header even when the served-page checks find errors (to fix it in place). Default: restore the previous header.'],
+            'check_only' => ['type' => 'boolean', 'default' => false, 'description' => 'Check the header the site serves now, without writing; returns findings and probe URLs.'],
+            'dry_run' => ['type' => 'boolean', 'default' => false, 'description' => 'Without a design: the site facts and building blocks. With one: the checks that need no page, without saving.'],
+            'confirm' => ['type' => 'boolean', 'description' => 'Must be true to write: the person approved replacing the site header.'],
         ],
         'additionalProperties' => false,
     ],
     'output_schema' => ['type' => 'object'],
     'execute_callback' => static function (array $input = []): array|WP_Error {
         // Inside WPPilot the gate pipeline enforces confirm; an exported copy has no
-        // pipeline, so the kit checks it itself. A dry run writes nothing.
-        if (empty($input['dry_run'])) {
+        // pipeline, so the kit checks it itself. A dry run and a check write nothing.
+        if (empty($input['dry_run']) && empty($input['check_only'])) {
             $guard = Runtime\confirm_guard('wppilot/build-site-header', $input);
             if ($guard instanceof WP_Error) {
                 return $guard;

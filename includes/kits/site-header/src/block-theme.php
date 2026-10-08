@@ -8,17 +8,16 @@ declare(strict_types=1);
 namespace WPPilot\Kits\SiteHeader;
 
 use WP_Error;
-use WPPilot\Kits\Runtime\Page;
 
 if (!defined('ABSPATH')) {
     exit();
 }
 
 /*
- * The block-theme header: the theme's `header` template part, rewritten as one row - logo and
- * site title, then a navigation block per language (Polylang's `pll_lang` block attribute shows
- * each only on its own language's pages) with Polylang's switcher as its last item, then the
- * WooCommerce mini-cart. Each language's classic menu becomes a navigation post of its own.
+ * The block-theme header: the theme's `header` template part, saved with the caller's own block
+ * markup. The plumbing is ours: each language's classic menu becomes a navigation post of its
+ * own (Polylang's switcher as its last item), linked as translations, and {{navigation_ref}} in
+ * the markup points at it; Polylang Pro serves one translated part per language.
  */
 
 /**
@@ -61,99 +60,6 @@ function navigation_markup(array $items, bool $switcher): string
     }
 
     return $out;
-}
-
-/**
- * The template part's content.
- *
- * @param array<string, mixed> $plan
- * @param array{logo: string, navigations: array<string, int>, cart: bool} $parts  logo is block markup or ''.
- */
-function header_part_markup(array $plan, array $parts): string
-{
-    $overlay = $plan['nav_layout'] === 'dropdown' ? 'always' : 'mobile';
-    $nav = '';
-    // One navigation block, pointing at the default language's navigation. Polylang translates
-    // navigation posts, so on a translated page it renders that language's linked navigation.
-    $ref = $parts['navigations'] !== [] ? (int) reset($parts['navigations']) : 0;
-    if ($ref > 0) {
-        $attrs = ['ref' => $ref, 'overlayMenu' => $overlay, 'layout' => ['type' => 'flex', 'justifyContent' => 'right', 'flexWrap' => 'nowrap']];
-        $nav .= '<!-- wp:navigation ' . wp_json_encode($attrs, JSON_UNESCAPED_SLASHES) . ' /-->' . "\n";
-    }
-    $title = '<!-- wp:site-title {"level":0} /-->';
-
-    return '<!-- wp:group {"tagName":"header","align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|30","bottom":"var:preset|spacing|30"}}},"layout":{"type":"constrained"}} -->' . "\n"
-        . '<header class="wp-block-group alignfull" style="padding-top:var(--wp--preset--spacing--30);padding-bottom:var(--wp--preset--spacing--30)">'
-        . '<!-- wp:group {"align":"wide","layout":{"type":"flex","flexWrap":"nowrap","justifyContent":"space-between"}} -->' . "\n"
-        . '<div class="wp-block-group alignwide">'
-        . '<!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap"}} -->' . "\n"
-        . '<div class="wp-block-group">' . $parts['logo'] . $title . '</div>' . "\n"
-        . '<!-- /wp:group -->' . "\n"
-        . '<!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap","justifyContent":"right"}} -->' . "\n"
-        . '<div class="wp-block-group">' . $nav . ($parts['cart'] ? '<!-- wp:woocommerce/mini-cart /-->' . "\n" : '') . '</div>' . "\n"
-        . '<!-- /wp:group --></div>' . "\n"
-        . '<!-- /wp:group --></header>' . "\n"
-        . '<!-- /wp:group -->';
-}
-
-/**
- * Check a served block-theme header.
- *
- * @param array{nav_items: int, language: bool, cart: bool|string, plan: array<string, mixed>} $expect  cart 'hidden': WooCommerce hides it.
- * @return array{passed: bool, checks: list<array{check: string, passed: bool, detail: string}>}
- */
-function check_served_block_header(string $html, array $expect): array
-{
-    $checks = [];
-    $add = static function (string $check, bool $passed, string $detail) use (&$checks): void {
-        $checks[] = ['check' => $check, 'passed' => $passed, 'detail' => $detail];
-    };
-    $document = new \DOMDocument();
-    $previous = libxml_use_internal_errors(true);
-    $loaded = $html !== '' && $document->loadHTML('<?xml encoding="utf-8"?>' . $html, LIBXML_NONET);
-    libxml_clear_errors();
-    libxml_use_internal_errors($previous);
-    $xpath = $loaded ? new \DOMXPath($document) : null;
-    $class = static fn(string $c): string => 'contains(concat(" ", normalize-space(@class), " "), " ' . $c . ' ")';
-    $headers = $xpath?->query('//header[' . $class('wp-block-template-part') . ']|//*[' . $class('wp-block-template-part') . ']//header');
-    $root = $headers !== null && $headers !== false && $headers->length > 0 ? $headers->item(0) : null;
-    $add('header_served', $root instanceof \DOMElement, $root instanceof \DOMElement ? 'The theme header template part is served.' : 'No block-theme header is served (another plugin\'s header may replace it).');
-    if (!$root instanceof \DOMElement || $xpath === null) {
-        return ['passed' => false, 'checks' => $checks];
-    }
-    $navs = $xpath->query('.//nav[' . $class('wp-block-navigation') . ']', $root);
-    $nav = $navs !== false && $navs->length > 0 ? $navs->item(0) : null;
-    if ($expect['nav_items'] > 0) {
-        $links = $nav instanceof \DOMElement ? $xpath->query('.//ul[' . $class('wp-block-navigation__container') . ']/li', $nav) : false;
-        $count = $links === false ? 0 : $links->length;
-        // This language's own menu: its top-level items plus the switcher, no more, no fewer.
-        $want = $expect['nav_items'] + ($expect['language'] ? 1 : 0);
-        $add('menu_rendered', $count === $want, sprintf('%d menu items rendered; the menu for this language has %d.', $count, $want));
-        $open = $nav instanceof \DOMElement ? $xpath->query('.//*[' . $class('wp-block-navigation__responsive-container-open') . ']', $nav) : false;
-        $add('menu_button_on_small_screens', $open !== false && $open->length > 0, 'The navigation has its overlay menu button.');
-        if ($navs !== false && $navs->length > 1) {
-            $add('one_language_menu', false, 'More than one language\'s menu is printed on this page.');
-        }
-    }
-    if ($expect['language']) {
-        $switch = $nav instanceof \DOMElement ? $xpath->query('.//*[' . $class('lang-item') . ']', $nav) : false;
-        $add('language_switcher_styled', $switch !== false && $switch->length > 0, 'The language switcher is an item of the navigation.');
-    }
-    $raw = $xpath->query('.//ul/li[' . $class('lang-item') . '][not(ancestor::nav)]', $root);
-    $add('no_raw_language_list', $raw === false || $raw->length === 0, 'No unstyled language list.');
-    if ($expect['cart'] === 'hidden') {
-        $add('cart_icon', true, 'WooCommerce is in coming-soon mode for store pages, so it hides the mini-cart from visitors; it shows once the store is live.');
-    } elseif ($expect['cart']) {
-        $cart = $xpath->query('.//*[' . $class('wc-block-mini-cart') . ']', $root);
-        $add('cart_icon', $cart !== false && $cart->length > 0, 'The mini-cart block is rendered.');
-    }
-
-    $passed = true;
-    foreach ($checks as $check) {
-        $passed = $passed && $check['passed'];
-    }
-
-    return ['passed' => $passed, 'checks' => $checks];
 }
 
 /**
@@ -230,52 +136,81 @@ function build_block_theme(array $input): array|WP_Error
     }
     $langs = languages();
     $language_list = $langs['languages'] !== [] ? $langs['languages'] : [''];
+    $default = $language_list[0];
     $want_switcher = $langs['plugin'] === 'polylang' && (string) ($input['show_language_switcher'] ?? 'auto') !== 'no';
-    $want_cart = class_exists('WooCommerce') && (string) ($input['show_cart'] ?? 'auto') !== 'no';
+    $woo = class_exists('WooCommerce');
     $logo_id = (int) ($input['logo_id'] ?? 0);
-    $site_logo = (int) get_theme_mod('custom_logo', 0);
-    $title = (string) get_bloginfo('name');
+    if ($logo_id === 0) {
+        $logo_id = (int) get_theme_mod('custom_logo', 0);
+    }
+    $found = language_menus($input, $language_list);
+    $menus = $found['menus'];
+    $facts = site_facts('block-theme', $language_list, $menus, $logo_id);
+    $languages = $langs['plugin'] !== '' ? count($language_list) : 1;
+    $cart_hidden = get_option('woocommerce_coming_soon') === 'yes' && get_option('woocommerce_store_pages_only') === 'yes';
 
-    $plans = [];
-    $menus = [];
-    $notes = [];
+    if (!empty($input['check_only'])) {
+        $checks = [];
+        foreach ($language_list as $language) {
+            $url = theme_template_url($language);
+            if ($url !== '') {
+                $checks[$language !== '' ? $language : 'site'] = check_page($url, ['kind' => 'block-theme', 'languages' => $languages, 'cart' => false]);
+            }
+        }
+
+        return ['check_only' => true, 'builder' => 'block-theme', 'site' => $facts, 'checks' => $checks, 'probe' => probe_instructions($checks)];
+    }
+
+    $shared = is_string($input['block_markup'] ?? null) ? (string) $input['block_markup'] : '';
+    $own = is_array($input['block_markup_by_language'] ?? null) ? $input['block_markup_by_language'] : [];
+    if (trim($shared) === '' && $own === []) {
+        if (!empty($input['dry_run'])) {
+            return ['dry_run' => true, 'builder' => 'block-theme', 'site' => $facts, 'template_part' => $part->id, 'current_markup' => (string) $part->content, 'notes' => $found['notes'], 'next' => 'Design the header for this brand from site (colours, fonts, logo, tone) as block markup, then call again with block_markup and dry_run: true to have it checked before it is saved.'];
+        }
+
+        return new WP_Error('kit_site_header_no_design', 'Pass the header design as block_markup (the header template part\'s blocks). Call with dry_run: true first for the site\'s colours, fonts, menus and the building blocks to use.', ['status' => 400]);
+    }
+
+    $labels = is_array($input['labels'] ?? null) ? $input['labels'] : [];
+    $findings = [];
+    $sources = [];
     foreach ($language_list as $language) {
-        $menus[$language] = pick_menu($input, $language);
-    }
-    $fallback = null;
-    foreach ($menus as $menu) {
-        if ($menu instanceof \WP_Term && (!$fallback instanceof \WP_Term || $menu->count > $fallback->count)) {
-            $fallback = $menu;
+        $source = is_string($own[$language] ?? null) && trim((string) $own[$language]) !== '' ? (string) $own[$language] : $shared;
+        if (trim($source) === '') {
+            return new WP_Error('kit_site_header_no_design', sprintf('No design for language "%s": pass block_markup (for every language) or block_markup_by_language.%s.', $language, $language), ['status' => 400]);
+        }
+        $sources[$language] = $source;
+        foreach (precheck_blocks(parse_blocks($source), $source, ['woo' => $woo, 'languages' => $languages, 'unfiltered_html' => current_user_can('unfiltered_html')]) as $f) {
+            $findings[] = ['language' => $language] + $f;
+        }
+        // Tokens with no value, found before anything is made (the navigation ref is made later).
+        $unknown = [];
+        substitute($source, [
+            'navigation_ref' => 1,
+            'home_url' => home_url('/'),
+            'site_title' => site_name(),
+            'labels' => labels_for($labels, $language, $default),
+        ], $unknown, true);
+        foreach (array_unique($unknown) as $token) {
+            $findings[] = ['language' => $language] + finding('error', 'unknown_token', '', sprintf('%s has no value here.', $token), 'Use one of the tokens listed in site.tokens, or add the label to labels.');
         }
     }
-    $widest = null;
-    foreach ($language_list as $language) {
-        if (!$menus[$language] instanceof \WP_Term && $fallback instanceof \WP_Term) {
-            $menus[$language] = $fallback;
-            $notes[] = sprintf('No menu for language "%s" was found, so its header uses "%s".', $language, $fallback->name);
-        }
-        $nav = $menus[$language] instanceof \WP_Term ? menu_top_level($menus[$language]) : [];
-        // The switcher is a navigation item here, so it counts toward the menu's width.
-        $plans[$language] = plan(['title' => $title, 'has_logo' => $logo_id > 0 || $site_logo > 0, 'nav' => array_merge($nav, $want_switcher ? [['title' => 'English', 'children' => true]] : []), 'language' => false, 'cart' => $want_cart, 'cta' => '']);
-        if ($widest === null || $plans[$language]['estimate']['nav_needed_px'] > $widest['estimate']['nav_needed_px']) {
-            $widest = $plans[$language];
-        }
-    }
+    $findings = dedupe_findings($findings);
+    $blocking = has_errors($findings);
     $summary = [
         'builder' => 'block-theme',
+        'site' => $facts,
         'template_part' => $part->id,
         'languages' => $langs['languages'],
         'language_switcher' => $want_switcher,
-        'cart' => $want_cart,
-        'plans' => $plans,
-        'notes' => array_merge($notes, array_values(array_filter([
-            isset($input['cta']) || isset($input['colors']) || isset($input['fonts']) || !empty($input['sticky'])
-                ? 'cta, colors, fonts and sticky apply to the Elementor header; a block-theme header takes its colours and type from the theme (Global Styles).'
-                : '',
-        ]))),
+        'findings' => $findings,
+        'notes' => $found['notes'],
     ];
     if (!empty($input['dry_run'])) {
-        return $summary + ['dry_run' => true];
+        return $summary + ['dry_run' => true, 'ready' => !$blocking, 'next' => $blocking ? 'Fix the error findings in the design, then dry-run again.' : 'Ready: call again without dry_run and with confirm: true.'];
+    }
+    if ($blocking) {
+        return new WP_Error('kit_site_header_design_problems', 'The design was not saved: ' . findings_line($findings), ['status' => 422, 'findings' => $findings]);
     }
 
     $before = ['source' => (string) $part->source, 'wp_id' => (int) $part->wp_id, 'content' => (string) $part->content];
@@ -289,8 +224,12 @@ function build_block_theme(array $input): array|WP_Error
     };
     try {
         $refs = [];
+        $uses_navigation = false;
+        foreach ($sources as $source) {
+            $uses_navigation = $uses_navigation || str_contains($source, '{{navigation_ref}}');
+        }
         foreach ($language_list as $language) {
-            if (!$menus[$language] instanceof \WP_Term) {
+            if (!$uses_navigation || !$menus[$language] instanceof \WP_Term) {
                 continue;
             }
             $nav_id = wp_insert_post(wp_slash([
@@ -313,17 +252,16 @@ function build_block_theme(array $input): array|WP_Error
         if (count($refs) > 1 && function_exists('pll_save_post_translations')) {
             pll_save_post_translations($refs);
         }
-        $logo = '';
-        $url = $logo_id > 0 ? (string) wp_get_attachment_image_url($logo_id, 'full') : '';
-        if ($logo_id > 0 && $logo_id !== $site_logo && $url !== '') {
-            $logo = '<!-- wp:image {"id":' . $logo_id . ',"width":"44px","sizeSlug":"full","linkDestination":"custom"} -->' . "\n"
-                . '<figure class="wp-block-image size-full is-resized"><a href="' . esc_url(home_url('/')) . '"><img src="' . esc_url($url) . '" alt="' . esc_attr($title) . '" class="wp-image-' . $logo_id . '" style="width:44px"/></a></figure>' . "\n"
-                . '<!-- /wp:image -->';
-        } elseif ($site_logo > 0) {
-            $logo = '<!-- wp:site-logo {"width":44} /-->';
-        }
-        $default = $language_list[0];
-        $markup = static fn(string $language): string => header_part_markup((array) $widest, ['logo' => $logo, 'navigations' => isset($refs[$language]) ? [$language => $refs[$language]] : [], 'cart' => $want_cart]);
+        $markup = static function (string $language) use ($sources, $refs, $labels, $default): string {
+            $unknown = [];
+
+            return (string) substitute($sources[$language], [
+                'navigation_ref' => $refs[$language] ?? 0,
+                'home_url' => $language !== '' && function_exists('pll_home_url') ? (string) pll_home_url($language) : home_url('/'),
+                'site_title' => site_name(),
+                'labels' => labels_for($labels, $language, $default),
+            ], $unknown, true);
+        };
         $saved = save_part($part->id, $markup($default));
         if ($saved instanceof WP_Error) {
             $restore();
@@ -332,6 +270,7 @@ function build_block_theme(array $input): array|WP_Error
         }
         // Polylang Pro serves a translated template part by slug: "header___ru" for Russian,
         // linked to the default one as its translation. Each carries its own language's menu.
+        $notes = $found['notes'];
         if ($langs['plugin'] === 'polylang' && function_exists('pll_set_post_language')) {
             $saved_part = header_part();
             $group = [$default => $saved_part instanceof \WP_Block_Template ? (int) $saved_part->wp_id : 0];
@@ -369,31 +308,21 @@ function build_block_theme(array $input): array|WP_Error
         }
 
         $checks = [];
-        $passed = true;
+        $failed = false;
         foreach ($language_list as $language) {
             $url = theme_template_url($language);
             if ($url === '') {
-                $checks[$language !== '' ? $language : 'site'] = ['url' => '', 'passed' => true, 'checks' => [[
-                    'check' => 'header_served',
-                    'passed' => true,
-                    'detail' => 'Not checked: every page in this language uses an Elementor page template, which prints the Elementor header instead of the theme header.',
-                ]]];
+                $notes[] = sprintf('%s: not checked, every page in this language uses an Elementor page template, which prints the Elementor header instead of the theme header.', $language !== '' ? strtoupper($language) : 'Site');
                 continue;
             }
-            $page = Page::fetch(add_query_arg('wppilot-kit-header-check', (string) time(), $url));
-            $check = check_served_block_header(is_array($page) ? $page['html'] : '', [
-                'nav_items' => $menus[$language] instanceof \WP_Term ? count(menu_top_level($menus[$language])) : 0,
-                'language' => $want_switcher,
-                'cart' => $want_cart && get_option('woocommerce_coming_soon') === 'yes' && get_option('woocommerce_store_pages_only') === 'yes' ? 'hidden' : $want_cart,
-                'plan' => $plans[$language],
-            ]);
-            $checks[$language !== '' ? $language : 'site'] = ['url' => $url] + $check;
-            $passed = $passed && $check['passed'];
+            $result = check_page($url, ['kind' => 'block-theme', 'languages' => $want_switcher ? $languages : 1, 'cart' => $woo && !$cart_hidden && str_contains($markup($language), 'woocommerce/mini-cart')]);
+            $checks[$language !== '' ? $language : 'site'] = $result;
+            $failed = $failed || !$result['passed'];
         }
-        if (!$passed) {
+        if ($failed && empty($input['keep_on_fail'])) {
             $restore();
 
-            return new WP_Error('kit_site_header_check_failed', 'The header was built but did not pass its own check on the served page, so the previous header was restored. Failed: ' . failed_checks($checks), ['status' => 422, 'checks' => $checks]);
+            return new WP_Error('kit_site_header_check_failed', 'The header was saved but did not pass its checks on the served page, so the previous header was restored. Fix the design and build again (or pass keep_on_fail: true to keep it while you fix it). ' . findings_line(array_merge(...array_values(array_map(static fn(array $c): array => $c['findings'], $checks)))), ['status' => 422, 'checks' => $checks]);
         }
     } catch (\Throwable $e) {
         $restore();
@@ -401,15 +330,17 @@ function build_block_theme(array $input): array|WP_Error
         return new WP_Error('kit_site_header_failed', 'Building the header failed and the previous header was restored: ' . $e->getMessage());
     }
 
-    return $summary + [
+    return array_merge($summary, [
+        'notes' => $notes,
         'kind' => 'block-theme',
         'navigations' => $refs,
         'created_navigation_ids' => $created_navigations,
         'created_part_ids' => $created_parts,
         'part_before' => $before,
         'checks' => $checks,
-        'look' => 'Structural checks passed. Screenshot each language at 1440, 768 and 390 px wide to see it; this check does not run a browser.',
-    ];
+        'passed' => !$failed,
+        'probe' => probe_instructions($checks),
+    ]);
 }
 
 /** Save the header template part through WordPress's own templates controller. */

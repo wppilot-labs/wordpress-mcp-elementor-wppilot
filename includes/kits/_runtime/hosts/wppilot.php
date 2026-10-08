@@ -76,7 +76,42 @@ final class WPPilotHost implements Host, ProfileGate
         if ($point === 'ability-runner') {
             return [$this, 'run_ability'];
         }
+        if ($point === 'elementor-content-writer') {
+            return [$this, 'write_elementor_content'];
+        }
         return apply_filters('wppilot_kit_extension', null, $point);
+    }
+
+    /**
+     * Write an Elementor document through wppilot/elementor-set-content, so a kit's Elementor
+     * write gets the same normalisation and schema validation as WPPilot's own, under the gate
+     * pipeline (run_ability). Null when that ability is not registered (Elementor inactive); the
+     * kit then saves through Elementor's document API itself.
+     *
+     * The write is not recorded in the change log of its own: it fills a document the calling
+     * kit ability made in this same call, and that ability's own row undoes it (by deleting the
+     * document). A row of its own would offer an undo that empties the document while the
+     * caller's other changes stay, and a session undo would fail on it once the caller's row
+     * had deleted the document. So only write documents your own ledger row removes on undo.
+     *
+     * @param list<array<string, mixed>> $elements
+     */
+    public function write_elementor_content(int $post_id, array $elements, string $template_type): mixed
+    {
+        $ability = wp_get_ability('wppilot/elementor-set-content');
+        if (!$ability instanceof WP_Ability) {
+            return null;
+        }
+        $was_suppressed = \wppilot_change_is_suppressed();
+        \wppilot_change_is_suppressed(true);
+        try {
+            // The caller's own write was confirmed by the person; this is that write, per document.
+            return $this->run_ability($ability, ['post_id' => $post_id, 'content' => $elements, 'template_type' => $template_type, 'confirm' => true]);
+        } finally {
+            \wppilot_change_is_suppressed($was_suppressed);
+            // The gate noted how this inner call was confirmed, for a row that is not written.
+            \wppilot_change_confirmation('wppilot/elementor-set-content', clear: true);
+        }
     }
 
     /**
