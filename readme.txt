@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.17.3
+Stable tag: 1.17.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.17.4 =
+* Fixed: on a site running Yoast SEO, every request signed in with a WPPilot access token (WPPilot Cloud, and AI connectors that use OAuth) failed with an HTTP 500 error. Checking the token asked Yoast for the user's permissions, Yoast asked WordPress who the current user was, and that started the token check again until PHP ran out of memory. The token check now ignores that inner lookup, so the request signs in as the token's user. Application Password connections were not affected. No ability permissions changed.
 
 = 1.17.3 =
 * Fixed: an AI client could list WPPilot's abilities but never run one, because it was offered only mcp-adapter-discover-abilities. When another plugin read the WordPress Abilities registry early in the request, the bundled MCP Adapter missed the moment to register mcp-adapter/get-ability-info and mcp-adapter/execute-ability, so every WPPilot MCP endpoint (OAuth and Application Password alike) served discovery alone. WPPilot now registers both itself when the adapter did not. Clients that connected before updating should disconnect and reconnect, or start a new chat, so they read the tool list again. No ability permissions changed.
@@ -473,6 +476,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.17.4 =
+Fixes HTTP 500 errors for WPPilot Cloud and OAuth connectors on sites running Yoast SEO. No ability permissions changed.
 
 = 1.17.3 =
 Fixes AI clients that could discover abilities but not run them. Reconnect the client after updating. No ability permissions changed.
