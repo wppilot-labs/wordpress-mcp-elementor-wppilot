@@ -18,7 +18,7 @@ if (Runtime\unclaimed('wppilot/backup-status')) {
     wp_register_ability('wppilot/backup-status', [
         'label' => __('Backup Status', domain: 'wppilot'),
         'description' => __(
-            'Backup health for each active backup plugin (UpdraftPlus, Duplicator, BackWPup): the last backup and its result (success, failed, cancelled, running or unknown), the last successful one, what it contained (db, plugins, themes, uploads… when the plugin records it), its size, whether a backup is running or queued now, the next scheduled backup, and the names of the storage archives go to. Times are given in the site timezone (time) and UTC (time_utc). Each provider says whether it can be read, and in trigger whether the Pro edition could start a backup for it. Never returns archive paths, download links or storage credentials. Use before a risky change to confirm a recent good backup exists.',
+            'Backup health for each active backup plugin (UpdraftPlus, Duplicator, BackWPup, All-in-One WP Migration as provider "ai1wm"): the last backup and its result (success, failed, cancelled, running or unknown), the last successful one, what it contained (db, plugins, themes, uploads… when the plugin records it), its size, whether a backup is running or queued now, the next scheduled backup, and the names of the storage archives go to. Times are given in the site timezone (time) and UTC (time_utc). Each provider says whether it can be read, and in trigger whether the Pro edition could start a backup for it. Never returns archive paths, download links or storage credentials. Use before a risky change to confirm a recent good backup exists.',
             domain: 'wppilot',
         ),
         'category' => 'backups',

@@ -12,10 +12,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * backup-status: read the site's backups from UpdraftPlus, Duplicator 5 and BackWPup.
+ * backup-status: read the site's backups from UpdraftPlus, Duplicator 5, BackWPup and
+ * All-in-One WP Migration.
  *
  * Returned to the kit loader, which registers the ability files inside wp_abilities_api_init.
- * Skipped when none of the three is active, with the same test WPPilot Pro's backups kit is gated
+ * Skipped when none of the four is active, with the same test WPPilot Pro's backups kit is gated
  * on; which of them answers is decided per call (active_providers()), so one ability file serves
  * any mix.
  */
@@ -24,8 +25,9 @@ if (
     && !defined('UPDRAFTPLUS_DIR')
     && !class_exists('BackWPup')
     && !class_exists('Duplicator\\Package\\DupPackage')
+    && !class_exists('Ai1wm_Backups')
 ) {
-    return ['skip' => 'no supported backup plugin (UpdraftPlus, Duplicator 5, BackWPup) is active'];
+    return ['skip' => 'no supported backup plugin (UpdraftPlus, Duplicator 5, BackWPup, All-in-One WP Migration) is active'];
 }
 
 require_once __DIR__ . '/src/providers.php';

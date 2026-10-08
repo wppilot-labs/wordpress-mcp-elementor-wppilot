@@ -10,7 +10,8 @@
         "vendor_floors": {
             "UpdraftPlus": "1.26",
             "Duplicator": "5.0",
-            "BackWPup": "5.7"
+            "BackWPup": "5.7",
+            "All-in-One WP Migration": "7.112"
         },
         "any": {
             "constants": [
@@ -19,7 +20,8 @@
             "classes": [
                 "UpdraftPlus",
                 "BackWPup",
-                "Duplicator\\Package\\DupPackage"
+                "Duplicator\\Package\\DupPackage",
+                "Ai1wm_Backups"
             ]
         }
     },
@@ -36,7 +38,7 @@
     "categories": {
         "backups": {
             "label": "Backups",
-            "description": "Read the site's backups from UpdraftPlus, Duplicator and BackWPup (whichever are active): the last backup and whether it worked, what it contained, its size, whether one is running, the next scheduled one and where archives are stored. Read-only: never restores, downloads or deletes, and never returns archive paths, download links or storage credentials."
+            "description": "Read the site's backups from UpdraftPlus, Duplicator, BackWPup and All-in-One WP Migration (whichever are active): the last backup and whether it worked, what it contained, its size, whether one is running, the next scheduled one and where archives are stored. Read-only: never restores, downloads or deletes, and never returns archive paths, download links or storage credentials."
         }
     },
     "abilities": [

@@ -1,6 +1,6 @@
 ---
 name: backup-status
-description: Check the site's backups (UpdraftPlus, Duplicator, BackWPup) — whether a recent backup worked, what it held, whether one is running, when the next is due. Activate when the user asks about backups, or before deleting, resetting or updating anything that would be hard to put back.
+description: Check the site's backups (UpdraftPlus, Duplicator, BackWPup, All-in-One WP Migration) — whether a recent backup worked, what it held, whether one is running, when the next is due. Activate when the user asks about backups, or before deleting, resetting or updating anything that would be hard to put back.
 ---
 
 # Backup status
@@ -21,7 +21,9 @@ Two read-only abilities:
   `archive_verified: false` on a BackWPup run means its archive went to remote storage and was
   not looked up: say the backup is reported, not confirmed.
 - `time` is the site's timezone, `time_utc` is UTC. UpdraftPlus and BackWPup times are when the
-  job started; `finished`, where present, is when it ended.
+  job started; `finished`, where present, is when it ended. All-in-One WP Migration (`ai1wm`)
+  times are when the export finished; it keeps no record of failed exports, so its backups are
+  always `success` and its `contents` is `null`.
 - `contents` lists what the backup held (`db`, `plugins`, `themes`, `uploads`, `others`, `core`,
   `wp-content`, `plugin-list`…); `null` means the plugin did not say. A BackWPup `plugin-list` is
   a text list of installed plugins, not the plugin files.
@@ -33,7 +35,8 @@ Two read-only abilities:
 
 If `newest_successful_backup` is missing or older than the user is comfortable with, say so
 before going ahead, and ask them to make a backup in their backup plugin (UpdraftPlus's Backup
-Now, a BackWPup job's Run now, Duplicator's Backups screen). Starting a backup from here is
+Now, a BackWPup job's Run now, Duplicator's Backups screen, All-in-One WP Migration's Export to
+File). Starting a backup from here is
 part of the Pro edition; `trigger.supported` on each provider says whether that would work for
 it. These abilities never restore, download or delete backups.
 

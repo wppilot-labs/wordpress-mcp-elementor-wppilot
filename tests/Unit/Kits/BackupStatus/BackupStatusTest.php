@@ -14,7 +14,8 @@ use WPPilot\Kits\Runtime;
 use WPPilot\Tests\Unit\Kits\BackupStatus\Duplicator\DupPackage;
 
 /**
- * The backup-status kit against UpdraftPlus, Duplicator 5 and BackWPup doubles: each adapter's
+ * The backup-status kit against UpdraftPlus, Duplicator 5, BackWPup and All-in-One WP Migration
+ * doubles: each adapter's
  * reading, what never leaves the kit, and standing aside when the ability names are taken.
  */
 final class BackupStatusTest extends TestCase
@@ -231,10 +232,80 @@ final class BackupStatusTest extends TestCase
 
         $status = B\status([]);
 
-        self::assertSame(['updraftplus', 'duplicator', 'backwpup'], $status['active_providers']);
-        self::assertSame(['UpdraftPlus', 'Duplicator', 'BackWPup'], $status['supported_providers']);
+        self::assertSame(['updraftplus', 'duplicator', 'backwpup', 'ai1wm'], $status['active_providers']);
+        self::assertSame(['UpdraftPlus', 'Duplicator', 'BackWPup', 'All-in-One WP Migration'], $status['supported_providers']);
         self::assertSame(['provider' => 'duplicator', 'timestamp' => Vendors::$now - 7000], array_slice($status['newest_successful_backup'], 0, 2), 'Duplicator finished last');
         self::assertSame(['updraftplus'], array_column(B\status(['provider' => 'updraftplus'])['providers'], 'provider'));
+
+        // An All-in-One WP Migration export that finished later is the newest across providers.
+        Vendors::$ai1wmFiles = [['path' => '', 'filename' => 'site-20260929-040000-abcdefghijkl.wpress', 'mtime' => Vendors::$now - 60, 'size' => 10]];
+        self::assertSame(['provider' => 'ai1wm', 'timestamp' => Vendors::$now - 60], array_slice(B\status([])['newest_successful_backup'], 0, 2));
+    }
+
+    // All-in-One WP Migration.
+
+    public function testAi1wmBackupsAreTheFinishedArchivesInItsFolderWithoutTheirNames(): void
+    {
+        $now = Vendors::$now;
+        Vendors::$ai1wmFiles = [
+            ['path' => '', 'filename' => 'example-com-20260928-090000-a1b2c3d4e5f6.wpress', 'mtime' => $now - 86400, 'size' => 5000],
+            ['path' => '', 'filename' => 'example-com-20260928-230000-zyxwvutsrqpo.wpress', 'mtime' => $now - 3600, 'size' => 9000],
+            ['path' => 'old', 'filename' => 'old/unreadable.wpress', 'mtime' => null, 'size' => null],
+            ['path' => '', 'filename' => 'huge.wpress', 'mtime' => $now - 7200, 'size' => null],
+        ];
+        Vendors::$ai1wmLabels = ['example-com-20260928-230000-zyxwvutsrqpo.wpress' => 'Before the update'];
+
+        $list = B\ai1wm_list(10);
+
+        self::assertCount(3, $list, 'a file the plugin could not date is not listed');
+        self::assertSame([$now - 3600, $now - 7200, $now - 86400], array_column($list, 'timestamp'), 'newest first, by file time');
+        self::assertSame(['success', 9000, ['Local (web server)'], 'Before the update', null, 'backup'], [$list[0]['result'], $list[0]['size_bytes'], $list[0]['storage'], $list[0]['label'], $list[0]['contents'], $list[0]['kind']]);
+        self::assertNull($list[1]['size_bytes'], 'a size the plugin could not read stays null');
+        self::assertSame(16, strlen($list[0]['id']));
+        self::assertNotSame($list[0]['id'], $list[2]['id']);
+        self::assertCount(1, B\ai1wm_list(1));
+
+        $status = B\ai1wm_status();
+        self::assertSame([$now - 3600, $now - 3600, 3, '7.112'], [$status['last_backup']['timestamp'], $status['last_successful_backup']['timestamp'], $status['backups'], $status['version']]);
+        $encoded = (string) json_encode([$list, $status]);
+        foreach (['a1b2c3d4e5f6', 'zyxwvutsrqpo', 'example-com', 'huge', 'unreadable', AI1WM_STORAGE_PATH] as $secret) {
+            self::assertStringNotContainsString($secret, $encoded, 'no archive names or paths leave the kit');
+        }
+    }
+
+    public function testAnAi1wmJobFolderCountsAsRunningOnlyWhileItChanges(): void
+    {
+        $storage = AI1WM_STORAGE_PATH;
+        @mkdir($storage);
+        try {
+            self::assertFalse(B\ai1wm_running()['running'], 'an empty storage folder: nothing running');
+
+            @mkdir($storage . '/6ac7aa9072d44');
+            touch($storage . '/6ac7aa9072d44/site.wpress', Vendors::$now - 30);
+            @mkdir($storage . '/not-a-job');
+            touch($storage . '/not-a-job/x.wpress', Vendors::$now);
+            touch($storage . '/error-log-6ac7aa9072d44.log', Vendors::$now);
+            $running = B\ai1wm_running();
+            self::assertTrue($running['running']);
+            self::assertCount(1, $running['jobs'], 'only a uniqid() job folder is a run');
+            self::assertSame(['running', 'export or import'], [$running['jobs'][0]['state'], $running['jobs'][0]['what']]);
+            self::assertSame(gmdate('Y-m-d\TH:i:s\Z', Vendors::$now - 30), $running['jobs'][0]['last_activity']['time_utc']);
+            self::assertTrue(B\ai1wm_status()['running']['running']);
+
+            touch($storage . '/6ac7aa9072d44/site.wpress', Vendors::$now - 16 * 60);
+            self::assertFalse(B\ai1wm_running()['running'], 'a folder left by an abandoned run stops counting');
+        } finally {
+            $this->removeTree($storage);
+        }
+    }
+
+    public function testAi1wmCanBeStartedOnlyWhereItsRestExportRouteExists(): void
+    {
+        $trigger = B\ai1wm_status()['trigger'];
+
+        self::assertFalse($trigger['supported'], 'these doubles have no Ai1wm_Rest_Controller');
+        self::assertStringContainsString('REST export route', $trigger['reason']);
+        self::assertSame([], B\ai1wm_status()['next_scheduled']);
     }
 
     public function testAnUnknownProviderIsRefused(): void
@@ -254,7 +325,7 @@ final class BackupStatusTest extends TestCase
         $listed = B\list_backups(['limit' => 1000]);
 
         self::assertSame(100, $listed['limit']);
-        self::assertSame(['updraftplus', 'duplicator', 'backwpup'], array_column($listed['providers'], 'provider'));
+        self::assertSame(['updraftplus', 'duplicator', 'backwpup', 'ai1wm'], array_column($listed['providers'], 'provider'));
     }
 
     public function testAProviderThatThrowsIsReportedUnreadableWithoutItsPaths(): void

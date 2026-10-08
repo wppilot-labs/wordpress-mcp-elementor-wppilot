@@ -6,8 +6,9 @@
 declare(strict_types=1);
 
 /**
- * UpdraftPlus, Duplicator 5 and BackWPup stubbed down to the calls the kit makes (shapes as read
- * from UpdraftPlus 1.26.8, Duplicator 5.0.4 and BackWPup 5.7.6), and the WordPress functions the
+ * UpdraftPlus, Duplicator 5, BackWPup and All-in-One WP Migration stubbed down to the calls the kit
+ * makes (shapes as read from UpdraftPlus 1.26.8, Duplicator 5.0.4, BackWPup 5.7.6 and All-in-One WP
+ * Migration 7.112), and the WordPress functions the
  * kit calls, defined in the kit's own namespace so the rest of the suite is untouched.
  *
  * The vendor classes are global because the kit detects them with class_exists(); each is guarded.
@@ -49,6 +50,12 @@ namespace WPPilot\Tests\Unit\Kits\BackupStatus {
 
         public static bool $updraftBroken = false;
 
+        /** @var list<array<string, mixed>> Ai1wm_Backups::get_files() rows. */
+        public static array $ai1wmFiles = [];
+
+        /** @var array<string, string> */
+        public static array $ai1wmLabels = [];
+
         public static function reset(): void
         {
             self::$updraft = [];
@@ -61,6 +68,8 @@ namespace WPPilot\Tests\Unit\Kits\BackupStatus {
             self::$bwpPaths = [];
             self::$bwpWorking = false;
             self::$updraftBroken = false;
+            self::$ai1wmFiles = [];
+            self::$ai1wmLabels = [];
         }
     }
 }
@@ -177,6 +186,29 @@ namespace {
     }
     if (!defined('HOUR_IN_SECONDS')) {
         define('HOUR_IN_SECONDS', 3600);
+    }
+    if (!defined('AI1WM_PLUGIN_NAME')) {
+        define('AI1WM_PLUGIN_NAME', 'all-in-one-wp-migration');
+        define('AI1WM_VERSION', '7.112');
+        define('AI1WM_STORAGE_PATH', sys_get_temp_dir() . '/kit-backup-status-ai1wm-' . getmypid());
+    }
+
+    // Read-only doubles: no Ai1wm_Rest_Controller, so the export route counts as missing here.
+    if (!class_exists('Ai1wm_Backups')) {
+        class Ai1wm_Backups
+        {
+            /** @return list<array<string, mixed>> */
+            public static function get_files(): array
+            {
+                return Vendors::$ai1wmFiles;
+            }
+
+            /** @return array<string, string> */
+            public static function get_labels(): array
+            {
+                return Vendors::$ai1wmLabels;
+            }
+        }
     }
 
     if (!class_exists('UpdraftPlus')) {

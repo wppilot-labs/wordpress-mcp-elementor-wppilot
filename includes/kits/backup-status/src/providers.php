@@ -16,7 +16,8 @@ if (!defined('ABSPATH')) {
  *
  * Each vendor keeps its history differently — UpdraftPlus as an option keyed by start time with
  * a separate "last backup" verdict, Duplicator as a table of packages with a status code,
- * BackWPup as jobs whose results only exist in their log headers — so each adapter translates
+ * BackWPup as jobs whose results only exist in their log headers, All-in-One WP Migration as the
+ * finished archives in its backups folder — so each adapter translates
  * into one record, and only into fields that are safe to hand an agent: when, whether it worked,
  * what it held, how big, and the names of the storage it went to. Never an archive path, a
  * download URL, a storage credential or a job secret: an agent that can read those can fetch the
@@ -31,13 +32,15 @@ if (!defined('ABSPATH')) {
 require_once __DIR__ . '/updraftplus.php';
 require_once __DIR__ . '/duplicator.php';
 require_once __DIR__ . '/backwpup.php';
+require_once __DIR__ . '/ai1wm.php';
 
-const PROVIDERS = ['updraftplus', 'duplicator', 'backwpup'];
+const PROVIDERS = ['updraftplus', 'duplicator', 'backwpup', 'ai1wm'];
 
 const LABELS = [
     'updraftplus' => 'UpdraftPlus',
     'duplicator' => 'Duplicator',
     'backwpup' => 'BackWPup',
+    'ai1wm' => 'All-in-One WP Migration',
 ];
 
 /**

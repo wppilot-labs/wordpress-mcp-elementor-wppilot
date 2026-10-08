@@ -18,7 +18,7 @@ if (Runtime\unclaimed('wppilot/backup-list')) {
     wp_register_ability('wppilot/backup-list', [
         'label' => __('List Backups', domain: 'wppilot'),
         'description' => __(
-            'Recent backups per active backup plugin, newest first: when (site timezone and UTC), result (success, failed, cancelled, running or unknown), contents, size in bytes, storage names, the label or job name, and error and warning counts where the plugin records them. UpdraftPlus lists its backup sets (only the most recent has a recorded result), Duplicator its backups, BackWPup its job runs from its logs. limit applies per provider (default 20, at most 100). Never returns archive paths, file names, download links or storage credentials.',
+            'Recent backups per active backup plugin, newest first: when (site timezone and UTC), result (success, failed, cancelled, running or unknown), contents, size in bytes, storage names, the label or job name, and error and warning counts where the plugin records them. UpdraftPlus lists its backup sets (only the most recent has a recorded result), Duplicator its backups, BackWPup its job runs from its logs, All-in-One WP Migration (provider "ai1wm") the finished exports in its backups folder (time is when the export finished; contents are not recorded). limit applies per provider (default 20, at most 100). Never returns archive paths, file names, download links or storage credentials.',
             domain: 'wppilot',
         ),
         'category' => 'backups',
