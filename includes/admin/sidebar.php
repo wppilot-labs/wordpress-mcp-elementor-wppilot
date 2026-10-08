@@ -73,11 +73,50 @@ function wppilot_sidebar_hide_submenu(): void
     }
 
     $selector = '#toplevel_page_' . WPPILOT_SIDEBAR_PARENT;
+    $visible = wppilot_sidebar_visible_pages();
 
+    if ($visible === []) {
+        printf(
+            '<style id="wppilot-collapse-submenu">%s .wp-submenu{display:none !important;}</style>',
+            esc_html($selector),
+        );
+        return;
+    }
+
+    // Keep the few screens people look for in the sidebar (owners could not find Prompts
+    // once it sat behind Studio in the tab rail) and hide the rest, which the rail covers.
+    $keep = [];
+    foreach ($visible as $slug) {
+        $keep[] = sprintf('%1$s .wp-submenu li:has(> a[href$="page=%2$s"])', $selector, $slug);
+    }
     printf(
-        '<style id="wppilot-collapse-submenu">%s .wp-submenu{display:none !important;}</style>',
+        '<style id="wppilot-collapse-submenu">%1$s .wp-submenu li:not(.wp-submenu-head){display:none !important;}%2$s{display:list-item !important;}</style>',
         esc_html($selector),
+        // Slugs are limited to [a-z0-9-] above and the selector is a constant, so the rule
+        // needs no escaping; esc_html() would turn the attribute quotes into &quot;.
+        implode(',', $keep), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
     );
+}
+
+/**
+ * WPPilot screens that stay listed in the admin sidebar while the rest collapse into the tab rail.
+ *
+ * @return list<string> Page slugs.
+ */
+function wppilot_sidebar_visible_pages(): array
+{
+    /** @var mixed $slugs */
+    $slugs = apply_filters('wppilot_sidebar_visible_pages', ['wppilot-connect', 'wppilot-prompts']);
+    if (!is_array($slugs)) {
+        return [];
+    }
+    $clean = [];
+    foreach ($slugs as $slug) {
+        if (is_string($slug) && preg_match('/^[a-z0-9-]+$/', $slug) === 1) {
+            $clean[] = $slug;
+        }
+    }
+    return $clean;
 }
 
 add_action('admin_head', callback: 'wppilot_sidebar_hide_submenu');
