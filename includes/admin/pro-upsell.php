@@ -91,6 +91,7 @@ function wppilot_pro_integration_catalog(): array
         ['label' => 'UpdraftPlus', 'category' => 'backups', 'class' => 'UpdraftPlus', 'abilities' => 1],
         ['label' => 'Duplicator', 'category' => 'backups', 'class' => 'Duplicator\\Package\\DupPackage', 'abilities' => 1],
         ['label' => 'BackWPup', 'category' => 'backups', 'class' => 'BackWPup', 'abilities' => 1],
+        ['label' => 'All-in-One WP Migration', 'category' => 'backups', 'class' => 'Ai1wm_Backups', 'abilities' => 1],
         ['label' => 'Wordfence', 'category' => 'security', 'constant' => 'WORDFENCE_VERSION', 'abilities' => 5],
         ['label' => 'Solid Security', 'category' => 'security', 'class' => 'ITSEC_Core', 'abilities' => 5],
         // Commerce, dev tools, dynamic content.
@@ -128,7 +129,7 @@ function wppilot_pro_integration_active(array $integration): bool
  * constant rather than counted from the catalog above: that catalog only lists
  * what this plugin can *detect*, which is a subset of what Pro ships.
  */
-const WPPILOT_PRO_INTEGRATION_COUNT = 88;
+const WPPILOT_PRO_INTEGRATION_COUNT = 89;
 
 /**
  * Labels of catalog integrations whose plugin or theme is active on this site,

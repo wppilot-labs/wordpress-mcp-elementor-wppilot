@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.18.0
+Stable tag: 1.18.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.18.1 =
+* New: All-in-One WP Migration backups are read alongside UpdraftPlus, BackWPup and Duplicator. backup-status and backup-list report its newest finished backup (time and size), how many there are and whether an export or import is running; WPPilot Cloud's Backups page shows it, and WPPilot Pro 1.12.1 counts it as the recent backup a safe update needs. Backup file names, folders and links are never returned, because on hosts that ignore .htaccess a .wpress file name is enough to download the whole site.
 
 = 1.18.0 =
 * New: WPPilot Cloud reporting. A site connected to WPPilot Cloud now reports its pending core, plugin and theme updates and its newest backup (UpdraftPlus, BackWPup or Duplicator), so Cloud's Updates and Backups screens can show every site at once. Cloud never receives backup files, links or storage credentials.
@@ -490,6 +493,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.18.1 =
+Reads All-in-One WP Migration backups, so sites that back up with it can use WPPilot Cloud's Backups page and WPPilot Pro 1.12.1's safe updates.
 
 = 1.18.0 =
 Adds WPPilot Cloud update, backup and safety-policy reporting, AI-designed site headers, the block themes kit, undo for Elementor's and WooCommerce's own MCP servers, and the client-reported Elementor and Polylang fixes. Update before WPPilot Pro 1.12.0, which requires it.

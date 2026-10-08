@@ -1,7 +1,7 @@
 # WPPilot - WordPress MCP Server, Elementor MCP and WooCommerce MCP
 
 <!-- current-releases:start -->
-Current releases: **WPPilot Free 1.18.0 / Pro 1.12.0**. Pro requires Free 1.18.0 or newer.
+Current releases: **WPPilot Free 1.18.1 / Pro 1.12.1**. Pro requires Free 1.18.1 or newer.
 <!-- current-releases:end -->
 
 **Connect Claude, ChatGPT, Claude Code, Codex, Cursor or Antigravity to your WordPress site and let an AI agent build pages, Elementor layouts, block content, menus, taxonomies, media and SEO metadata through typed abilities your permissions still govern.**
@@ -37,7 +37,7 @@ This is it, with one server instead of one per plugin. **Elementor editing is fr
 
 [Elementor MCP](https://wppilot.co/mcp-for-elementor) · [Bricks MCP](https://wppilot.co/mcp-for-bricks) · [Divi MCP](https://wppilot.co/mcp-for-divi) · [Beaver Builder MCP](https://wppilot.co/mcp-for-beaver-builder) · [Oxygen MCP](https://wppilot.co/mcp-for-oxygen) · [Breakdance MCP](https://wppilot.co/mcp-for-breakdance) · [WPBakery MCP](https://wppilot.co/mcp-for-wpbakery) · [Etch MCP](https://wppilot.co/mcp-for-etch) · [Mosaic MCP](https://wppilot.co/mcp-for-mosaic)
 
-Beyond page builders, Pro also covers WooCommerce, FunnelKit, UpdraftPlus, Duplicator, BackWPup, Wordfence, Solid Security, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Forminator, WS Form, Yoast SEO, Rank Math, AIOSEO, SEOPress, The SEO Framework, Slim SEO, SmartCrawl, WPML, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [88 integrations](#wppilot-pro-plugin-aware-abilities-across-88-integrations).
+Beyond page builders, Pro also covers WooCommerce, FunnelKit, UpdraftPlus, Duplicator, BackWPup, All-in-One WP Migration, Wordfence, Solid Security, Advanced Custom Fields, Meta Box, JetEngine, Pods, ACPT, WPForms, Gravity Forms, Fluent Forms, Formidable, Contact Form 7, Ninja Forms, Forminator, WS Form, Yoast SEO, Rank Math, AIOSEO, SEOPress, The SEO Framework, Slim SEO, SmartCrawl, WPML, Polylang, Weglot, The Events Calendar, Tutor LMS, Paid Memberships Pro and BuddyPress. Full table below: [89 integrations](#wppilot-pro-plugin-aware-abilities-across-89-integrations).
 
 ## WordPress MCP server and protocol support
 
@@ -211,7 +211,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **WooCommerce** | `13` | Check the setup, list and read products, variations, categories, tags and store settings, read orders and customers, and edit one product's name, description, prices and stock with undo. Pro adds bulk prices and stock, order and customer writes, refunds, coupons, reports and full product editing. |
 | **SEO** | `14` | One post's SEO title, meta description and robots in Yoast SEO, Rank Math, All in One SEO, SEOPress, The SEO Framework, Slim SEO and SmartCrawl, read and set with undo. Pro adds focus keywords, canonicals, social previews, schema, redirects and bulk SEO. |
 | **Forms** | `8` | List the forms of WPForms, Contact Form 7, Gravity Forms and Forminator and read their entries with email addresses, phone numbers and sensitive fields withheld. Pro adds full values, exports and form editing. |
-| **Backups and security** | `5` | Backup status and history (UpdraftPlus, Duplicator, BackWPup); security plugin status, scan findings and lockouts with IPs shown as networks (Wordfence, Solid Security). Pro starts backups, holds risky calls until a fresh backup exists, hardens settings and blocks IPs. |
+| **Backups and security** | `5` | Backup status and history (UpdraftPlus, Duplicator, BackWPup, All-in-One WP Migration); security plugin status, scan findings and lockouts with IPs shown as networks (Wordfence, Solid Security). Pro starts backups, holds risky calls until a fresh backup exists, hardens settings and blocks IPs. |
 | **Scheduled audits** | `5` | Routines that run the accessibility, content and alt-text audits on a schedule, store each report, compare it with the last and email what changed. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 
@@ -253,11 +253,11 @@ The free abilities are the primitives, and they compose. What Pro adds is the au
 
 The dividing line is simple: free can **edit** an Elementor page, Pro can **compose** one.
 
-## WPPilot Pro: plugin-aware abilities across 88 integrations
+## WPPilot Pro: plugin-aware abilities across 89 integrations
 
 The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **229 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
-[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 88 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
+[**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 89 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
 | Category | Integrations · `ability count` |
 | --- | --- |
@@ -269,7 +269,7 @@ The free plugin in this repository is a complete WordPress MCP server: connectio
 | **SEO suites** | [AIOSEO](https://wppilot.co/integrations/aioseo) `12` · [Rank Math](https://wppilot.co/integrations/rank-math) `8` · [SEOPress](https://wppilot.co/integrations/seopress) `16` · [Yoast SEO](https://wppilot.co/integrations/yoast) `10` · [The SEO Framework](https://wppilot.co/integrations/the-seo-framework) `3` · [Slim SEO](https://wppilot.co/integrations/slim-seo) `3` · [SmartCrawl](https://wppilot.co/integrations/smartcrawl) `3` |
 | **Custom data** | [Advanced Custom Fields](https://wppilot.co/integrations/acf) `23` · [ACPT](https://wppilot.co/integrations/acpt) `24` · [Admin and Site Enhancements](https://wppilot.co/integrations/ase) `18` · [JetEngine](https://wppilot.co/integrations/jetengine) `26` · [Meta Box](https://wppilot.co/integrations/meta-box) `32` · [Pods](https://wppilot.co/integrations/pods) `25` · [Dynamic Shortcodes](https://wppilot.co/integrations/dynamic-shortcodes) `9` |
 | **Localization** | [Weglot](https://wppilot.co/integrations/weglot) `19` · [WPML](https://wppilot.co/integrations/wpml) `8` · [Polylang](https://wppilot.co/integrations/polylang) `6` |
-| **Backups** | [UpdraftPlus](https://wppilot.co/integrations/updraftplus) `1` · [Duplicator](https://wppilot.co/integrations/duplicator) `1` · [BackWPup](https://wppilot.co/integrations/backwpup) `1` (start a backup, and an optional "require a fresh backup" hold on destructive calls; status and history are free) |
+| **Backups** | [UpdraftPlus](https://wppilot.co/integrations/updraftplus) `1` · [Duplicator](https://wppilot.co/integrations/duplicator) `1` · [BackWPup](https://wppilot.co/integrations/backwpup) `1` · All-in-One WP Migration `1` (start a backup, and an optional "require a fresh backup" hold on destructive calls; status and history are free) |
 | **Security** | [Wordfence](https://wppilot.co/integrations/wordfence) `5` · [Solid Security](https://wppilot.co/integrations/solid-security) `5` (a hardening plan you confirm, IP blocks and scans, all undoable; status, findings and lockouts are free) |
 | **Site maintenance** | [Safe plugin and theme updates](https://wppilot.co/wordpress-ai-safe-updates) `3` (checks pages before and after, rolls back on its own) · [Content fixes](https://wppilot.co/use-cases/fix-broken-links-with-ai) `2` |
 | **Site operations** | [The Events Calendar](https://wppilot.co/integrations/the-events-calendar) `7` · [Paid Memberships Pro](https://wppilot.co/integrations/paid-memberships-pro) `5` · [Tutor LMS](https://wppilot.co/integrations/tutor-lms) `7` · [BuddyPress](https://wppilot.co/integrations/buddypress) `8` |
