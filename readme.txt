@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.17.4
+Stable tag: 1.18.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,19 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.18.0 =
+* New: WPPilot Cloud reporting. A site connected to WPPilot Cloud now reports its pending core, plugin and theme updates and its newest backup (UpdraftPlus, BackWPup or Duplicator), so Cloud's Updates and Backups screens can show every site at once. Cloud never receives backup files, links or storage credentials.
+* New: safety settings pushed from WPPilot Cloud. Under WPPilot > Connect > WPPilot Cloud the site owner can let Cloud tighten this site's safety profile, approval mode and switched-off abilities, or also loosen them. Both are off by default, loosening needs tightening, Developer Full Access can never be set from Cloud, and a rule the owner changes afterwards stays the owner's.
+* New: block themes kit. AI clients can edit Global Styles, templates and template parts (header, footer), patterns and navigation menus on block themes through WordPress's own REST endpoints, and every change can be undone.
+* New: wppilot/build-site-header. The AI designs the site header for the brand (an Elementor Pro Theme Builder header or a block theme header part) and WPPilot does the rest: one header per Polylang language, a styled language switcher, the menu and the cart, confirmation and undo. WPPilot checks the design before saving (mobile menu button, contrast, empty images and links) and the served page after (wrapping, overlap, broken links), and reports each problem against the element so the AI can fix its own design.
+* New: safety and undo for other MCP servers. Writes made through Elementor's and WooCommerce's own MCP abilities, and TranslatePress's and Easy Digital Downloads' settings and product abilities, are recorded in WPPilot's change log and can be undone. An optional setting (Settings > Other MCP servers) also asks for approval before they run.
+* New: builder quality audit. wppilot/elementor-audit-output scores how editable an Elementor page is in the panel (native widgets versus HTML widgets and raw markup) and lists what to fix. WPPilot Pro 1.12.0 adds the fixer.
+* New: Chat usage meter. WordPress Chat shows how many tokens each person has used today and this month. Only token counts are kept, for 62 days, and they never leave the site. WPPilot Pro 1.12.0 adds daily and monthly limits that stop Chat before the AI provider is asked.
+* Fixed (reported by a client): elementor-set-content rejected classic sections and columns, so a page built with them could not be written back; Elementor Pro form fields such as Reply-To did not accept the form's own field IDs; rich-text fields documented inline tags only although paragraphs and lists are allowed; and Polylang sites were reported as WPML.
+* Fixed: verify-rendered-page and the accessibility audit can check drafts, through a one-minute signed-in preview that only reaches this site, and every finding and heading says whether it comes from the page or the theme. Theme, sidebar and footer output no longer fails a page.
+* Fixed: elementor-set-content kept a Theme Builder template's type (header, footer) instead of resetting it to a page; the Gutenberg finalizer keeps blocks whose attributes arrive empty; undoing a WooCommerce product edit no longer refuses over its live sales counters; parallel Chat steps are all counted.
+* Changed: discover-abilities lists each ability's parameters, for example post_types?: array, so clients stop guessing names.
 
 = 1.17.4 =
 * Fixed: on a site running Yoast SEO, every request signed in with a WPPilot access token (WPPilot Cloud, and AI connectors that use OAuth) failed with an HTTP 500 error. Checking the token asked Yoast for the user's permissions, Yoast asked WordPress who the current user was, and that started the token check again until PHP ran out of memory. The token check now ignores that inner lookup, so the request signs in as the token's user. Application Password connections were not affected. No ability permissions changed.
@@ -476,6 +489,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.18.0 =
+Adds WPPilot Cloud update, backup and safety-policy reporting, AI-designed site headers, the block themes kit, undo for Elementor's and WooCommerce's own MCP servers, and the client-reported Elementor and Polylang fixes. Update before WPPilot Pro 1.12.0, which requires it.
 
 = 1.17.4 =
 Fixes HTTP 500 errors for WPPilot Cloud and OAuth connectors on sites running Yoast SEO. No ability permissions changed.
