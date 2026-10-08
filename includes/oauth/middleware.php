@@ -68,6 +68,25 @@ function resolve_bearer_identity(mixed $user): mixed
         return $user;
     }
 
+    // Validating a credential checks the subject's capabilities, and a plugin's
+    // map_meta_cap filter may ask for the current user (Yoast SEO does). Before
+    // this filter returns, that asks determine_current_user again: without this
+    // guard the request recursed until PHP ran out of memory. The inner call
+    // leaves the identity alone; the outer one sets it.
+    static $resolving = false;
+    if ($resolving) {
+        return $user;
+    }
+    $resolving = true;
+    try {
+        return resolve_bearer_identity_now($user);
+    } finally {
+        $resolving = false;
+    }
+}
+
+function resolve_bearer_identity_now(mixed $user): mixed
+{
     $auth = get_authorization_header();
 
     // function_exists guards the load order rather than the feature: this file is

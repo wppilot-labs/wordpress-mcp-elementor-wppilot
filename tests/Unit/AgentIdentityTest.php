@@ -281,6 +281,57 @@ final class AgentIdentityTest extends TestCase
     }
 
     /**
+     * Checking a token's owner runs map_meta_cap, where a plugin (Yoast SEO) may ask for the
+     * current user before the bearer filter has returned. That asked determine_current_user
+     * again and recursed until PHP ran out of memory: every token request 500ed. The inner
+     * call must leave the identity alone, and the outer one still authenticate.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testAReentrantIdentityLookupDuringTokenValidationDoesNotRecurse(): void
+    {
+        require_once \dirname(__DIR__) . '/doubles/cloud.php';
+        require_once \dirname(__DIR__, 2) . '/includes/capabilities.php';
+        if (!\defined('MINUTE_IN_SECONDS')) {
+            \define('MINUTE_IN_SECONDS', 60);
+        }
+        if (!function_exists('wp_set_current_user')) {
+            eval('function wp_set_current_user(int $id, string $name = ""): void { \WPPilot_Test_State::$current_user_id = $id; }');
+        }
+        $GLOBALS['wppilot_test_managers'] = [1];
+        $secret = 'wpp_reentrant-secret';
+        $this->wpdb->rows[21] = [
+            'id' => 21,
+            'user_id' => 1,
+            'name' => 'Cloud',
+            'token_hash' => wppilot_token_hash($secret),
+            'expires' => null,
+            'scope' => null,
+            'ceiling' => '',
+        ];
+        $inner = [];
+        $this->wpdb->onLookup = static function () use (&$inner): void {
+            if (count($inner) < 5) {
+                $inner[] = \WPPilot\OAuth\Middleware\resolve_bearer_identity(0);
+            }
+        };
+        $saved_server = $_SERVER;
+        $saved_get = $_GET;
+        $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $secret;
+        $_GET['rest_route'] = '/wppilot/v1/cloud/status';
+        try {
+            $outer = \WPPilot\OAuth\Middleware\resolve_bearer_identity(0);
+        } finally {
+            $_SERVER = $saved_server;
+            $_GET = $saved_get;
+        }
+
+        self::assertSame([0], $inner, 'the nested lookup returns the identity it was given, once');
+        self::assertSame(1, $outer);
+        self::assertSame(1, \WPPilot_Test_State::$current_user_id);
+    }
+
+    /**
      * Discovery is the other half of enforcement: tools/list must not advertise
      * what the next tools/call would refuse. Run apart because it needs a
      * wp_get_abilities() double, and defining one for the whole suite would change
@@ -373,6 +424,14 @@ final class FakeTokenWpdb
     /** @var array<int, array<string, mixed>> */
     public array $rows = [];
 
+    /** Called on every token lookup, to simulate code that runs during validation. */
+    public ?\Closure $onLookup = null;
+
+    public function query(string $query): int
+    {
+        return 0;
+    }
+
     public function prepare(string $query, mixed ...$args): string
     {
         $index = 0;
@@ -385,6 +444,9 @@ final class FakeTokenWpdb
     /** @return array<string, mixed>|null */
     public function get_row(string $query, mixed $output = null): ?array
     {
+        if ($this->onLookup !== null) {
+            ($this->onLookup)();
+        }
         if (preg_match('/WHERE id = (\d+)/', $query, $match) === 1) {
             return $this->rows[(int) $match[1]] ?? null;
         }
