@@ -104,6 +104,16 @@ function wppilot_plugins_api($result, $action, $args)
 }
 
 /**
+ * Whether a person with update rights asked WordPress to check for updates now.
+ */
+function wppilot_update_check_forced(): bool
+{
+    return is_admin()
+        && isset($_GET['force-check']) // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only flag, the same one core's update screen reads.
+        && current_user_can('update_plugins');
+}
+
+/**
  * Fetch public plugin release metadata with transient caching.
  *
  * @return array{name: string, version: string, author: string, author_homepage: string, homepage: string, requires: string, requires_php: string, tested: string, last_updated: string, sections: array<string, string>, icons: array<string, string>, banners: array<string, string>, download_url: string}|null
@@ -113,6 +123,12 @@ function wppilot_fetch_update_info()
     $cache_key = 'wppilot_update_info';
     /** @var array{name: string, version: string, author: string, author_homepage: string, homepage: string, requires: string, requires_php: string, tested: string, last_updated: string, sections: array<string, string>, icons: array<string, string>, banners: array<string, string>, download_url: string}|string|false $cached */
     $cached = get_transient($cache_key);
+
+    // "Check again" on Dashboard > Updates (update-core.php?force-check=1) asks for fresh
+    // data; without this the 12-hour cache below hid a new release until it expired.
+    if ($cached !== false && wppilot_update_check_forced()) {
+        $cached = false;
+    }
 
     if ($cached === 'error') {
         return null;
