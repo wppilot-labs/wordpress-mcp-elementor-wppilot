@@ -314,8 +314,8 @@ function build_block_theme(array $input): array|WP_Error
             pll_save_post_translations($refs);
         }
         $logo = '';
-        if ($logo_id > 0 && $logo_id !== $site_logo) {
-            $url = (string) wp_get_attachment_image_url($logo_id, 'full');
+        $url = $logo_id > 0 ? (string) wp_get_attachment_image_url($logo_id, 'full') : '';
+        if ($logo_id > 0 && $logo_id !== $site_logo && $url !== '') {
             $logo = '<!-- wp:image {"id":' . $logo_id . ',"width":"44px","sizeSlug":"full","linkDestination":"custom"} -->' . "\n"
                 . '<figure class="wp-block-image size-full is-resized"><a href="' . esc_url(home_url('/')) . '"><img src="' . esc_url($url) . '" alt="' . esc_attr($title) . '" class="wp-image-' . $logo_id . '" style="width:44px"/></a></figure>' . "\n"
                 . '<!-- /wp:image -->';

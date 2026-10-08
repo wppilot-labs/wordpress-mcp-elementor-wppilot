@@ -17,7 +17,7 @@ declare(strict_types=1);
  */
 
 if (!class_exists('Kit_Test_Site')) {
-    require_once dirname(__DIR__, 3) . '/doubles/kit-site.php';
+    require_once dirname(__DIR__, 2) . '/doubles/kit-site.php';
 }
 
 final class Kit_Media_Test_State

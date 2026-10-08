@@ -245,6 +245,9 @@ function active_headers(): array
 /** @param list<string> $conditions */
 function save_conditions(int $post_id, array $conditions): bool
 {
+    if (!class_exists(\ElementorPro\Modules\ThemeBuilder\Module::class)) {
+        return false;
+    }
     $manager = \ElementorPro\Modules\ThemeBuilder\Module::instance()->get_conditions_manager();
     $parts = [];
     foreach ($conditions as $condition) {
@@ -390,6 +393,9 @@ function build(array $input): array|WP_Error
     $demoted = [];
     $undo_partial = static function () use (&$created, &$created_menu, &$demoted): void {
         foreach ($created as $id) {
+            // Clear the display conditions first so Elementor Pro's conditions cache
+            // never points at a deleted template.
+            save_conditions($id, []);
             wp_delete_post($id, true);
         }
         foreach ($demoted as $id => $conditions) {
@@ -600,6 +606,7 @@ function undo(array $payload): array|WP_Error
     foreach ($created as $id) {
         $post = get_post($id);
         if ($post instanceof \WP_Post && $post->post_type === 'elementor_library') {
+            save_conditions($id, []);
             wp_delete_post($id, true);
         }
     }

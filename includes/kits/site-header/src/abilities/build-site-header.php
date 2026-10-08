@@ -62,11 +62,24 @@ wp_register_ability('wppilot/build-site-header', [
                 'description' => 'Font family names for the site title and the menu, such as the site heading and body fonts. Omitted, they follow the global typography of the Elementor kit.',
             ],
             'dry_run' => ['type' => 'boolean', 'default' => false, 'description' => 'Return the layout plan (menus found, width estimates, what would be replaced) without writing.'],
+            'confirm' => ['type' => 'boolean', 'description' => 'Must be true to write: the person approved replacing the site header. Not needed with dry_run.'],
         ],
         'additionalProperties' => false,
     ],
     'output_schema' => ['type' => 'object'],
-    'execute_callback' => static fn(array $input = []): array|WP_Error => build($input),
+    'execute_callback' => static function (array $input = []): array|WP_Error {
+        // Inside WPPilot the gate pipeline enforces confirm; an exported copy has no
+        // pipeline, so the kit checks it itself. A dry run writes nothing.
+        if (empty($input['dry_run'])) {
+            $guard = Runtime\confirm_guard('wppilot/build-site-header', $input);
+            if ($guard instanceof WP_Error) {
+                return $guard;
+            }
+        }
+        unset($input['confirm']);
+
+        return build($input);
+    },
     'permission_callback' => static fn(): bool => Runtime\can_run() && current_user_can('edit_theme_options') && current_user_can('publish_pages'),
     'meta' => [
         'show_in_rest' => true,
