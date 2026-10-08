@@ -545,9 +545,12 @@ function gutenberg_finalizer_script(): string
                 return fallbackApi;
             };
 
+            // PHP encodes a block with no attributes as `[]`, and a block made with an array for
+            // attributes behaves differently once the editor mounts it: a core/list given `[]`
+            // replaced its items with one empty item, so every queued list saved as `<li></li>`.
             const toBlock = ( blocksApi, spec ) => blocksApi.createBlock(
                 spec.name,
-                spec.attributes || {},
+                spec.attributes && ! Array.isArray( spec.attributes ) ? spec.attributes : {},
                 ( spec.innerBlocks || [] ).map( ( innerSpec ) => toBlock( blocksApi, innerSpec ) )
             );
 

@@ -82,11 +82,28 @@ function wppilot_chat_record_usage(int $user_id, int $prompt, int $completion, ?
         return;
     }
     $day = gmdate('Y-m-d', $now ?? time());
-    $days = wppilot_chat_usage_days($user_id);
-    $row = $days[$day] ?? ['prompt' => 0, 'completion' => 0, 'calls' => 0];
-    $days[$day] = ['prompt' => $row['prompt'] + $prompt, 'completion' => $row['completion'] + $completion, 'calls' => $row['calls'] + 1];
-    krsort($days);
-    update_user_meta($user_id, WPPILOT_CHAT_USAGE_META, array_slice($days, 0, WPPILOT_CHAT_USAGE_DAYS, preserve_keys: true));
+
+    // Model steps run in parallel (several tabs, several sessions). Without a lock each one reads
+    // the same total and the last write wins, so usage the provider billed goes unrecorded. The
+    // user's meta was cached when the request authenticated, so it is read fresh under the lock.
+    global $wpdb;
+    $lock = 'wppilot_chat_usage_' . $user_id;
+    $locked = isset($wpdb) && is_object($wpdb) && method_exists($wpdb, 'get_var')
+        && (string) $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, %d)', $lock, 5)) === '1';
+    if ($locked && function_exists('wp_cache_delete')) {
+        wp_cache_delete($user_id, 'user_meta');
+    }
+    try {
+        $days = wppilot_chat_usage_days($user_id);
+        $row = $days[$day] ?? ['prompt' => 0, 'completion' => 0, 'calls' => 0];
+        $days[$day] = ['prompt' => $row['prompt'] + $prompt, 'completion' => $row['completion'] + $completion, 'calls' => $row['calls'] + 1];
+        krsort($days);
+        update_user_meta($user_id, WPPILOT_CHAT_USAGE_META, array_slice($days, 0, WPPILOT_CHAT_USAGE_DAYS, preserve_keys: true));
+    } finally {
+        if ($locked) {
+            $wpdb->query($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock));
+        }
+    }
 }
 
 /**

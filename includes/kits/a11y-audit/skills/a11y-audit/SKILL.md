@@ -8,7 +8,7 @@ description: Audit a page of this site for accessibility against WCAG 2.2, then 
 ## The loop
 
 1. **Audit.** `wppilot/audit-accessibility` with `url` (a page on this site, or a path such as
-   `/contact/`) or `post_id` (published only). It reads the HTML a logged-out visitor gets and
+   `/contact/`) or `post_id` (a draft you can edit is read as its preview). It reads the served HTML and
    returns a 0-100 `score`, a `summary`, and `findings`. Each finding has a `rule`, `severity`,
    `wcag` (criterion, name, level, Understanding link), `count`, up to ten `examples` (a
    selector and the element's opening tag), a `fix`, and `fix_ability` when an ability here

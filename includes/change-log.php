@@ -1198,6 +1198,19 @@ function wppilot_snapshot_menu_order(int $menu_id): ?array
 }
 
 /**
+ * Product meta WooCommerce keeps current outside any edit: an order adds to `total_sales`, a
+ * review moves the rating counts. A before-image must leave them out, or undoing a price edit a
+ * week later writes the old sales count back over every order placed since. Listed in
+ * `excluded_meta_keys` instead, so the restore neither deletes nor rewrites them and its own check
+ * does not read the live count as drift. WPPilot Pro hides the same keys during its rollbacks.
+ */
+function wppilot_post_meta_is_live_counter(string $post_type, string $key): bool
+{
+    return ($post_type === 'product' || $post_type === 'product_variation')
+        && in_array($key, ['total_sales', '_wc_review_count', '_wc_average_rating', '_wc_rating_count'], strict: true);
+}
+
+/**
  * @param bool $bounded False skips the size cap. Only for a fingerprint that is compared and then
  *                      dropped (the session conflict check); nothing unbounded is ever stored.
  * @return array<string, mixed>|null
@@ -1216,7 +1229,7 @@ function wppilot_snapshot_post(int $post_id, bool $bounded = true): ?array
     $excluded_meta_keys = [];
     // @mago-expect analysis:mixed-assignment -- WordPress post meta values are intentionally opaque.
     foreach ($all_meta as $key => $values) {
-        if (wppilot_change_key_is_sensitive((string) $key)) {
+        if (wppilot_change_key_is_sensitive((string) $key) || wppilot_post_meta_is_live_counter((string) $post['post_type'], (string) $key)) {
             $excluded_meta_keys[] = (string) $key;
             continue;
         }
@@ -2038,13 +2051,21 @@ function wppilot_restore_post_snapshot(array $snapshot): array|WP_Error
     $current_meta_value = get_post_meta($post_id);
     $current_meta = is_array($current_meta_value) ? $current_meta_value : [];
     foreach (array_keys($current_meta) as $key) {
-        if (in_array((string) $key, $excluded_meta_keys, strict: true)) {
+        if (
+            in_array((string) $key, $excluded_meta_keys, strict: true)
+            || wppilot_post_meta_is_live_counter((string) ($post['post_type'] ?? ''), (string) $key)
+        ) {
             continue;
         }
         delete_post_meta($post_id, (string) $key);
     }
     // @mago-expect analysis:mixed-assignment -- Snapshot values are validated at each nesting level.
     foreach (wppilot_string_keyed_array($snapshot['meta'] ?? []) as $key => $values) {
+        // A before-image recorded before the counters were left out still carries them; the live
+        // row was kept above, so adding the stale value would leave the product with two.
+        if (wppilot_post_meta_is_live_counter((string) ($post['post_type'] ?? ''), (string) $key)) {
+            continue;
+        }
         // @mago-expect analysis:mixed-assignment -- Individual post-meta values are intentionally opaque.
         foreach (is_array($values) ? $values : [] as $value) {
             // add_post_meta() unslashes what it is given, as if it came from a
@@ -2245,6 +2266,12 @@ function wppilot_post_snapshot_fingerprint(array $snapshot): string
     // restored exactly still reported "did not match the before-image". The values of one key keep
     // their order, which is meaningful.
     $meta = is_array($snapshot['meta'] ?? null) ? $snapshot['meta'] : [];
+    // Live counters are not part of what a restore puts back (older before-images still hold them).
+    foreach (array_keys($meta) as $key) {
+        if (wppilot_post_meta_is_live_counter((string) ($post['post_type'] ?? ''), (string) $key)) {
+            unset($meta[$key]);
+        }
+    }
     ksort($meta, SORT_STRING);
     $terms = is_array($snapshot['terms'] ?? null) ? $snapshot['terms'] : [];
     ksort($terms, SORT_STRING);

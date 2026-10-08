@@ -341,6 +341,16 @@ function wppilot_chat_rest_model_step(WP_REST_Request $request): array|WP_Error
         return wppilot_chat_fail_session($session, $e->getMessage());
     }
     if (is_wp_error($parsed)) {
+        // A usage limit is not a model failure: the session stays usable once the allowance
+        // resets, and the caller gets the 429 and its usage data rather than a generic 500.
+        if ($parsed->get_error_code() === 'wppilot_chat_usage_limit') {
+            $session['status'] = 'idle';
+            $session['updated_at'] = time();
+            wppilot_chat_save_session($session);
+
+            return $parsed;
+        }
+
         return wppilot_chat_fail_session($session, $parsed->get_error_message());
     }
 

@@ -446,6 +446,14 @@ if (!function_exists('get_permalink')) {
     }
 }
 
+if (!function_exists('get_preview_post_link')) {
+    function get_preview_post_link(mixed $post = null): ?string
+    {
+        $id = $post instanceof WP_Post ? $post->ID : (int) $post;
+        return get_post($id) instanceof WP_Post ? 'https://example.test/?page_id=' . $id . '&preview=true' : null;
+    }
+}
+
 if (!function_exists('wp_http_validate_url')) {
     function wp_http_validate_url(string $url): string|false
     {

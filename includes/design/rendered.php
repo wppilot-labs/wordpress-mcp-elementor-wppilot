@@ -473,7 +473,9 @@ function headings(DOMXPath $xpath, array $roots, array &$summary): array
  */
 function images(DOMXPath $xpath, array &$summary): array
 {
-    $nodes = $xpath->query('//img');
+    // An <img> inside <template> is inert until a script clones it, with its src bound then
+    // (WooCommerce's mini-cart prints two in every block-theme header). It is not a broken image.
+    $nodes = $xpath->query('//img[not(ancestor::template)]');
     $total = 0;
     $missing_alt = [];
     $missing_src = 0;
@@ -546,7 +548,9 @@ function empty_elements(DOMXPath $xpath, array $roots, array &$summary): array
         '//section|//article'
         . '|//div[contains(@class,"col")]'
         . '|//div[contains(@class,"elementor-widget")]'
-        . '|//div[contains(@class,"wp-block")]',
+        . '|//div[contains(@class,"wp-block")]'
+        // Elementor flexbox containers and atomic (v4) blocks all carry `e-con`.
+        . '|//div[contains(concat(" ", normalize-space(@class), " "), " e-con ")]',
     );
     $empty = 0;
     $outside = 0;
@@ -562,7 +566,8 @@ function empty_elements(DOMXPath $xpath, array $roots, array &$summary): array
             // Text is not the only content: an image, an embed or an svg makes
             // a container legitimately textless.
             $inner = new DOMXPath($node->ownerDocument ?? new DOMDocument());
-            $media = $inner->query('.//img|.//svg|.//iframe|.//video|.//canvas|.//input|.//textarea|.//select|.//button|.//hr', $node);
+            // A textless <i> is a font icon (Font Awesome, eicons).
+            $media = $inner->query('.//img|.//svg|.//iframe|.//video|.//canvas|.//input|.//textarea|.//select|.//button|.//hr|.//i', $node);
             if ($media !== false && $media->length > 0) {
                 continue;
             }
@@ -570,6 +575,16 @@ function empty_elements(DOMXPath $xpath, array $roots, array &$summary): array
             // job. Counting them meant a page with four dividers earned a hard
             // failure for having drawn four lines.
             if (preg_match('/\b(divider|separator|spacer|gap|rule)\b/i', $node->getAttribute('class')) === 1) {
+                continue;
+            }
+            // An Elementor element with a background (image, video, slideshow, gradient) is
+            // painting something without text, which is a design, not a gap.
+            if (str_contains($node->getAttribute('data-settings'), 'background_background')) {
+                continue;
+            }
+            // Slots a script fills after load: a form's message area and CAPTCHA widgets.
+            if ($node->hasAttribute('aria-live') || in_array($node->getAttribute('role'), ['status', 'alert'], strict: true)
+                || preg_match('/\b(g-recaptcha|h-captcha|cf-turnstile)\b/', $node->getAttribute('class')) === 1) {
                 continue;
             }
             if (!in_content($node, $roots)) {
@@ -619,8 +634,15 @@ function render_errors(string $html): array
         'unrendered-shortcode' => '/\[(?:vc_row|et_pb_section|section|row|col|ux_banner|fusion_builder_row)[^\]]{0,120}\]/i',
         'template-placeholder' => '/\{\{\s*[a-z_.]+\s*\}\}/i',
     ];
+    // Placeholders and shortcodes count only where a visitor reads them. Script templates
+    // (`<script type="text/template">`, which Elementor prints for signed-in editors) are full of
+    // `{{ name }}` that a script fills in later. A PHP error is real wherever it is printed, and
+    // with html_errors on (PHP's default) it reads `<b>Warning</b>:  … in <b>file</b>`, so it is
+    // matched with the tags taken out.
+    $visible = (string) preg_replace('#<(script|style|template|textarea)\b[^>]*>.*?</\1\s*>#is', '', $html);
+    $text = strip_tags($html);
     foreach ($patterns as $check => $pattern) {
-        if (preg_match($pattern, $html, $match) !== 1) {
+        if (preg_match($pattern, $check === 'php-error' ? $text : $visible, $match) !== 1) {
             continue;
         }
         $findings[] = [

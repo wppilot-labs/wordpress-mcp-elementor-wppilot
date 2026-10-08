@@ -399,7 +399,28 @@ final class MediaAltTest extends TestCase
         self::assertSame('kit_a11y_no_target', self::code(A11yAudit\target_url([])));
 
         $post->post_status = 'draft';
+        Kit_Test_Site::as_user(1);
         self::assertSame('kit_a11y_post_not_public', self::code(A11yAudit\target_url(['post_id' => 5])));
+    }
+
+    public function testADraftIsAuditedAsItsPreviewOnlyForSomeoneWhoCanEditIt(): void
+    {
+        Kit_Test_Site::insert(['ID' => 7, 'post_type' => 'page', 'post_status' => 'draft']);
+
+        Kit_Test_Site::as_user(1);
+        self::assertSame('kit_a11y_post_not_public', self::code(A11yAudit\target(['post_id' => 7])));
+
+        Kit_Test_Site::as_user(1, 'edit_post');
+        self::assertSame(['url' => 'https://example.test/?page_id=7&preview=true', 'preview' => true], A11yAudit\target(['post_id' => 7]));
+        self::assertSame(['url' => 'https://example.test/about/', 'preview' => false], A11yAudit\target(['url' => '/about/']));
+    }
+
+    public function testASignedInFetchOnlyGoesToTheSiteOwnOrigin(): void
+    {
+        self::assertTrue(Runtime\Page::is_same_origin('https://example.test/?page_id=7&preview=true'));
+        self::assertFalse(Runtime\Page::is_same_origin('http://example.test/?page_id=7'));
+        self::assertFalse(Runtime\Page::is_same_origin('https://example.test:8443/'));
+        self::assertFalse(Runtime\Page::is_same_origin('https://elsewhere.test/'));
     }
 
     public function testAuditFetchesSameSiteOnlyAndRefusesErrorPages(): void

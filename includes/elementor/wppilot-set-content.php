@@ -36,7 +36,7 @@ wp_register_ability('wppilot/elementor-set-content', [
             ],
             'template_type' => [
                 'type' => 'string',
-                'description' => 'Elementor template type. Defaults to "wp-page".',
+                'description' => 'Elementor template type. Omit it to keep the document\'s current type (a header stays a header); a post without one becomes "wp-page".',
             ],
         ],
         'required' => ['post_id', 'content'],
@@ -148,7 +148,9 @@ function elementor_set_content(array $input): array
 
     /** @var list<array<string, mixed>> $content */
     $content = is_array($input['content'] ?? null) ? array_values($input['content']) : [];
-    $template_type = (string) ($input['template_type'] ?? 'wp-page');
+    // Without an explicit type the document keeps its own: a Theme Builder header rewritten as
+    // `wp-page` stops being a header, and its display conditions stop placing it anywhere.
+    $template_type = is_string($input['template_type'] ?? null) && $input['template_type'] !== '' ? $input['template_type'] : null;
 
     $prepared = elementor_prepare_content(
         $content,
