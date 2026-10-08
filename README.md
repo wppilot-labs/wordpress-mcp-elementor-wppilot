@@ -1,7 +1,7 @@
 # WPPilot - WordPress MCP Server, Elementor MCP and WooCommerce MCP
 
 <!-- current-releases:start -->
-Current releases: **WPPilot Free 1.18.2 / Pro 1.12.1**. Pro requires Free 1.18.1 or newer.
+Current releases: **WPPilot Free 1.18.3 / Pro 1.12.1**. Pro requires Free 1.18.1 or newer.
 <!-- current-releases:end -->
 
 **Connect Claude, ChatGPT, Claude Code, Codex, Cursor or Antigravity to your WordPress site and let an AI agent build pages, Elementor layouts, block content, menus, taxonomies, media and SEO metadata through typed abilities your permissions still govern.**

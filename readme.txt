@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.18.2
+Stable tag: 1.18.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,9 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.18.3 =
+* Changed: Prompts is listed in the WordPress admin menu under WPPilot, next to Dashboard. WPPilot collapses its other screens into the tab bar on its pages, which had left the industry briefs two clicks deep under Studio. Sites that want a different set can change it with the wppilot_sidebar_visible_pages filter.
 
 = 1.18.2 =
 * Fixed: with WPPilot Cloud or an OAuth connector (Claude, ChatGPT), abilities that work through WordPress's own REST API failed with "This OAuth credential is not accepted on the requested REST route." That broke the block themes kit (Global Styles, templates, patterns, navigation), the block theme path of wppilot/build-site-header, Cloud's "Back up now" with All-in-One WP Migration, and WPPilot Pro abilities that use WordPress REST (WooCommerce reports, Etch, GeneratePress, Meta Box relationships, Site Kit). The access-token route limit now lets through a REST call an ability makes for itself while serving an MCP request that already passed it; that call still runs the route's own permission check as the token's user. A token sent straight to any other REST route, including inside a REST batch request, is still refused with 403. Application Password connections were not affected.
@@ -497,6 +500,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.18.3 =
+Prompts is back in the WordPress admin menu. No ability or permission changed.
 
 = 1.18.2 =
 Fixes WPPilot Cloud and OAuth connections failing on abilities that use WordPress's REST API (block themes, Cloud backups with All-in-One WP Migration, several Pro abilities). Update if you connect through WPPilot Cloud, Claude or ChatGPT.
