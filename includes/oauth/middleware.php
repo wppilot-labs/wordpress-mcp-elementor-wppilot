@@ -303,7 +303,8 @@ function authorize_routed_request(mixed $result, mixed $handler, WP_REST_Request
         return challenge_unauthenticated($result, $handler, $request);
     }
 
-    if (!oauth_identity_may_use_route($route, $method)) {
+    $within_boundary = oauth_identity_may_use_route($route, $method);
+    if (!$within_boundary && !is_internal_dispatch_of_admitted_request($route)) {
         return new WP_Error(
             'rest_oauth_route_forbidden',
             'This OAuth credential is not accepted on the requested REST route.',
@@ -321,8 +322,96 @@ function authorize_routed_request(mixed $result, mixed $handler, WP_REST_Request
         ]);
     }
 
+    if ($within_boundary) {
+        note_admitted_http_request($route, $method);
+    }
+
     // Preserve an earlier pre-dispatch response only after proving that OAuth may be used here.
     return $result;
+}
+
+/**
+ * The REST route of the HTTP request this process is serving, or '' outside one.
+ *
+ * Read from the URL WordPress parsed, not from any WP_REST_Request: rest_api_loaded() builds the
+ * outer request from exactly this value (untrailingslashed, '/' when empty), and nothing an
+ * internal dispatch or a batch subrequest carries can change it.
+ */
+function http_rest_route(): string
+{
+    // @mago-expect lint:no-global -- $wp is WordPress' parsed main request.
+    // @mago-expect analysis:mixed-assignment -- Narrowed by the checks below.
+    $wp = $GLOBALS['wp'] ?? null;
+    // @mago-expect analysis:mixed-assignment -- Narrowed by the checks below.
+    $query_vars = is_object($wp) && property_exists($wp, 'query_vars') ? $wp->query_vars : null;
+    // @mago-expect analysis:mixed-assignment -- Narrowed by the checks below.
+    $route = is_array($query_vars) ? $query_vars['rest_route'] ?? '' : '';
+    if (!is_string($route) || $route === '') {
+        return '';
+    }
+    // untrailingslashit(), spelled out so this stays callable before formatting.php loads.
+    $route = rtrim($route, characters: '/\\');
+
+    return $route === '' ? '/' : $route;
+}
+
+/**
+ * Routes whose handlers run abilities through WPPilot's gate (wppilot_gate_ability_call(), or the
+ * foreign gate for other MCP servers' abilities): the MCP endpoints and the REST shim's run route.
+ */
+function route_runs_gated_abilities(string $route, string $method): bool
+{
+    return is_any_mcp_route($route)
+        || ($method === 'POST' && preg_match('#^/wppilot/v1/abilities/[^/]+(?:/[^/]+)+/run$#', $route) === 1);
+}
+
+/**
+ * Remember that the HTTP request itself was admitted onto an ability-running route.
+ *
+ * Only the outer request counts: the route being admitted must be the one in the URL. An internal
+ * dispatch or a batch subrequest to an MCP route can never stand in for it, because the URL of a
+ * batch call is /batch/v1, which no access token may use.
+ */
+function note_admitted_http_request(string $route, string $method): void
+{
+    if ($route !== http_rest_route() || !route_runs_gated_abilities($route, $method)) {
+        return;
+    }
+    $context = &request_context();
+    $context['admitted_ability_request'] = true;
+}
+
+/**
+ * Whether a routed request outside the token's boundary is an internal dispatch that an ability
+ * made while serving an already-admitted MCP (or ability-run) request.
+ *
+ * The route boundary exists so a token cannot be pointed at arbitrary WordPress REST routes over
+ * HTTP. It was also applied to rest_do_request() calls an ability makes for itself — the block
+ * theme kit reading global styles, a backup plugin's export endpoint — which broke every such
+ * ability for OAuth and access-token connections while Application Passwords worked. Such a call
+ * is part of an ability that has already passed WPPilot's gate: the safety profile (which is what
+ * a read-only token's limits are), the confirmation contract and the rate limit. The route it
+ * dispatches is chosen by the ability's code, not by the client, and the route's own
+ * permission_callback still runs as the token's user. The scope and manage-capability checks after
+ * the boundary still apply to it.
+ *
+ * Three things must all hold, and none of them can be supplied by an HTTP client:
+ * - the request is not the HTTP request itself (its route differs from the URL's);
+ * - the HTTP request's own route is one that runs gated abilities;
+ * - that HTTP request was admitted by this boundary for this identity.
+ * A REST batch call fails the second: its URL is /batch/v1, so its subrequests stay enforced.
+ */
+function is_internal_dispatch_of_admitted_request(string $route): bool
+{
+    $outer = http_rest_route();
+    if ($outer === '' || $route === $outer) {
+        return false;
+    }
+    $context = &request_context();
+
+    // Set only by note_admitted_http_request(), which already required the URL's route to run
+    // gated abilities, so the outer route needs no second look here.
+    return $context['admitted_ability_request'] === true;
 }
 
 /**
@@ -591,18 +680,21 @@ function has_existing_identity(mixed $user): bool
  * Request-local proof and error storage. PHP normally serves one request per process; reset at the
  * start of determine_current_user also keeps persistent test/worker environments isolated.
  *
- * @return array{identity: array{user_id: int, scopes: list<string>, via?: string, client_id?: string}|null, error: WP_Error|null}
+ * `admitted_ability_request` is set once the HTTP request itself passed the route boundary onto an
+ * ability-running route; see is_internal_dispatch_of_admitted_request().
+ *
+ * @return array{identity: array{user_id: int, scopes: list<string>, via?: string, client_id?: string}|null, error: WP_Error|null, admitted_ability_request: bool}
  */
 function &request_context(): array
 {
-    static $context = ['identity' => null, 'error' => null];
+    static $context = ['identity' => null, 'error' => null, 'admitted_ability_request' => false];
     return $context;
 }
 
 function reset_request_context(): void
 {
     $context = &request_context();
-    $context = ['identity' => null, 'error' => null];
+    $context = ['identity' => null, 'error' => null, 'admitted_ability_request' => false];
 }
 
 /** @param list<string> $scopes */
@@ -610,6 +702,8 @@ function record_oauth_identity(int $user_id, array $scopes, string $client_id = 
 {
     $context = &request_context();
     $context['identity'] = ['user_id' => $user_id, 'scopes' => $scopes, 'via' => $via];
+    // An admission belongs to the identity it was decided for.
+    $context['admitted_ability_request'] = false;
     if ($client_id !== '') {
         $context['identity']['client_id'] = $client_id;
     }
@@ -631,6 +725,7 @@ function record_authentication_error(string $message, int $status = 401): void
 {
     $context = &request_context();
     $context['identity'] = null;
+    $context['admitted_ability_request'] = false;
     $context['error'] = new WP_Error('rest_oauth_error', $message, ['status' => $status]);
 }
 

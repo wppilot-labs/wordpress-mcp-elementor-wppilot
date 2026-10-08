@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.18.1
+Stable tag: 1.18.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,10 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.18.2 =
+* Fixed: with WPPilot Cloud or an OAuth connector (Claude, ChatGPT), abilities that work through WordPress's own REST API failed with "This OAuth credential is not accepted on the requested REST route." That broke the block themes kit (Global Styles, templates, patterns, navigation), the block theme path of wppilot/build-site-header, Cloud's "Back up now" with All-in-One WP Migration, and WPPilot Pro abilities that use WordPress REST (WooCommerce reports, Etch, GeneratePress, Meta Box relationships, Site Kit). The access-token route limit now lets through a REST call an ability makes for itself while serving an MCP request that already passed it; that call still runs the route's own permission check as the token's user. A token sent straight to any other REST route, including inside a REST batch request, is still refused with 403. Application Password connections were not affected.
+* Fixed: Dashboard > Updates > Check again now fetches WPPilot's release data instead of answering from a 12-hour cache, so a new release shows at once.
 
 = 1.18.1 =
 * New: All-in-One WP Migration backups are read alongside UpdraftPlus, BackWPup and Duplicator. backup-status and backup-list report its newest finished backup (time and size), how many there are and whether an export or import is running (only a complete archive of at least 1 MB in its backups folder counts, so a file dropped there cannot pass for a backup); WPPilot Cloud's Backups page shows it, and WPPilot Pro 1.12.1 counts it as the recent backup a safe update needs. Backup file names, folders and links are never returned, because on hosts that ignore .htaccess a .wpress file name is enough to download the whole site.
@@ -493,6 +497,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.18.2 =
+Fixes WPPilot Cloud and OAuth connections failing on abilities that use WordPress's REST API (block themes, Cloud backups with All-in-One WP Migration, several Pro abilities). Update if you connect through WPPilot Cloud, Claude or ChatGPT.
 
 = 1.18.1 =
 Reads All-in-One WP Migration backups, so sites that back up with it can use WPPilot Cloud's Backups page and WPPilot Pro 1.12.1's safe updates.

@@ -1,7 +1,7 @@
 # WPPilot documentation
 
 <!-- current-releases:start -->
-Current releases: **WPPilot Free 1.18.1 / Pro 1.12.1**. Pro requires Free 1.18.1 or newer.
+Current releases: **WPPilot Free 1.18.2 / Pro 1.12.1**. Pro requires Free 1.18.1 or newer.
 <!-- current-releases:end -->
 
 The technical documentation that ships with the free plugin. Task-based guides
