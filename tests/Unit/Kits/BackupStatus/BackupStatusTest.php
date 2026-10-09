@@ -367,7 +367,7 @@ final class BackupStatusTest extends TestCase
         $trigger = B\ai1wm_status()['trigger'];
 
         self::assertFalse($trigger['supported'], 'these doubles have no Ai1wm_Rest_Controller');
-        self::assertStringContainsString('REST export route', $trigger['reason']);
+        self::assertSame("this All-in-One WP Migration install can't be started by this plugin; make the backup from its Export screen in wp-admin.", $trigger['reason']);
         self::assertSame([], B\ai1wm_status()['next_scheduled']);
     }
 

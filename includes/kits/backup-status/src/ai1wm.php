@@ -39,8 +39,8 @@ if (!defined('ABSPATH')) {
  *
  * The free plugin has no schedule. Since 7.106 it has a REST API whose POST /ai1wm/v1/exports
  * starts a full export on the server, continued by loopback requests; `trigger.supported` says
- * whether that route is there, on a release it was verified with (AI1WM_TRIGGER_FLOOR), for
- * WPPilot Pro's wppilot/backup-trigger to use.
+ * whether that route's controller is loaded, for WPPilot Pro's wppilot/backup-trigger to use. No
+ * version is compared: whether the install can be started is read from what it has.
  */
 
 const AI1WM_BACKUPS = 'Ai1wm_Backups';
@@ -48,12 +48,6 @@ const AI1WM_BACKUPS = 'Ai1wm_Backups';
 const AI1WM_REST_CONTROLLER = 'Ai1wm_Rest_Controller';
 
 const AI1WM_EXPORT_ROUTE = '/ai1wm/v1/exports';
-
-/**
- * The release starting a backup was verified against. The REST export route arrived in 7.106, and
- * 7.107 and 7.111 changed it (multisite, find-and-replace); older releases are not trusted with it.
- */
-const AI1WM_TRIGGER_FLOOR = '7.112';
 
 /** Smallest file counted as a backup: a finished export holds at least the database and its package.json. */
 const AI1WM_MIN_BYTES = 1048576;
@@ -191,22 +185,12 @@ function ai1wm_running(): array
  */
 function ai1wm_trigger_support(): array
 {
-    $version = ai1wm_version();
-    if (
-        $version === null
-        || version_compare($version, AI1WM_TRIGGER_FLOOR, '<')
-        || !class_exists(AI1WM_REST_CONTROLLER)
-        || !method_exists(AI1WM_REST_CONTROLLER, 'create_export')
-    ) {
+    // A capability check, not a version check: the runner calls the plugin's REST export
+    // controller, so the answer is whether that controller is loaded here.
+    if (!class_exists(AI1WM_REST_CONTROLLER) || !method_exists(AI1WM_REST_CONTROLLER, 'create_export')) {
         return [
             'supported' => false,
-            'reason' => $version !== null && version_compare($version, AI1WM_TRIGGER_FLOOR, '>=')
-                ? sprintf('All-in-One WP Migration %s does not have the REST export route this needs loaded; make the backup from its Export screen in wp-admin.', $version)
-                : sprintf(
-                    'Starting an export from here needs All-in-One WP Migration %2$s or later (its REST export route); %1$s is installed. Update it, or make the backup from its Export screen in wp-admin.',
-                    $version ?? '(version unknown)',
-                    AI1WM_TRIGGER_FLOOR,
-                ),
+            'reason' => "this All-in-One WP Migration install can't be started by this plugin; make the backup from its Export screen in wp-admin.",
         ];
     }
 

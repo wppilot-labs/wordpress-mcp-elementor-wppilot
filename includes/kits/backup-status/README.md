@@ -44,8 +44,8 @@ same name keeps it.
   runs); any other `.wpress` is `kind: "unverified"` and never the last successful backup, so a
   file dropped there by hand cannot open the fresh-backup hold. Running: a job folder (13 hex
   characters) whose files changed in the last 15 minutes, export or import. No schedule in the
-  free plugin. `trigger.supported` from 7.112 when the REST export route
-  (`Ai1wm_Rest_Controller::create_export`, added in 7.106) is there. Backup ids are a hash of the file name, which is never returned: its random suffix is
+  free plugin. `trigger.supported` whenever the REST export controller
+  (`Ai1wm_Rest_Controller::create_export`, added in 7.106) is loaded; no version is compared. Backup ids are a hash of the file name, which is never returned: its random suffix is
   all that guards the archive where the folder's .htaccess is ignored.
 
 ## Host needs
