@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.18.3
+Stable tag: 1.18.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,12 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.18.4 =
+* New: wppilot/pagespeed-check runs Google PageSpeed Insights on any page of the site and returns the Lighthouse scores, lab metrics, Core Web Vitals field data when Google has it, the opportunities ordered by the time they save, and failing diagnostics. No Google key is needed from anyone: Site Kit by Google answers when its PageSpeed module is connected and readable, otherwise WPPilot Cloud runs the check with WPPilot's own key (signed by a paired site, plain otherwise), and Google's keyless API is the last resort. A key of your own on Settings > PageSpeed is optional and not needed. refresh: true measures again instead of reusing a recent result, on the site and, for a paired site, at WPPilot Cloud too.
+* New: wppilot/site-kit-enable-sharing turns on Site Kit's read-only dashboard sharing for Administrators for Search Console, Analytics and PageSpeed Insights, through Site Kit's own sharing route so its owner rules apply, and can be undone. PageSpeed checks say when this sharing is all that keeps Site Kit from answering.
+* Changed: whether an All-in-One WP Migration backup can be started is now decided by what the install has - the same check WPPilot Pro 1.12.2's export runner makes - and never by its version. backup-status's trigger.reason names what is missing when it can't.
+* Changed: WPPilot Cloud is told why a backup is stuck. cloud/status now reports, per backup plugin, whether it is running, the site's own reason it can't be started, and the export WPPilot Pro started (running, stalled, failed or finished, with a plain reason), so Cloud shows it on the run page and stops waiting for an export that failed. File names, folders, job ids and keys are never sent.
 
 = 1.18.3 =
 * Changed: Prompts is listed in the WordPress admin menu under WPPilot, next to Dashboard. WPPilot collapses its other screens into the tab bar on its pages, which had left the industry briefs two clicks deep under Studio. Sites that want a different set can change it with the wppilot_sidebar_visible_pages filter.
@@ -500,6 +506,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.18.4 =
+Adds PageSpeed checks with no Google key needed and Site Kit dashboard sharing, and lets WPPilot Cloud show why a backup is stuck. Update together with WPPilot Pro 1.12.2 for All-in-One WP Migration backups on any host.
 
 = 1.18.3 =
 Prompts is back in the WordPress admin menu. No ability or permission changed.
