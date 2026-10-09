@@ -152,6 +152,14 @@ function run(string $url, string $strategy, string $only, bool $refresh): array|
                 'message' => 'Site Kit\'s PageSpeed Insights module is connected but not shared with this user\'s role, so another source answered. Offer once to turn on read-only Site Kit dashboard sharing for Administrators with ' . SHARING_ABILITY . ' (needs confirm=true; Site Kit only accepts it from an administrator signed in to Site Kit with Google).',
             ];
         }
+        if (in_array('site_kit_owner_signed_out', array_column($attempts, 'reason'), strict: true)) {
+            $answer['fix'] = [
+                'action' => 'site_kit_sign_in',
+                'url' => admin_url('admin.php?page=googlesitekit-dashboard'),
+                'message' => 'This user owns Site Kit\'s PageSpeed Insights module but is no longer signed in to Site Kit with Google, so another source answered. Sign in once at Site Kit > Dashboard as this user'
+                    . (wp_has_ability(SHARING_ABILITY) ? '; then it can be shared read-only with Administrators (' . SHARING_ABILITY . ').' : '.'),
+            ];
+        }
         set_transient($key, $answer, CACHE_TTL);
         return $answer;
     }
@@ -212,8 +220,8 @@ function from_site_kit(string $url, string $strategy): array|WP_Error|string
         return 'site_kit_not_readable_by_user';
     }
     $list = site_kit_get('core/modules/data/list', []);
+    $module = null;
     if (is_array($list)) {
-        $module = null;
         foreach ($list as $entry) {
             if (is_array($entry) && ($entry['slug'] ?? '') === 'pagespeed-insights') {
                 $module = $entry;
@@ -231,7 +239,15 @@ function from_site_kit(string $url, string $strategy): array|WP_Error|string
     }
     $authenticated = site_kit_get('core/user/data/authentication', []);
     $own_google = is_array($authenticated) && !empty($authenticated['authenticated']);
-    if (!$own_google && !current_user_can('googlesitekit_read_shared_module_data', 'pagespeed-insights')) {
+    // The owner always reads with their own token (Module::get_oauth_client_for_datapoint skips
+    // the shared path for the owner), and Site Kit serves everyone else's shared reads from that
+    // same token, so an owner whose sign-in is gone needs to sign in again; sharing cannot help.
+    // Site Kit lists the owner only to users who can list_users.
+    $owner_id = is_array($module) && is_array($module['owner'] ?? null) ? (int) ($module['owner']['id'] ?? 0) : 0;
+    if (is_array($authenticated) && !$own_google && $owner_id > 0 && $owner_id === get_current_user_id()) {
+        return 'site_kit_owner_signed_out';
+    }
+    if (!$own_google &&!current_user_can('googlesitekit_read_shared_module_data', 'pagespeed-insights')) {
         // Site Kit would answer with this user's own (absent) Google sign-in and fail. Sharing the
         // module with the user's role is what lets it answer with the owner's.
         return 'site_kit_not_shared_with_user';

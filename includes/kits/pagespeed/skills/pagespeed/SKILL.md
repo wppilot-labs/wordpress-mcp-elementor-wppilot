@@ -43,3 +43,7 @@ answered and `attempts` says why earlier ones did not.
 When the result carries `fix` naming `wppilot/site-kit-enable-sharing`, Site Kit could have
 answered but its data is not shared with this user's role. Offer once to turn on read-only
 dashboard sharing for Administrators; run it only if the user agrees.
+
+When `fix.action` is `site_kit_sign_in`, this user owns Site Kit's PageSpeed module but is no
+longer signed in to Site Kit with Google. Tell them to sign in once at `fix.url`; do not offer
+sharing first, because Site Kit refuses it until the owner is signed in.

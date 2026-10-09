@@ -62,7 +62,7 @@ final class PagespeedTest extends TestCase
     {
         self::$siteKitCalls[] = ['route' => $route, 'params' => $params];
         if ($route === 'core/modules/data/list') {
-            return [['slug' => 'pagespeed-insights', 'active' => self::$siteKit['connected'], 'connected' => self::$siteKit['connected']]];
+            return [['slug' => 'pagespeed-insights', 'active' => self::$siteKit['connected'], 'connected' => self::$siteKit['connected'], 'owner' => self::$siteKit['owner'] ?? null]];
         }
         if ($route === 'core/site/data/connection') {
             return ['connected' => self::$siteKit['setup'] ?? true, 'setupCompleted' => self::$siteKit['setup'] ?? true];
@@ -235,6 +235,58 @@ final class PagespeedTest extends TestCase
         $shared = P\check(['refresh' => true]);
         self::assertSame('site-kit', $shared['source']);
         self::assertArrayNotHasKey('fix', $shared);
+    }
+
+    public function testASignedOutOwnerIsToldToSignInRatherThanOfferedSharing(): void
+    {
+        // Seen live on biasmd.com: the module's owner had lost their Google sign-in. Sharing serves
+        // reads from that same token and Site Kit accepts it only from a signed-in owner.
+        self::$siteKit = ['connected' => true, 'authenticated' => false, 'pagespeed' => null, 'owner' => ['id' => 1, 'login' => 'admin']];
+        Net::$caps[] = 'googlesitekit_setup';
+        Net::$abilities[] = 'wppilot/site-kit-enable-sharing';
+        Net::$answers[] = Net::json(200, self::cloudBody());
+
+        $result = P\check([]);
+
+        self::assertSame(['source' => 'site-kit', 'outcome' => 'skipped', 'reason' => 'site_kit_owner_signed_out'], $result['attempts'][0]);
+        self::assertSame('cloud', $result['source']);
+        self::assertSame('site_kit_sign_in', $result['fix']['action']);
+        self::assertArrayNotHasKey('ability', $result['fix'], 'sharing is not the fix');
+        self::assertSame('https://example.test/wp-admin/admin.php?page=googlesitekit-dashboard', $result['fix']['url']);
+        self::assertSame(
+            'This user owns Site Kit\'s PageSpeed Insights module but is no longer signed in to Site Kit with Google, so another source answered. Sign in once at Site Kit > Dashboard as this user; then it can be shared read-only with Administrators (wppilot/site-kit-enable-sharing).',
+            $result['fix']['message'],
+        );
+
+        // Without free's sharing ability the follow-up is not promised.
+        Net::$abilities = [];
+        Net::$answers[] = Net::json(200, self::cloudBody());
+        $bare = P\check(['refresh' => true]);
+        self::assertStringEndsWith('Sign in once at Site Kit > Dashboard as this user.', $bare['fix']['message']);
+    }
+
+    public function testASignedOutAdminWhoIsNotTheOwnerIsStillOfferedSharing(): void
+    {
+        self::$siteKit = ['connected' => true, 'authenticated' => false, 'pagespeed' => null, 'owner' => ['id' => 2, 'login' => 'editor-in-chief']];
+        Net::$caps[] = 'googlesitekit_setup';
+        Net::$abilities[] = 'wppilot/site-kit-enable-sharing';
+        Net::$answers[] = Net::json(200, self::cloudBody());
+
+        $result = P\check([]);
+
+        self::assertSame('site_kit_not_shared_with_user', $result['attempts'][0]['reason']);
+        self::assertSame('wppilot/site-kit-enable-sharing', $result['fix']['ability']);
+    }
+
+    public function testTheOwnerSignedInIsAnsweredBySiteKit(): void
+    {
+        self::$siteKit = ['connected' => true, 'authenticated' => true, 'pagespeed' => self::legacyResponse(), 'owner' => ['id' => 1, 'login' => 'admin']];
+        Net::$caps[] = 'googlesitekit_setup';
+
+        $result = P\check([]);
+
+        self::assertSame('site-kit', $result['source']);
+        self::assertArrayNotHasKey('fix', $result);
     }
 
     public function testSiteKitNotSetUpIsSkippedWithoutOfferingSharing(): void

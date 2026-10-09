@@ -37,9 +37,12 @@ namespace WPPilot\Tests\Unit\Kits\Pagespeed {
         /** @var array<string, mixed> */
         public static array $options = [];
 
+        public static int $userId = 1;
+
         public static function reset(): void
         {
             self::$options = [];
+            self::$userId = 1;
             self::$requests = [];
             self::$answers = [];
             self::$transients = [];
@@ -185,6 +188,16 @@ namespace WPPilot\Kits\Pagespeed {
         function wp_has_ability(string $name): bool
         {
             return in_array($name, Net::$abilities, true);
+        }
+
+        function get_current_user_id(): int
+        {
+            return Net::$userId;
+        }
+
+        function admin_url(string $path = ''): string
+        {
+            return 'https://example.test/wp-admin/' . $path;
         }
 
         /** @param array<string, mixed> $args */
