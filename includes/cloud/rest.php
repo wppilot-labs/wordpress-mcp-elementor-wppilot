@@ -99,7 +99,7 @@ function wppilot_cloud_rest_status(): WP_REST_Response|WP_Error
 
     $versions = wppilot_cloud_versions();
 
-    return new WP_REST_Response([
+    $status = [
         'site_id' => $link['site_id'],
         'plugin_version' => $versions['plugin'],
         'wp_version' => $versions['wp'],
@@ -111,7 +111,14 @@ function wppilot_cloud_rest_status(): WP_REST_Response|WP_Error
         'updates' => wppilot_cloud_pending_updates(),
         'backup' => wppilot_cloud_backup_summary(),
         'policy' => wppilot_cloud_policy_status(),
-    ], 200);
+    ];
+    // The site-issues kit's summary: counts, newest fatal, newest few issues. Left out (not null)
+    // when the kit is not loaded, which is what older plugins send too.
+    if (function_exists('WPPilot\Kits\SiteIssues\cloud_summary')) {
+        $status['issues'] = \WPPilot\Kits\SiteIssues\cloud_summary();
+    }
+
+    return new WP_REST_Response($status, 200);
 }
 
 /**

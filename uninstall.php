@@ -131,6 +131,8 @@ function wppilot_uninstall_options(): array
         'wppilot_cloud_manage',
         'wppilot_cloud_policy',
         'wppilot_cloud_event_push',
+        // includes/kits/site-issues: the PHP fatal error log.
+        'wppilot_kit_site_issues_php_errors',
     ];
 }
 
