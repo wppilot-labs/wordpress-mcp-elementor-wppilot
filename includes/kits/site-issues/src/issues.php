@@ -45,13 +45,14 @@ function report(array $input = []): array
     $updates = array_values(array_filter($other, static fn(array $i): bool => $i['kind'] === 'update_rolled_back'));
     $backups = backup_failures($since);
 
+    $iso = static fn(array $item): array => array_merge($item, ['at' => gmdate('c', (int) $item['at'])]);
     return [
         'since' => gmdate('c', $since),
         'counts' => counts($errors, $updates, $backups, $paused),
         'php_errors' => $errors,
         'paused_extensions' => $paused,
-        'update_failures' => array_slice($updates, 0, $limit),
-        'backup_failures' => $backups,
+        'update_failures' => array_map($iso, array_slice($updates, 0, $limit)),
+        'backup_failures' => array_map($iso, $backups),
         'error_log' => [
             'kept' => MAX_ERRORS,
             'note' => 'Fatal errors are recorded by WordPress\'s fatal error handler on this site, deduplicated by message, file and line; count is a lower bound. A fatal in a plugin that loads before this one, while it is being loaded, is not recorded.',
