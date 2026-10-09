@@ -30,7 +30,7 @@ if (Runtime\unclaimed('wppilot/pagespeed-check')) {
             'properties' => [
                 'url' => ['type' => 'string', 'description' => 'A page on this site: an absolute URL or a path starting with /. Defaults to the home page.'],
                 'strategy' => ['type' => 'string', 'enum' => ['mobile', 'desktop', 'both'], 'default' => 'mobile'],
-                'refresh' => ['type' => 'boolean', 'default' => false, 'description' => 'Skip the 15-minute reuse and run a new test. Use after a change, not to re-read.'],
+                'refresh' => ['type' => 'boolean', 'default' => false, 'description' => 'Skip the 15-minute reuse (and the cloud service\'s hour-long cache) and run a new test. Use after a change, not to re-read.'],
                 'source' => [
                     'type' => 'string',
                     'enum' => ['auto', 'site-kit', 'cloud', 'google-api-key', 'google-keyless'],

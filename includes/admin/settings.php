@@ -105,7 +105,7 @@ function wppilot_settings_sections(): array
             'id' => 'pagespeed',
             'title' => __('PageSpeed', domain: 'wppilot'),
             'description' => __(
-                'PageSpeed checks need no Google key: Site Kit by Google answers them when it can, and WPPilot Cloud otherwise, paired or not.',
+                'PageSpeed checks need no Google key: Site Kit by Google answers them when it can, and WPPilot Cloud otherwise, paired or not, with WPPilot\'s own key. You do not need to add one.',
                 domain: 'wppilot',
             ),
             'fields' => [
@@ -114,7 +114,7 @@ function wppilot_settings_sections(): array
                     'name' => WPPILOT_SETTINGS_PAGESPEED_KEY_FIELD,
                     'label' => __('PageSpeed API key (optional)', domain: 'wppilot'),
                     'help' => __(
-                        'For power users who run many checks and reach the shared quota. In Google Cloud console, create an API key (APIs & Services > Credentials > Create credentials > API key) and enable the PageSpeed Insights API for its project. The key is stored on this site, used only for PageSpeed requests to Google, and never shown again or sent to agents.',
+                        'Optional and not needed: leave it blank and WPPilot Cloud runs your checks. Only for power users who run many checks and reach the shared quota. In Google Cloud console, create an API key (APIs & Services > Credentials > Create credentials > API key) and enable the PageSpeed Insights API for its project. The key is stored on this site, used only for PageSpeed requests to Google, and never shown again or sent to agents.',
                         domain: 'wppilot',
                     ),
                     'link' => ['url' => 'https://console.cloud.google.com/apis/credentials', 'text' => __('Open Google Cloud credentials', domain: 'wppilot')],

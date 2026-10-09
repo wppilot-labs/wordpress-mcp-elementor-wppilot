@@ -126,7 +126,7 @@ function run(string $url, string $strategy, string $only, bool $refresh): array|
             $attempts[] = ['source' => $source, 'outcome' => 'skipped', 'reason' => 'time_budget'];
             continue;
         }
-        $answer = from_source($source, $url, $strategy);
+        $answer = from_source($source, $url, $strategy, $refresh);
         if (is_string($answer)) {
             $attempts[] = ['source' => $source, 'outcome' => 'skipped', 'reason' => $answer];
             continue;
@@ -177,13 +177,13 @@ function run(string $url, string $strategy, string $only, bool $refresh): array|
  *
  * @return array<string, mixed>|WP_Error|string
  */
-function from_source(string $source, string $url, string $strategy): array|WP_Error|string
+function from_source(string $source, string $url, string $strategy, bool $refresh = false): array|WP_Error|string
 {
     switch ($source) {
         case 'site-kit':
             return from_site_kit($url, $strategy);
         case 'cloud':
-            return from_cloud_proxy($url, $strategy);
+            return from_cloud_proxy($url, $strategy, $refresh);
         case 'google-api-key':
             $api_key = api_key();
             return $api_key === '' ? 'no_api_key_saved' : from_google($url, $strategy, $api_key);
@@ -302,16 +302,20 @@ function site_kit_get(string $route, array $params): mixed
  * holds no bearer credential for it. When the Cloud no longer knows the paired site (404
  * unknown_site) the call is repeated unsigned; the link itself is the heartbeat's business.
  *
+ * With $refresh a signed call also sends `refresh: true`, and the Cloud skips its hour-long cache
+ * for it (counted against the site's daily allowance). It honours that only for a signed call, so
+ * the unsigned body never carries it.
+ *
  * @return array<string, mixed>|WP_Error|string
  */
-function from_cloud_proxy(string $url, string $strategy): array|WP_Error|string
+function from_cloud_proxy(string $url, string $strategy, bool $refresh = false): array|WP_Error|string
 {
     $payload = ['url' => $url, 'strategy' => $strategy, 'site_url' => home_url()];
 
     /** @var mixed $signer */
     $signer = Runtime\host()->extension('cloud-sign');
     /** @var mixed $signed */
-    $signed = is_callable($signer) ? $signer($payload) : null;
+    $signed = is_callable($signer) ? $signer($refresh ? array_merge($payload, ['refresh' => true]) : $payload) : null;
     if (is_array($signed) && is_string($signed['body'] ?? null) && is_string($signed['base'] ?? null)) {
         $base = filtered_cloud_url($signed['base']);
         if ($base !== '') {

@@ -25,7 +25,8 @@ answered and `attempts` says why earlier ones did not.
   `null` is normal for small sites.
 - `opportunities` are ordered by time saved; `id` is the Lighthouse audit id. Work from the top.
 - A run takes 10-60 seconds; results are reused for 15 minutes. Pass `refresh: true` only to
-  measure again after a change.
+  measure again after a change: it also skips the Cloud's own hour-long cache and counts against
+  the site's daily allowance there.
 
 ## Errors
 

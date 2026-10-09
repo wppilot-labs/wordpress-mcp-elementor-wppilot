@@ -190,9 +190,12 @@ final class PagespeedTest extends TestCase
         $again = P\check(['refresh' => true]);
 
         self::assertSame('cloud', $again['source']);
+        self::assertTrue(json_decode(Net::$requests[1]['args']['body'], true)['refresh'], 'refresh asks the Cloud to skip its hour-long cache, on the signed call');
         self::assertSame('https://cloud.example/api/pagespeed/v1/run', Net::$requests[2]['url']);
         self::assertArrayNotHasKey('X-Site-Signature', Net::$requests[2]['args']['headers']);
-        self::assertArrayNotHasKey('site_id', json_decode(Net::$requests[2]['args']['body'], true));
+        $unsigned = json_decode(Net::$requests[2]['args']['body'], true);
+        self::assertArrayNotHasKey('site_id', $unsigned);
+        self::assertArrayNotHasKey('refresh', $unsigned, 'the Cloud honours refresh only when signed, so the plain body never carries it');
     }
 
     public function testTheCloudsOwnMessageReachesTheAgent(): void

@@ -27,7 +27,8 @@ owner. Read-only.
 A failure that belongs to the page (Lighthouse `NO_FCP`, `PAGE_HUNG`, `PROTOCOL_TIMEOUT`,
 `FAILED_DOCUMENT_REQUEST`, …) stops the chain; a quota, key or transport failure moves to the next
 source. Sources are skipped once 150 seconds have gone. Results are cached for 15 minutes in a
-transient (`refresh: true` bypasses it).
+transient (`refresh: true` bypasses it, and on a signed call to the Cloud also asks it to skip its
+own hour-long cache; the Cloud honours that only for a paired site's signed call).
 
 ## Vendor data, verified 2026-10-09
 
