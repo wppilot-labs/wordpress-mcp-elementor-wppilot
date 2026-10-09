@@ -745,8 +745,8 @@ final class CloudPairingTest extends TestCase
 
         self::assertSame([
             'providers' => [
-                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'startable' => true],
-                ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false, 'startable' => false],
+                ['provider' => 'updraftplus', 'label' => 'UpdraftPlus', 'readable' => true, 'startable' => true, 'running' => true],
+                ['provider' => 'backwpup', 'label' => 'BackWPup', 'readable' => false, 'startable' => false, 'running' => false, 'trigger_reason' => 'unreadable'],
             ],
             'newest' => ['provider' => 'updraftplus', 'timestamp' => 1_700_000_000],
             'running' => true,
@@ -758,6 +758,81 @@ final class CloudPairingTest extends TestCase
 
         $GLOBALS['cloud_test_backup_status'] = new WP_Error('kit_down', 'no');
         self::assertNull(wppilot_cloud_backup_summary(), 'a failing ability reads as no summary, never an error in the status answer');
+    }
+
+    /**
+     * Why a backup is stuck reaches Cloud (1.18.4): each provider's running flag, the site's own
+     * reason it can't be started, and the export Pro started - never a path, archive name or job id.
+     */
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function test_status_says_why_a_backup_is_stuck_without_naming_files(): void
+    {
+        $this->pairedLink();
+        $GLOBALS['cloud_test_backup_status'] = [
+            'active_providers' => ['ai1wm', 'duplicator'],
+            'providers' => [
+                [
+                    'provider' => 'ai1wm',
+                    'label' => 'All-in-One WP Migration',
+                    'readable' => true,
+                    'running' => ['running' => false, 'jobs' => []],
+                    'trigger' => ['supported' => true, 'scopes' => []],
+                    'export' => [
+                        'state' => 'failed',
+                        'reason' => 'All-in-One WP Migration\'s export failed at "archiving media": Could not open /var/www/html/wp-content/ai1wm-backups/site-20261009-abc123.wpress (C:\\sites\\x\\y.wpress) in job 6ac7aa9072d44; see wppilot/backup-status.',
+                        'step' => 'archiving media',
+                        'started' => ['time' => '2026-10-09T10:00:00+00:00', 'time_utc' => '2026-10-09T10:00:00Z'],
+                        'last_progress' => ['time' => '2026-10-09T10:03:00+00:00', 'time_utc' => '2026-10-09T10:03:00Z'],
+                        'finished' => ['time' => '2026-10-09T10:04:00+00:00', 'time_utc' => '2026-10-09T10:04:00Z'],
+                        'backup_id' => 'deadbeefdeadbeef',
+                    ],
+                ],
+                [
+                    'provider' => 'duplicator',
+                    'label' => 'Duplicator',
+                    'readable' => true,
+                    'running' => ['running' => false, 'jobs' => []],
+                    'trigger' => ['supported' => false, 'reason' => 'Duplicator <b>cannot</b> be started from here.'],
+                ],
+            ],
+            'newest_successful_backup' => null,
+        ];
+        eval('function wp_get_ability(string $name) { return $name === "wppilot/backup-status" ? new class { public function execute(array $input = []): mixed { return $GLOBALS["cloud_test_backup_status"]; } } : null; }');
+
+        $backup = wppilot_cloud_rest_status()->data['backup'];
+
+        self::assertSame([
+            'provider' => 'ai1wm',
+            'label' => 'All-in-One WP Migration',
+            'readable' => true,
+            'startable' => true,
+            'running' => false,
+            'export' => [
+                'state' => 'failed',
+                'reason' => 'All-in-One WP Migration\'s export failed at "archiving media": Could not open [path] ([path]) in job [id]; see wppilot/backup-status.',
+                'step' => 'archiving media',
+                'started_at' => 1_791_540_000,
+                'last_progress_at' => 1_791_540_180,
+                'finished_at' => 1_791_540_240,
+            ],
+        ], $backup['providers'][0], 'backup_id and every path, archive name and job id stay on the site');
+        self::assertSame('Duplicator cannot be started from here.', $backup['providers'][1]['trigger_reason']);
+        self::assertArrayNotHasKey('export', $backup['providers'][1], 'a provider that reports no export sends none');
+        self::assertFalse($backup['running']);
+
+        // A state Cloud does not know, or no export at all, reads as null rather than a guess.
+        $GLOBALS['cloud_test_backup_status']['providers'][0]['export'] = ['state' => 'exploded', 'reason' => 'x'];
+        self::assertNull(wppilot_cloud_backup_summary()['providers'][0]['export']);
+        $GLOBALS['cloud_test_backup_status']['providers'][0]['export'] = null;
+        self::assertNull(wppilot_cloud_backup_summary()['providers'][0]['export']);
+
+        // A running export makes the whole summary running.
+        $GLOBALS['cloud_test_backup_status']['providers'][0]['running'] = ['running' => true, 'jobs' => [['state' => 'running']]];
+        $GLOBALS['cloud_test_backup_status']['providers'][0]['export'] = ['state' => 'running', 'reason' => null, 'step' => 'exporting the database', 'started' => ['time_utc' => '2026-10-09T10:00:00Z'], 'last_progress' => ['time_utc' => '2026-10-09T10:01:00Z'], 'finished' => null];
+        $summary = wppilot_cloud_backup_summary();
+        self::assertTrue($summary['running']);
+        self::assertSame(['state' => 'running', 'reason' => null, 'step' => 'exporting the database', 'started_at' => 1_791_540_000, 'last_progress_at' => 1_791_540_060, 'finished_at' => null], $summary['providers'][0]['export']);
     }
 
     public function test_core_already_current_is_not_an_update(): void
