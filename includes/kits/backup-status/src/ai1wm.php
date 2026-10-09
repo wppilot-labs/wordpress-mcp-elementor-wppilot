@@ -235,7 +235,7 @@ function ai1wm_trigger_support(): array
     return [
         'supported' => true,
         'scopes' => [],
-        'how' => "With WPPilot Pro 1.12.2 or later: a full export to All-in-One WP Migration's backups folder (database, media, plugins and themes), run on the server with the plugin's own export steps, in short slices on WP-Cron and on each wppilot/backup-status read. It does not depend on the plugin's loopback requests to admin-ajax.php.",
+        'how' => "Started by the Pro edition's backup trigger: a full export to All-in-One WP Migration's backups folder (database, media, plugins and themes), run on the server with the plugin's own export steps, in short slices on WP-Cron and on each wppilot/backup-status read. It does not depend on the plugin's loopback requests to admin-ajax.php.",
     ];
 }
 
