@@ -44,8 +44,12 @@ same name keeps it.
   runs); any other `.wpress` is `kind: "unverified"` and never the last successful backup, so a
   file dropped there by hand cannot open the fresh-backup hold. Running: a job folder (13 hex
   characters) whose files changed in the last 15 minutes, export or import. No schedule in the
-  free plugin. `trigger.supported` whenever the REST export controller
-  (`Ai1wm_Rest_Controller::create_export`, added in 7.106) is loaded; no version is compared. Backup ids are a hash of the file name, which is never returned: its random suffix is
+  free plugin. `trigger.supported` whenever the install has what WPPilot Pro's
+  export runner calls (`ai1wm_runner_missing()`: the plugin's `ai1wm_get_filters`,
+  `ai1wm_setup_environment`, `ai1wm_setup_errors`, `ai1wm_storage_path`, `ai1wm_archive_path`,
+  `ai1wm_backup_path`, `Ai1wm_Export_Controller`, `Ai1wm_Status`, `Ai1wm_Directory::delete()` and a
+  non-empty `ai1wm_export` chain); otherwise `trigger.reason` names what is missing. No version is
+  ever compared. Backup ids are a hash of the file name, which is never returned: its random suffix is
   all that guards the archive where the folder's .htaccess is ignored.
 
 ## Host needs

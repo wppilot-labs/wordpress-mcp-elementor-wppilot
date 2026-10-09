@@ -56,6 +56,9 @@ namespace WPPilot\Tests\Unit\Kits\BackupStatus {
         /** @var array<string, string> */
         public static array $ai1wmLabels = [];
 
+        /** @var array<int, list<array<string, mixed>>> What ai1wm_get_filters('ai1wm_export') answers: the export chain by priority. */
+        public static array $ai1wmChain = [];
+
         public static function reset(): void
         {
             self::$updraft = [];
@@ -70,6 +73,7 @@ namespace WPPilot\Tests\Unit\Kits\BackupStatus {
             self::$updraftBroken = false;
             self::$ai1wmFiles = [];
             self::$ai1wmLabels = [];
+            self::$ai1wmChain = [];
         }
     }
 }
@@ -226,7 +230,57 @@ namespace {
         }
     }
 
-    // Read-only doubles: no Ai1wm_Rest_Controller, so the export route counts as missing here.
+    // What WPPilot Pro's export runner calls (ai1wm_runner_missing()); the chain is Vendors::$ai1wmChain,
+    // empty unless a test registers steps, so an install counts as startable only when it has one.
+    if (!function_exists('ai1wm_get_filters')) {
+        /** @return array<int, list<array<string, mixed>>> */
+        function ai1wm_get_filters(string $tag): array
+        {
+            return $tag === 'ai1wm_export' ? \WPPilot\Tests\Unit\Kits\BackupStatus\Vendors::$ai1wmChain : [];
+        }
+        function ai1wm_setup_environment(): void
+        {
+        }
+        function ai1wm_setup_errors(): void
+        {
+        }
+        /** @param array<string, mixed> $params */
+        function ai1wm_storage_path(array $params): string
+        {
+            return AI1WM_STORAGE_PATH . '/' . (string) ($params['storage'] ?? '');
+        }
+        /** @param array<string, mixed> $params */
+        function ai1wm_archive_path(array $params): string
+        {
+            return AI1WM_STORAGE_PATH . '/' . (string) ($params['archive'] ?? '');
+        }
+        /** @param array<string, mixed> $params */
+        function ai1wm_backup_path(array $params): string
+        {
+            return AI1WM_BACKUPS_PATH . '/' . (string) ($params['archive'] ?? '');
+        }
+    }
+    if (!class_exists('Ai1wm_Export_Controller')) {
+        class Ai1wm_Export_Controller
+        {
+        }
+        class Ai1wm_Status
+        {
+            public static mixed $job_id = null;
+
+            public static function error(string $title, string $message): void
+            {
+            }
+        }
+        class Ai1wm_Directory
+        {
+            public static function delete(string $path): bool
+            {
+                return true;
+            }
+        }
+    }
+
     if (!class_exists('Ai1wm_Backups')) {
         class Ai1wm_Backups
         {

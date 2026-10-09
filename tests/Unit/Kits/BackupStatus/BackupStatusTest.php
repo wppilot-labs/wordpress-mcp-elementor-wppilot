@@ -362,12 +362,21 @@ final class BackupStatusTest extends TestCase
         }
     }
 
-    public function testAi1wmCanBeStartedOnlyWhereItsRestExportRouteExists(): void
+    public function testAi1wmCanBeStartedWhereverProsRunnerHasWhatItCalls(): void
     {
         $trigger = B\ai1wm_status()['trigger'];
+        self::assertFalse($trigger['supported'], 'no ai1wm_export chain is registered');
+        self::assertSame(
+            "This All-in-One WP Migration install can't be started from here (no export steps are registered). Make the backup from All-in-One WP Migration's Export screen in wp-admin.",
+            $trigger['reason'],
+        );
 
-        self::assertFalse($trigger['supported'], 'these doubles have no Ai1wm_Rest_Controller');
-        self::assertSame("this All-in-One WP Migration install can't be started by this plugin; make the backup from its Export screen in wp-admin.", $trigger['reason']);
+        // Any chain the installed release registers; the version is never read.
+        Vendors::$ai1wmChain = [5 => [['function' => 'Ai1wm_Export_Init::execute', 'accepted_args' => 1]]];
+        $trigger = B\ai1wm_status()['trigger'];
+        self::assertTrue($trigger['supported']);
+        self::assertSame([], $trigger['scopes']);
+        self::assertArrayNotHasKey('reason', $trigger);
         self::assertSame([], B\ai1wm_status()['next_scheduled']);
     }
 

@@ -37,17 +37,13 @@ if (!defined('ABSPATH')) {
  * changed in the last AI1WM_ACTIVE_SECONDS: the archive grows with every step. A folder left by an
  * abandoned run stops changing and stops counting; the plugin's daily cron deletes it after a day.
  *
- * The free plugin has no schedule. Since 7.106 it has a REST API whose POST /ai1wm/v1/exports
- * starts a full export on the server, continued by loopback requests; `trigger.supported` says
- * whether that route's controller is loaded, for WPPilot Pro's wppilot/backup-trigger to use. No
- * version is compared: whether the install can be started is read from what it has.
+ * The free plugin has no schedule. WPPilot Pro's wppilot/backup-trigger (1.12.2+) runs the
+ * plugin's own `ai1wm_export` steps on the server rather than its loopback requests;
+ * `trigger.supported` says whether this install has what that runner calls (ai1wm_runner_missing()).
+ * No version is compared: whether the install can be started is read from what it has.
  */
 
 const AI1WM_BACKUPS = 'Ai1wm_Backups';
-
-const AI1WM_REST_CONTROLLER = 'Ai1wm_Rest_Controller';
-
-const AI1WM_EXPORT_ROUTE = '/ai1wm/v1/exports';
 
 /** Smallest file counted as a backup: a finished export holds at least the database and its package.json. */
 const AI1WM_MIN_BYTES = 1048576;
@@ -178,26 +174,68 @@ function ai1wm_running(): array
     return ['running' => $jobs !== [], 'jobs' => $jobs];
 }
 
+/** The plugin's functions WPPilot Pro's export runner calls (Pro 1.12.2+, ai1wm_runner_missing()). */
+const AI1WM_RUNNER_FUNCTIONS = ['ai1wm_get_filters', 'ai1wm_setup_environment', 'ai1wm_setup_errors', 'ai1wm_storage_path', 'ai1wm_archive_path', 'ai1wm_backup_path'];
+
 /**
- * Whether WPPilot Pro's wppilot/backup-trigger can start an export here.
+ * Why WPPilot Pro's export runner could not run the installed plugin, or null when it could.
+ *
+ * The same capability set as Pro's ai1wm_runner_missing() (this kit cannot call Pro): the
+ * plugin's functions the runner calls, Ai1wm_Export_Controller, Ai1wm_Status with its job id and
+ * error(), Ai1wm_Directory::delete(), and a non-empty `ai1wm_export` chain. Pro runs whatever
+ * chain the installed release registers, so no version is ever compared: an install is refused or
+ * allowed by what it has, never by what it calls itself.
+ */
+function ai1wm_runner_missing(): ?string
+{
+    foreach (AI1WM_RUNNER_FUNCTIONS as $function) {
+        if (!function_exists($function)) {
+            return sprintf('%s() is missing', $function);
+        }
+    }
+    if (!class_exists('Ai1wm_Export_Controller')) {
+        return 'Ai1wm_Export_Controller is missing';
+    }
+    if (!class_exists('Ai1wm_Status') || !property_exists('Ai1wm_Status', 'job_id') || !method_exists('Ai1wm_Status', 'error')) {
+        return 'Ai1wm_Status is missing';
+    }
+    if (!class_exists('Ai1wm_Directory') || !method_exists('Ai1wm_Directory', 'delete')) {
+        return 'Ai1wm_Directory::delete() is missing';
+    }
+    try {
+        /** @var mixed $filters */
+        $filters = call_user_func('ai1wm_get_filters', 'ai1wm_export');
+    } catch (\Throwable $error) {
+        return 'its export steps could not be read';
+    }
+
+    return is_array($filters) && $filters !== [] ? null : 'no export steps are registered';
+}
+
+/**
+ * Whether WPPilot Pro's wppilot/backup-trigger can start an export here: what its runner calls is
+ * present (ai1wm_runner_missing()). Pro replaces this answer with its own when it is active; this
+ * one is what a site without Pro, or Cloud reading it, sees.
  *
  * @return array{supported: bool, reason?: string, scopes?: list<string>, how?: string}
  */
 function ai1wm_trigger_support(): array
 {
-    // A capability check, not a version check: the runner calls the plugin's REST export
-    // controller, so the answer is whether that controller is loaded here.
-    if (!class_exists(AI1WM_REST_CONTROLLER) || !method_exists(AI1WM_REST_CONTROLLER, 'create_export')) {
+    $missing = ai1wm_runner_missing();
+    if ($missing !== null) {
         return [
             'supported' => false,
-            'reason' => "this All-in-One WP Migration install can't be started by this plugin; make the backup from its Export screen in wp-admin.",
+            'reason' => sprintf(
+                "This All-in-One WP Migration install can't be started from here (%s). Make the backup from All-in-One WP Migration's Export screen in wp-admin.",
+                $missing,
+            ),
         ];
     }
 
     return [
         'supported' => true,
         'scopes' => [],
-        'how' => 'All-in-One WP Migration\'s REST API (POST /ai1wm/v1/exports) starts a full export to its backups folder (database, media, plugins and themes), continued by loopback requests to admin-ajax.php.',
+        'how' => "With WPPilot Pro 1.12.2 or later: a full export to All-in-One WP Migration's backups folder (database, media, plugins and themes), run on the server with the plugin's own export steps, in short slices on WP-Cron and on each wppilot/backup-status read. It does not depend on the plugin's loopback requests to admin-ajax.php.",
     ];
 }
 
