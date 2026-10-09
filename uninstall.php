@@ -130,6 +130,7 @@ function wppilot_uninstall_options(): array
         'wppilot_cloud_seen_version',
         'wppilot_cloud_manage',
         'wppilot_cloud_policy',
+        'wppilot_cloud_event_push',
     ];
 }
 
@@ -215,6 +216,8 @@ function wppilot_uninstall_cron_hooks(): array
         'wppilot_kit_routines_reconcile',
         // includes/cloud/heartbeat.php
         'wppilot_cloud_heartbeat',
+        // includes/cloud/events.php
+        'wppilot_cloud_event_push',
     ];
 }
 

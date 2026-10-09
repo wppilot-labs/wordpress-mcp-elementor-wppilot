@@ -28,25 +28,33 @@ function wppilot_cloud_schedule_heartbeat(): void
 /**
  * The heartbeat payload after site_id, ts and nonce.
  *
- * @return array{versions: array{wp: string, php: string, plugin: string, pro: string|null}, safety_profile: string, home_url: string}
+ * `event` is present only on an event push (events.php); the hourly heartbeat
+ * is unchanged.
+ *
+ * @return array{versions: array{wp: string, php: string, plugin: string, pro: string|null}, safety_profile: string, home_url: string, event?: string}
  */
-function wppilot_cloud_heartbeat_payload(): array
+function wppilot_cloud_heartbeat_payload(?string $event = null): array
 {
-    return [
+    $payload = [
         'versions' => wppilot_cloud_versions(),
         'safety_profile' => wppilot_cloud_safety_profile(),
         'home_url' => home_url(),
     ];
+    if ($event !== null) {
+        $payload['event'] = $event;
+    }
+
+    return $payload;
 }
 
 /**
- * Cron: send one heartbeat.
+ * Cron: send one heartbeat, or an event push when $event is given.
  *
  * A link whose token is gone - revoked another way, or its owner deleted - is
  * a pairing that can no longer work, so it is disconnected properly (the Cloud
  * is told) rather than kept beating for a site the Cloud cannot reach.
  */
-function wppilot_cloud_send_heartbeat(): void
+function wppilot_cloud_send_heartbeat(?string $event = null): void
 {
     $link = wppilot_cloud_link();
     if ($link === null) {
@@ -68,7 +76,7 @@ function wppilot_cloud_send_heartbeat(): void
         $base,
         '/api/sites/heartbeat',
         $link['site_id'],
-        wppilot_cloud_heartbeat_payload(),
+        wppilot_cloud_heartbeat_payload($event),
     );
 
     wppilot_cloud_handle_signed_response($response, $link['site_id']);

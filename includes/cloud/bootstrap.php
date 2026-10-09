@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   signing.php     §5     the site's Ed25519 key and signed calls to the Cloud
  *   rest.php        §4     the two routes the Cloud calls with its access token
  *   heartbeat.php   §5     the hourly heartbeat and the schedule that drives it
+ *   events.php      §5     the same heartbeat pushed early, with `event`, when a backup, update or extension change happens
  *   updates.php     §4     pending core, plugin and theme updates for the status answer
  *   backups.php     §4     the newest backup and running state for the status answer
  *   policy.php      §7     safety settings pushed from the Cloud, only as far as the owner allows
@@ -61,6 +62,7 @@ require_once __DIR__ . '/pairing.php';
 require_once __DIR__ . '/signing.php';
 require_once __DIR__ . '/rest.php';
 require_once __DIR__ . '/heartbeat.php';
+require_once __DIR__ . '/events.php';
 require_once __DIR__ . '/updates.php';
 require_once __DIR__ . '/backups.php';
 require_once __DIR__ . '/policy.php';
@@ -75,8 +77,10 @@ add_action('admin_post_wppilot_cloud_manage', callback: 'wppilot_cloud_handle_ma
 
 add_action('rest_api_init', callback: 'wppilot_cloud_register_routes');
 
-add_action(WPPILOT_CLOUD_HEARTBEAT_HOOK, callback: 'wppilot_cloud_send_heartbeat');
+// No arguments: the event push (events.php) passes $event itself.
+add_action(WPPILOT_CLOUD_HEARTBEAT_HOOK, callback: 'wppilot_cloud_send_heartbeat', priority: 10, accepted_args: 0);
 add_action('admin_init', callback: 'wppilot_cloud_maintain_schedule');
 add_action('upgrader_process_complete', callback: 'wppilot_cloud_on_upgrade', priority: 10, accepted_args: 2);
+wppilot_cloud_register_event_hooks();
 
 add_filter('wppilot_tool_call_rate_limit', callback: 'wppilot_cloud_rate_limit', priority: 10, accepted_args: 2);
