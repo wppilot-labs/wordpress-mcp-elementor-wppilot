@@ -4,7 +4,7 @@ Tags: mcp, ai, claude, elementor, agent
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.18.4
+Stable tag: 1.18.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -168,6 +168,12 @@ To rebuild it from source:
 The PHP dependencies under `vendor/` are installed with `composer install --no-dev` from the included `composer.json`.
 
 == Changelog ==
+
+= 1.18.5 =
+* New: wppilot/site-issues, a read-only log of what went wrong on the site. WordPress's fatal error handler now records the error behind "There has been a critical error on this website" - type, the message's first line, the file relative to the WordPress root and the line, the plugin or theme it belongs to, the request path without its query string, a count and first/last seen - in a capped, non-autoloaded log of 50 entries. Out-of-memory and timeout fatals are not blamed on the file PHP happened to stop in. The ability reads that log with the plugins and themes WordPress paused in recovery mode, failed backups and the updates WPPilot Pro's safe update rolled back. Query strings, cookies, stack traces and server paths are never stored.
+* New: WPPilot Cloud hears about changes within seconds instead of at the next hourly check-in: a finished or failed backup (UpdraftPlus, BackWPup, Duplicator), a core, plugin or theme update (safe updates included), a plugin or theme installed, activated, deactivated, deleted or switched, and a Site Kit connection change each send the same signed check-in from WordPress cron, at most once every 30 seconds and never during a visitor's page load.
+* Changed: cloud/status sends a compact issues summary - counts, when the newest fatal was, and the newest ten issues with relative file paths only - so WPPilot Cloud can show an Issues log per site.
+* Fixed: wppilot/pagespeed-check offered Site Kit dashboard sharing to a module owner whose Google sign-in was gone, which Site Kit refuses. It now skips Site Kit with site_kit_owner_signed_out and returns a sign-in fix that links to Site Kit > Dashboard.
 
 = 1.18.4 =
 * New: wppilot/pagespeed-check runs Google PageSpeed Insights on any page of the site and returns the Lighthouse scores, lab metrics, Core Web Vitals field data when Google has it, the opportunities ordered by the time they save, and failing diagnostics. No Google key is needed from anyone: Site Kit by Google answers when its PageSpeed module is connected and readable, otherwise WPPilot Cloud runs the check with WPPilot's own key (signed by a paired site, plain otherwise), and Google's keyless API is the last resort. A key of your own on Settings > PageSpeed is optional and not needed. refresh: true measures again instead of reusing a recent result, on the site and, for a paired site, at WPPilot Cloud too.
@@ -506,6 +512,9 @@ The PHP dependencies under `vendor/` are installed with `composer install --no-d
 * Skills, site instructions, and a guarded sandbox for agent-authored PHP.
 
 == Upgrade Notice ==
+
+= 1.18.5 =
+Records the PHP error behind "There has been a critical error" so you and WPPilot Cloud can see what broke, and keeps Cloud current within seconds. Update together with WPPilot Pro 1.12.3, whose safe updates no longer roll back on LiteSpeed servers for an error they caused themselves.
 
 = 1.18.4 =
 Adds PageSpeed checks with no Google key needed and Site Kit dashboard sharing, and lets WPPilot Cloud show why a backup is stuck. Update together with WPPilot Pro 1.12.2 for All-in-One WP Migration backups on any host.
