@@ -47,6 +47,8 @@ if (!function_exists('wp_schedule_single_event')) {
     function wp_schedule_single_event(int $timestamp, string $hook, array $args = []): bool
     {
         $GLOBALS['wppilot_test_single_events'][] = ['hook' => $hook, 'timestamp' => $timestamp];
+        // So wp_next_scheduled() sees it, as it would in WordPress.
+        WPPilot_Test_State::$cron[$hook] ??= $timestamp;
 
         return true;
     }

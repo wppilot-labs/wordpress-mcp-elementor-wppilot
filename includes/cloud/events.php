@@ -101,8 +101,14 @@ function wppilot_cloud_note_event(string $event, ?int $now = null): void
     if ($state['event'] !== null) {
         $state['event'] = wppilot_cloud_significant_event($state['event'], $event);
         if ($state['due'] >= $now - WPPILOT_CLOUD_EVENT_STALE) {
-            // A push is already waiting; it will carry this event too.
+            // A push is already waiting; it will carry this event too. Its cron entry can be gone
+            // (WP-Cron keeps every event in one option, and requests writing it at once can drop
+            // one; seen on the WP 7.1 test site), so it is put back then, or the event would wait
+            // out the stale window for nothing.
             update_option(WPPILOT_CLOUD_EVENT_OPTION, $state, autoload: false);
+            if (wp_next_scheduled(WPPILOT_CLOUD_EVENT_HOOK) === false) {
+                wp_schedule_single_event(max($now, $state['due']), WPPILOT_CLOUD_EVENT_HOOK);
+            }
             return;
         }
     } else {

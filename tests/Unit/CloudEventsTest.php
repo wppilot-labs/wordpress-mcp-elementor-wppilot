@@ -213,7 +213,23 @@ final class CloudEventsTest extends TestCase
         self::assertCount(2, self::pushes());
     }
 
-    public function test_upgrader_updates_and_installs_map_to_their_events(): void
+    public function test_a_waiting_push_whose_cron_entry_vanished_is_scheduled_again(): void
+    {
+        $this->link();
+        $now = 1_760_000_000;
+        wppilot_cloud_note_event('extension_changed', $now);
+        self::assertCount(1, self::pushes());
+
+        // WP-Cron dropped the entry (concurrent writes to its one option).
+        unset(WPPilot_Test_State::$cron[WPPILOT_CLOUD_EVENT_HOOK]);
+        wppilot_cloud_note_event('update_finished', $now + 40);
+        self::assertSame(['hook' => WPPILOT_CLOUD_EVENT_HOOK, 'timestamp' => $now + 40], self::pushes()[1] ?? null);
+
+        wppilot_cloud_note_event('extension_changed', $now + 41);
+        self::assertCount(2, self::pushes(), 'while the entry exists, nothing more is scheduled');
+    }
+
+        public function test_upgrader_updates_and_installs_map_to_their_events(): void
     {
         $this->link();
         wppilot_cloud_on_upgrader_event(null, ['action' => 'update', 'type' => 'translation']);
