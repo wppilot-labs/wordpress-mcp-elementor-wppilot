@@ -168,8 +168,14 @@ function backup_failures(int $since): array
     if (!$ability instanceof \WP_Ability) {
         return [];
     }
-    /** @var mixed $status */
-    $status = Runtime\run_ability($ability, []);
+    try {
+        /** @var mixed $status */
+        $status = Runtime\run_ability($ability, []);
+    } catch (\Throwable $error) {
+        // A backup plugin that throws while being read must not take the whole report with it.
+        unset($error);
+        return [];
+    }
     if (!is_array($status) || !is_array($status['providers'] ?? null)) {
         return [];
     }
