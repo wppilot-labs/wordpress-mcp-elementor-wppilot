@@ -64,6 +64,9 @@ final class PagespeedTest extends TestCase
         if ($route === 'core/modules/data/list') {
             return [['slug' => 'pagespeed-insights', 'active' => self::$siteKit['connected'], 'connected' => self::$siteKit['connected']]];
         }
+        if ($route === 'core/site/data/connection') {
+            return ['connected' => self::$siteKit['setup'] ?? true, 'setupCompleted' => self::$siteKit['setup'] ?? true];
+        }
         if ($route === 'core/user/data/authentication') {
             return ['authenticated' => self::$siteKit['authenticated']];
         }
@@ -232,6 +235,21 @@ final class PagespeedTest extends TestCase
         $shared = P\check(['refresh' => true]);
         self::assertSame('site-kit', $shared['source']);
         self::assertArrayNotHasKey('fix', $shared);
+    }
+
+    public function testSiteKitNotSetUpIsSkippedWithoutOfferingSharing(): void
+    {
+        // Seen live on Site Kit 1.189.0: the PageSpeed module reads active and connected before setup.
+        self::$siteKit = ['connected' => true, 'authenticated' => false, 'pagespeed' => null, 'setup' => false];
+        Net::$caps[] = 'googlesitekit_setup';
+        Net::$abilities[] = 'wppilot/site-kit-enable-sharing';
+        Net::$answers[] = Net::json(200, self::cloudBody());
+
+        $result = P\check([]);
+
+        self::assertSame(['source' => 'site-kit', 'outcome' => 'skipped', 'reason' => 'site_kit_not_set_up'], $result['attempts'][0]);
+        self::assertSame('cloud', $result['source']);
+        self::assertArrayNotHasKey('fix', $result, 'sharing cannot help until Site Kit setup is finished');
     }
 
     public function testAQuotaRefusalFallsThroughToTheSavedKeyWhichNeverLeavesTheSite(): void

@@ -223,6 +223,12 @@ function from_site_kit(string $url, string $strategy): array|WP_Error|string
             return 'site_kit_module_not_connected';
         }
     }
+    // Site Kit lists its PageSpeed module as connected before anyone has signed in to Google, but
+    // it cannot answer until setup is finished; sharing would not help either, so it is not offered.
+    $connection = site_kit_get('core/site/data/connection', []);
+    if (is_array($connection) && array_key_exists('setupCompleted', $connection) && $connection['setupCompleted'] !== true) {
+        return 'site_kit_not_set_up';
+    }
     $authenticated = site_kit_get('core/user/data/authentication', []);
     $own_google = is_array($authenticated) && !empty($authenticated['authenticated']);
     if (!$own_google && !current_user_can('googlesitekit_read_shared_module_data', 'pagespeed-insights')) {
