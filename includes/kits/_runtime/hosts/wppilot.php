@@ -79,7 +79,47 @@ final class WPPilotHost implements Host, ProfileGate
         if ($point === 'elementor-content-writer') {
             return [$this, 'write_elementor_content'];
         }
+        if ($point === 'cloud-url') {
+            // The pagespeed kit's proxy: the same base pairing uses, so WPPILOT_CLOUD_URL (and the
+            // wppilot_cloud_url filter) point a development site's speed tests at a local Cloud too.
+            // '' when the configured URL may not be used (plain HTTP outside a local environment).
+            return function_exists('wppilot_cloud_url') ? \wppilot_cloud_url() : null;
+        }
+        if ($point === 'cloud-sign') {
+            return [$this, 'sign_cloud_payload'];
+        }
         return apply_filters('wppilot_kit_extension', null, $point);
+    }
+
+    /**
+     * A call to the paired Cloud, signed as the heartbeat is (pairing protocol §5): the payload
+     * after site_id, ts and nonce, and X-WPPilot-Signature over exactly those bytes. Null when the
+     * site is not paired or cannot sign, so the caller sends its unsigned form instead. The site
+     * holds no bearer credential for the Cloud, so nothing else authenticates it.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{base: string, body: string, headers: array<string, string>}|null
+     */
+    public function sign_cloud_payload(array $payload): ?array
+    {
+        if (!function_exists('wppilot_cloud_link') || !function_exists('wppilot_cloud_signed_body')) {
+            return null;
+        }
+        $link = \wppilot_cloud_link();
+        if ($link === null || !\wppilot_cloud_sodium_available()) {
+            return null;
+        }
+        $base = \wppilot_cloud_normalize_url($link['cloud_url']);
+        $keys = \wppilot_cloud_keys(create: false);
+        if ($base === '' || $keys instanceof WP_Error) {
+            return null;
+        }
+        $body = \wppilot_cloud_signed_body($link['site_id'], $payload);
+        $signature = \wppilot_cloud_sign($body, $keys['secret']);
+        if ($signature === '') {
+            return null;
+        }
+        return ['base' => $base, 'body' => $body, 'headers' => ['X-WPPilot-Signature' => $signature]];
     }
 
     /**

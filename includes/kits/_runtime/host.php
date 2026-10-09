@@ -47,6 +47,9 @@ interface Host
      *
      * `ability-runner` is the host's way to run another ability through its controls; kits
      * reach it through Runtime\run_ability(), which falls back to the confirm guard.
+     * `cloud-url` is the base URL of the host's cloud service (a string, '' when unusable), and
+     * `cloud-sign` a callable that signs a payload for it ({base, body, headers}, or null when the
+     * site is not paired).
      */
     public function extension(string $point): mixed;
 

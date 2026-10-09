@@ -435,3 +435,46 @@ if (!function_exists('get_post_types')) {
         return [];
     }
 }
+
+/**
+ * No network here. A GET or POST is recorded and answered 200 with the smallest Lighthouse result,
+ * so a read that calls out (pagespeed-check) runs its whole path in both copies without leaving
+ * the machine.
+ *
+ * @param array<string, mixed> $args
+ * @return array{response: array{code: int}, headers: array<string, string>, body: string}
+ */
+function wp_remote_get(string $url, array $args = []): array
+{
+    Kit_Coexistence::record('http', (string) strtok($url, '?'));
+    return ['response' => ['code' => 200], 'headers' => [], 'body' => '{"lighthouseResult":{"lighthouseVersion":"13.0.1","categories":{"performance":{"score":0.9}},"audits":{}}}'];
+}
+
+/**
+ * @param array<string, mixed> $args
+ * @return array{response: array{code: int}, headers: array<string, string>, body: string}
+ */
+function wp_remote_post(string $url, array $args = []): array
+{
+    return wp_remote_get($url, $args);
+}
+
+if (!function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code(array|WP_Error $response): int|string
+    {
+        return is_array($response) ? (int) ($response['response']['code'] ?? 0) : '';
+    }
+
+    function wp_remote_retrieve_body(array|WP_Error $response): string
+    {
+        return is_array($response) ? (string) ($response['body'] ?? '') : '';
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_header')) {
+    /** @return string|list<string> */
+    function wp_remote_retrieve_header(array|WP_Error $response, string $header): string|array
+    {
+        return is_array($response) ? ($response['headers'][strtolower($header)] ?? '') : '';
+    }
+}

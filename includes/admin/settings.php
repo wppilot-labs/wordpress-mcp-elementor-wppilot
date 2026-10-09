@@ -32,6 +32,8 @@ const WPPILOT_SETTINGS_PAGE = 'wppilot-settings';
 
 const WPPILOT_SETTINGS_NONCE = 'wppilot_save_settings';
 
+const WPPILOT_SETTINGS_PAGESPEED_KEY_FIELD = 'wppilot_pagespeed_api_key';
+
 /**
  * Every settings section, in display order.
  *
@@ -96,6 +98,32 @@ function wppilot_settings_sections(): array
             'save' => 'wppilot_settings_save_context',
         ],
     ];
+
+    // The pagespeed kit's optional key. Only shown while the kit is loaded, since it owns the option.
+    if (defined('WPPilot\\Kits\\Pagespeed\\API_KEY_OPTION')) {
+        $sections[] = [
+            'id' => 'pagespeed',
+            'title' => __('PageSpeed', domain: 'wppilot'),
+            'description' => __(
+                'PageSpeed checks need no Google key: Site Kit by Google answers them when it can, and WPPilot Cloud otherwise, paired or not.',
+                domain: 'wppilot',
+            ),
+            'fields' => [
+                [
+                    'type' => 'secret',
+                    'name' => WPPILOT_SETTINGS_PAGESPEED_KEY_FIELD,
+                    'label' => __('PageSpeed API key (optional)', domain: 'wppilot'),
+                    'help' => __(
+                        'For power users who run many checks and reach the shared quota. In Google Cloud console, create an API key (APIs & Services > Credentials > Create credentials > API key) and enable the PageSpeed Insights API for its project. The key is stored on this site, used only for PageSpeed requests to Google, and never shown again or sent to agents.',
+                        domain: 'wppilot',
+                    ),
+                    'link' => ['url' => 'https://console.cloud.google.com/apis/credentials', 'text' => __('Open Google Cloud credentials', domain: 'wppilot')],
+                    'value' => wppilot_settings_pagespeed_key() !== '',
+                ],
+            ],
+            'save' => 'wppilot_settings_save_pagespeed',
+        ];
+    }
 
     /**
      * Filter the WPPilot settings sections.
@@ -173,6 +201,38 @@ function wppilot_settings_save_context(array $post): void
         ($post['wppilot_instructions_enabled'] ?? null) !== null ? '1' : '0',
         autoload: true,
     );
+}
+
+function wppilot_settings_pagespeed_option(): string
+{
+    return (string) constant('WPPilot\\Kits\\Pagespeed\\API_KEY_OPTION');
+}
+
+function wppilot_settings_pagespeed_key(): string
+{
+    /** @var mixed $stored */
+    $stored = get_option(wppilot_settings_pagespeed_option(), default_value: '');
+
+    return is_string($stored) ? $stored : '';
+}
+
+/**
+ * A blank field keeps the saved key, so the form never has to echo it back; the checkbox removes it.
+ *
+ * @param array<string, mixed> $post
+ */
+function wppilot_settings_save_pagespeed(array $post): void
+{
+    if (($post[WPPILOT_SETTINGS_PAGESPEED_KEY_FIELD . '_clear'] ?? null) !== null) {
+        delete_option(wppilot_settings_pagespeed_option());
+        return;
+    }
+    $raw = $post[WPPILOT_SETTINGS_PAGESPEED_KEY_FIELD] ?? '';
+    // Google API keys are letters, digits, "-" and "_"; anything else is a paste accident.
+    $key = is_string($raw) ? (string) preg_replace('/[^A-Za-z0-9_\-]/', '', $raw) : '';
+    if ($key !== '') {
+        update_option(wppilot_settings_pagespeed_option(), substr($key, offset: 0, length: 200), autoload: false);
+    }
 }
 
 /**
@@ -286,9 +346,33 @@ function wppilot_render_settings_field(array $field): void
             <?php if ($help !== '') { ?>
                 <p class="wppilot-setting__help"><?php echo esc_html($help); ?></p>
             <?php } ?>
+            <?php if (is_array($field['link'] ?? null) && is_string($field['link']['url'] ?? null)) { ?>
+                <p class="wppilot-setting__help"><a href="<?php echo esc_url((string) $field['link']['url']); ?>" target="_blank" rel="noopener noreferrer"><?php
+                echo esc_html((string) ($field['link']['text'] ?? $field['link']['url'])); ?></a></p>
+            <?php } ?>
         </div>
         <div class="wppilot-setting__control">
-            <?php if ($type === 'select') {
+            <?php if ($type === 'secret') {
+                $saved = ($field['value'] ?? false) === true;
+                ?>
+                <input
+                    type="password"
+                    id="<?php echo esc_attr($id); ?>"
+                    name="<?php echo esc_attr($name); ?>"
+                    value=""
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="regular-text"
+                    placeholder="<?php echo esc_attr($saved ? __('Saved. Leave blank to keep it.', domain: 'wppilot') : __('Not set', domain: 'wppilot')); ?>"
+                >
+                <?php if ($saved) { ?>
+                    <label>
+                        <input type="checkbox" name="<?php echo esc_attr($name . '_clear'); ?>" value="1">
+                        <?php esc_html_e('Remove the saved key', domain: 'wppilot'); ?>
+                    </label>
+                <?php } ?>
+            <?php
+            } elseif ($type === 'select') {
                 $options = is_array($field['options'] ?? null) ? $field['options'] : [];
                 ?>
                 <select id="<?php echo esc_attr($id); ?>" name="<?php echo esc_attr($name); ?>">

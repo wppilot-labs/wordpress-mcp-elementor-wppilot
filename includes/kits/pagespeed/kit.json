@@ -1,0 +1,37 @@
+{
+    "slug": "pagespeed",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\Pagespeed",
+    "tier": "free",
+    "runtime": "^1.2",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "kits": [
+            "site-kit-sharing"
+        ],
+        "vendor_floors": {
+            "Site Kit by Google": "1.189"
+        }
+    },
+    "categories": {
+        "performance": {
+            "label": "Performance",
+            "description": "Measure how fast this site's pages load with Google PageSpeed Insights: Lighthouse scores, lab metrics, Core Web Vitals field data and the opportunities that would save the most time. Read-only; needs no Google key from the site owner."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/pagespeed-check",
+            "readonly": true,
+            "destructive": false,
+            "ledger": "self"
+        }
+    ],
+    "skills": [
+        "pagespeed"
+    ],
+    "tests": [
+        "tests/Unit/Kits/Pagespeed"
+    ]
+}

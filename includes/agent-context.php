@@ -85,6 +85,46 @@ function wppilot_build_building_context_lines(): array
 }
 
 /**
+ * Markdown lines on measuring speed, and the one-time Site Kit sharing offer.
+ *
+ * The offer is a line in the instructions rather than something the reads push on every call:
+ * an agent told once what `fix` means asks the person once, where a hint repeated in every result
+ * turns into a question asked on every turn. It is only included while Site Kit is active and at
+ * least one of its three modules is not yet shared with Administrators; after that it has nothing
+ * to offer.
+ *
+ * @return list<string>
+ */
+function wppilot_build_speed_context_lines(): array
+{
+    $lines = [
+        '## Page speed',
+        '',
+        'Measure a page with `wppilot/pagespeed-check` (Google PageSpeed Insights: scores, lab metrics, field data, opportunities). It needs no Google API key from the user.',
+    ];
+
+    if (!defined('GOOGLESITEKIT_VERSION')) {
+        return $lines;
+    }
+
+    /** @var mixed $sharing */
+    $sharing = get_option('googlesitekit_dashboard_sharing', default_value: []);
+    $unshared = false;
+    foreach (['search-console', 'analytics-4', 'pagespeed-insights'] as $module) {
+        $roles = is_array($sharing) && is_array($sharing[$module]['sharedRoles'] ?? null) ? $sharing[$module]['sharedRoles'] : [];
+        if (!in_array('administrator', $roles, strict: true)) {
+            $unshared = true;
+        }
+    }
+    if ($unshared) {
+        $lines[] = '';
+        $lines[] = 'Site Kit by Google is active, and some of its data is not shared with Administrators. When a Site Kit read or a PageSpeed check returns `fix` naming `wppilot/site-kit-enable-sharing`, offer once to turn on read-only Site Kit dashboard sharing for Administrators, and run it (confirm=true) only if the user agrees. If they decline, do not offer it again in this conversation.';
+    }
+
+    return $lines;
+}
+
+/**
  * Build the MCP server instructions sent to AI agents during initialization.
  *
  * Includes environment info (PHP/WP versions, plugins) and guidance on using
@@ -152,6 +192,8 @@ function wppilot_build_server_instructions()
     ]);
 
     $lines = array_merge($lines, wppilot_build_building_context_lines());
+    $lines[] = '';
+    $lines = array_merge($lines, wppilot_build_speed_context_lines());
 
     return implode("\n", $lines);
 }

@@ -179,7 +179,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 
 ## What the free plugin can do
 
-229 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup and security abilities register only while their plugin is active, and developer abilities only under Developer Full Access, so a fresh install with none of those plugins registers 165 on the default profile. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
+231 registered abilities, plus one MCP prompt per skill you save. The WooCommerce, SEO, form, backup, security and Site Kit abilities register only while their plugin is active, and developer abilities only under Developer Full Access, so a fresh install with none of those plugins registers 166 on the default profile. The WordPress ones are grouped under a single **WordPress** category in the Abilities screen and can be switched off individually.
 
 | Domain | Abilities | What it covers |
 | --- | --- | --- |
@@ -212,6 +212,7 @@ Every ledger entry names the agent behind the write, not only the WordPress user
 | **SEO** | `14` | One post's SEO title, meta description and robots in Yoast SEO, Rank Math, All in One SEO, SEOPress, The SEO Framework, Slim SEO and SmartCrawl, read and set with undo. Pro adds focus keywords, canonicals, social previews, schema, redirects and bulk SEO. |
 | **Forms** | `8` | List the forms of WPForms, Contact Form 7, Gravity Forms and Forminator and read their entries with email addresses, phone numbers and sensitive fields withheld. Pro adds full values, exports and form editing. |
 | **Backups and security** | `5` | Backup status and history (UpdraftPlus, Duplicator, BackWPup, All-in-One WP Migration); security plugin status, scan findings and lockouts with IPs shown as networks (Wordfence, Solid Security). Pro starts backups, holds risky calls until a fresh backup exists, hardens settings and blocks IPs. |
+| **Page speed** | `2` | Google PageSpeed Insights for any page of the site - Lighthouse scores, lab metrics, Core Web Vitals field data and the opportunities that save the most time - with no Google key needed: Site Kit answers when it can, WPPilot Cloud otherwise, and a key of your own is optional. With Site Kit by Google active, turn on its read-only dashboard sharing for Administrators, undoably. |
 | **Scheduled audits** | `5` | Routines that run the accessibility, content and alt-text audits on a schedule, store each report, compare it with the last and email what changed. |
 | **Developer** | `13` | PHP execution, WP-CLI, filesystem and temporary admin access. Blocked outside Developer Full Access, and excluded entirely from the WordPress.org build. |
 
@@ -255,7 +256,7 @@ The dividing line is simple: free can **edit** an Elementor page, Pro can **comp
 
 ## WPPilot Pro: plugin-aware abilities across 89 integrations
 
-The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **229 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
+The free plugin in this repository is a complete WordPress MCP server: connection, authentication, safety profiles, Gutenberg workflows, **Elementor editing**, the design system, diagnostics, change evidence and **231 abilities**, including the whole WordPress core surface: content, taxonomies, media, comments, revisions, menus, user reads, allowlisted settings and the plugin/theme lifecycle. Free needs no licence, entitlement service or Pro install.
 
 [**WPPilot Pro**](https://wppilot.co/pro) adds **plugin-aware abilities across 89 integrations** (the plugins, themes and builders in the table below plus [26 caching and optimization layers](https://wppilot.co/solutions/performance)), typed operations that understand each plugin's own data model rather than writing generic content. Modules load only when their plugin is detected, and each loads in isolation, so a missing or broken plugin cannot stop the rest of the registry from registering.
 
@@ -397,7 +398,7 @@ Those are [WPPilot Pro](https://wppilot.co/pro), which registers builder-aware a
 Yes, in [WPPilot Pro](https://wppilot.co/pro). Products, variations, orders, coupons and stock become typed abilities on the same endpoint, capability-checked against the connected WordPress user - an agent connected as a shop manager cannot do what that account could not do by hand. Anything touching money is classed destructive, so it needs explicit confirmation and lands in the change ledger with rollback.
 
 **Do I need Pro to use this?**
-No. The free plugin in this repository is a complete WordPress MCP server with 229 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
+No. The free plugin in this repository is a complete WordPress MCP server with 231 abilities - including Elementor editing and the design system - and it needs no licence, activation key or entitlement service. Pro is additive.
 
 **Can an agent build an Elementor page with the free plugin?**
 It can build one element at a time, which is what `elementor-add-element`, `elementor-edit-element` and `elementor-set-content` are for, and the design system in free gives it the palette, the type and spacing ladders and the compositions to build against. The single-call whole-page builders, `elementor-build-page` and `elementor-build-from-spec`, are Pro.

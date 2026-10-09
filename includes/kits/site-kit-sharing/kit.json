@@ -1,0 +1,40 @@
+{
+    "slug": "site-kit-sharing",
+    "version": "1.0.0",
+    "namespace": "WPPilot\\Kits\\SiteKitSharing",
+    "tier": "free",
+    "runtime": "^1.2",
+    "requires": {
+        "php": "8.0",
+        "wp": "6.9",
+        "vendor_floors": {
+            "Site Kit by Google": "1.189"
+        }
+    },
+    "vendor_storage": {
+        "option": [
+            "googlesitekit_dashboard_sharing",
+            "googlesitekit_pagespeed-insights_settings"
+        ]
+    },
+    "categories": {
+        "site-kit": {
+            "label": "Site Kit by Google",
+            "description": "Abilities for Site Kit by Google: its Dashboard sharing, which decides which WordPress roles may read Search Console, Analytics and PageSpeed Insights data through the owner's Google account. No Google token is read or stored."
+        }
+    },
+    "abilities": [
+        {
+            "name": "wppilot/site-kit-enable-sharing",
+            "readonly": false,
+            "destructive": true,
+            "ledger": "restore:kits/site-kit-sharing"
+        }
+    ],
+    "skills": [
+        "site-kit-sharing"
+    ],
+    "tests": [
+        "tests/Unit/Kits/SiteKitSharing"
+    ]
+}
